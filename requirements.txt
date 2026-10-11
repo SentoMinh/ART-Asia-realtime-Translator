@@ -1,0 +1,19 @@
+# The app (Python 3.12). Install into .venv-app:  uv pip install -r requirements.txt
+PySide6>=6.11
+numpy>=2
+proc-tap>=1.1.1          # VRChat-only sound capture (Windows 10 2004 or newer)
+sounddevice>=0.5         # microphone
+PyAudioWPatch>=0.2.12.7; sys_platform == 'win32'  # selected output device loopback
+soxr>=1.1                # resampling to 16 kHz
+onnxruntime>=1.20        # runs the voice detector (engine/assets/silero_vad_v6.onnx)
+httpx>=0.28              # the online hearing and translating services
+zhconv>=1.4              # simplified / traditional Chinese
+
+# only for "This PC (Whisper)" on an NVIDIA GPU:
+faster-whisper>=1.2
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
+
+# development
+pytest
+pyinstaller

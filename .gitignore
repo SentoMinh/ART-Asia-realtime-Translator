@@ -1,0 +1,21 @@
+# Python environments and the tool that makes them
+.venv/
+.venv-app/
+.tools/
+
+# caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# build output (the zip goes to the GitHub release, not into git)
+build/
+dist/
+*.spec
+
+# benchmark sound clips and downloads (re-made by bench/prepare_data.py)
+bench/data/
+
+# keys never belong here; they live in %APPDATA%
+*key*.txt
+.env

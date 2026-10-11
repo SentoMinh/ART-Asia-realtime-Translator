@@ -1,0 +1,497 @@
+"""The main window: status and switches on top, the chat log, and the text box."""
+from __future__ import annotations
+
+import ctypes
+import sys
+from ctypes import wintypes
+
+from PySide6.QtCore import QRectF, QSize, Qt, QTimer
+from PySide6.QtGui import QAction, QActionGroup, QColor, QCursor, QGuiApplication, QPainter, QPen
+from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit,
+                               QMenu, QPushButton, QToolButton, QVBoxLayout, QWidget)
+
+from . import config, i18n, theme
+from .backend import AUTO, LANGS, PICK_LANGS, Backend, Status, Utterance
+from .config import Settings
+from .i18n import tr
+from .log_view import SHORT, LogView
+from .settings_window import SettingsWindow, fill_lang_combo, retranslate_lang_combo, select_data
+from .widgets import LevelBar
+from vrc.audio import input_devices, output_devices
+
+GRIP = 6          # px at the window edge that resize it
+SHADOW_BELOW = 50  # backdrop % under which the letters get a dark shadow instead of a background
+WM_NCHITTEST = 0x0084
+HT = {(-1, -1): 13, (0, -1): 12, (1, -1): 14, (-1, 0): 10, (1, 0): 11,
+      (-1, 1): 16, (0, 1): 15, (1, 1): 17}   # HTTOPLEFT, HTTOP, … HTBOTTOMRIGHT
+
+
+class TitleBar(QWidget):
+    """Drag it to move the window; double-click to maximise."""
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self.window().windowHandle():
+            self.window().windowHandle().startSystemMove()
+
+    def mouseDoubleClickEvent(self, event):
+        self.window().toggle_maximized()
+
+
+class MainWindow(QWidget):
+    def __init__(self, backend: Backend, settings: Settings, save=config.save):
+        super().__init__()
+        self.backend = backend
+        self.settings = settings
+        self._save = save
+        self._dialog: SettingsWindow | None = None
+        self._tips: list[tuple[QWidget, str]] = []     # (widget, English tooltip), for retranslating
+        self._labels: list[tuple[QLabel, str]] = []
+        self._status = Status("warn", "Starting…", "")
+        i18n.set_lang(settings.ui_lang)
+        self.setWindowTitle("VRChat Translator")
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setMinimumSize(*config.MIN_SIZE)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(GRIP + 4, GRIP + 2, GRIP + 4, GRIP + 4)
+        root.setSpacing(6)
+        self.bars = QFrame()
+        self.bars.setObjectName("bars")
+        bars = QVBoxLayout(self.bars)
+        bars.setContentsMargins(4, 2, 2, 4)
+        bars.setSpacing(4)
+        self.log = LogView()
+        bars.addWidget(self._build_title_bar())
+        bars.addWidget(self._build_lang_row())
+        root.addWidget(self.bars)
+        root.addWidget(self.log, 1)
+        root.addWidget(self._build_input_bar())
+
+        backend.status_changed.connect(self.show_status)
+        backend.mic_level.connect(self.mic_bar.set_level)
+        backend.speaker_level.connect(self.speaker_bar.set_level)
+        backend.utterance.connect(self.show_utterance)
+
+        self._hover = QTimer(self)
+        self._hover.timeout.connect(self._check_hover)
+        self._hover.start(250)
+
+        self.resize(settings.w, settings.h)
+        self._place()
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, settings.always_on_top)
+        self._retranslate()
+        self._apply()
+        backend.apply_settings(settings)
+        self._refresh_send_target()
+
+    # ---- building -------------------------------------------------------
+
+    def _button(self, name: str, tip: str, slot, object_name: str = "") -> QToolButton:
+        button = QToolButton()
+        button.setIcon(theme.icon(name))
+        button.setIconSize(QSize(18, 18))
+        button.setCursor(Qt.PointingHandCursor)
+        if slot:
+            button.clicked.connect(slot)
+        if tip:
+            self._tips.append((button, tip))
+        if object_name:
+            button.setObjectName(object_name)
+        return button
+
+    def _build_title_bar(self) -> QWidget:
+        bar = TitleBar()
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(4, 0, 0, 0)
+        row.setSpacing(4)
+        self.dot = QLabel()
+        self.dot.setFixedSize(8, 8)
+        self.status = QLabel()
+        self.status.setObjectName("dim")
+        self.mic_button = self._button("mic", "", lambda: self._flip("mic_on"))
+        self.mic_device_button = self._audio_picker("mic_device", "Microphone input")
+        self.mic_bar = LevelBar()
+        self.mic_bar.setFixedWidth(38)
+        self.speaker_button = self._button("speaker", "", lambda: self._flip("subtitles_on"))
+        self.speaker_device_button = self._audio_picker("speaker_device", "Subtitle audio source")
+        self.speaker_bar = LevelBar()
+        self.speaker_bar.setFixedWidth(38)
+        self.vad_button = self._button("wave", "", lambda: self._flip("vad_on"))
+        self.delay = QLabel()
+        self.delay.setObjectName("dim")
+        self._tips.append((self.delay, "How long the last translation took"))
+        # the globe: the language of the window itself
+        self.ui_lang_button = self._button("globe", "Language of the window", None)
+        self.ui_lang_button.setPopupMode(QToolButton.InstantPopup)
+        self.ui_lang_button.setStyleSheet("QToolButton::menu-indicator { image: none; }")
+        menu = QMenu(self.ui_lang_button)
+        group = QActionGroup(menu)
+        self.ui_lang_actions: dict[str, QAction] = {}
+        for code, name in i18n.UI_LANGS.items():
+            action = menu.addAction(name)
+            action.setCheckable(True)
+            action.triggered.connect(lambda _checked=False, code=code: self._ui_lang_picked(code))
+            group.addAction(action)
+            self.ui_lang_actions[code] = action
+        self.ui_lang_button.setMenu(menu)
+        self.pin_button = self._button("pin", "", lambda: self._flip("always_on_top"))
+        row.addWidget(self.dot)
+        row.addWidget(self.status)
+        row.addSpacing(8)
+        row.addWidget(self.mic_device_button)
+        row.addWidget(self.mic_button)
+        row.addWidget(self.mic_bar)
+        row.addSpacing(6)
+        row.addWidget(self.speaker_device_button)
+        row.addWidget(self.speaker_button)
+        row.addWidget(self.speaker_bar)
+        row.addSpacing(6)
+        row.addWidget(self.vad_button)
+        row.addStretch(1)
+        row.addWidget(self.delay)
+        row.addSpacing(4)
+        row.addWidget(self.ui_lang_button)
+        row.addWidget(self.pin_button)
+        row.addWidget(self._button("gear", "Settings", self.open_settings))
+        row.addWidget(self._button("min", "Minimise", self.showMinimized))
+        row.addWidget(self._button("max", "Maximise", self.toggle_maximized))
+        row.addWidget(self._button("close", "Close", self.close, "close"))
+        return bar
+
+    def _audio_picker(self, setting: str, tip: str) -> QToolButton:
+        button = self._button("down", tip, None)
+        button.setIconSize(QSize(16, 16))
+        button.setFixedWidth(18)
+        button.setPopupMode(QToolButton.InstantPopup)
+        button.setStyleSheet("QToolButton::menu-indicator { image: none; }")
+        menu = QMenu(button)
+        menu.aboutToShow.connect(lambda: self._fill_audio_menu(menu, setting))
+        button.setMenu(menu)
+        return button
+
+    def _fill_audio_menu(self, menu: QMenu, setting: str) -> None:
+        menu.clear()
+        selected = getattr(self.settings, setting)
+        microphone = setting == "mic_device"
+        devices = input_devices() if microphone else output_devices()
+        choices = [("", tr("Windows default") if microphone else "VRChat")]
+        choices.extend((name, name.removesuffix(" [Loopback]")) for name in devices)
+        if selected and selected not in devices:
+            choices.append((selected, f"{selected} ({tr('Unavailable')})"))
+        for value, label in choices:
+            action = menu.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(value == selected)
+            action.setData(value)
+            action.setEnabled(not value or value in devices)
+            action.triggered.connect(lambda _checked=False, value=value: self._audio_picked(setting, value))
+
+    def _audio_picked(self, setting: str, device: str) -> None:
+        setattr(self.settings, setting, device)
+        self.settings_changed()
+
+    def _build_lang_row(self) -> QWidget:
+        box = QWidget()
+        row = QHBoxLayout(box)
+        row.setContentsMargins(4, 0, 0, 0)
+        row.setSpacing(6)
+        self.my_lang = QComboBox()
+        fill_lang_combo(self.my_lang, with_auto=False)
+        self.my_lang.currentIndexChanged.connect(self._lang_picked)
+        self.their_lang = QComboBox()
+        fill_lang_combo(self.their_lang, with_auto=True)
+        self.their_lang.currentIndexChanged.connect(self._lang_picked)
+        self._tips.extend([
+            (self.my_lang, "Your language. Subtitles are translated into it."),
+            (self.their_lang, "Your microphone is translated into this language. Auto-detect uses the "
+                              "language heard last. Typed text uses the Send menu."),
+        ])
+        self.swap_button = self._button("swap", "Swap the two languages", self._swap)
+        for text, widget in (("I speak", self.my_lang), ("", self.swap_button),
+                             ("They speak", self.their_lang)):
+            if text:
+                label = QLabel(text)
+                label.setObjectName("dim")
+                self._labels.append((label, text))
+                row.addWidget(label)
+            row.addWidget(widget)
+        row.addStretch(1)
+        row.addWidget(self._button("trash", "Clear the chat log", self.log.clear))
+        return box
+
+    def _build_input_bar(self) -> QWidget:
+        self.input_bar = QFrame()
+        self.input_bar.setObjectName("inputBar")
+        row = QHBoxLayout(self.input_bar)
+        row.setContentsMargins(12, 6, 6, 6)
+        row.setSpacing(10)
+        self.input = QLineEdit()
+        self.input.returnPressed.connect(self.send_typed)
+        self.send_button = QPushButton("Send")
+        self.send_button.setObjectName("send")
+        self.send_button.setCursor(Qt.PointingHandCursor)
+        self.send_button.setEnabled(False)
+        self.send_button.clicked.connect(self.send_typed)
+        self.input.textChanged.connect(lambda text: self.send_button.setEnabled(bool(text.strip())))
+        # the arrow: which language typed text is translated into
+        self.send_lang_button = QToolButton()
+        self.send_lang_button.setObjectName("sendLang")
+        self.send_lang_button.setIcon(theme.icon("down", theme.ON_ACCENT, 14))
+        self.send_lang_button.setIconSize(QSize(14, 14))
+        self.send_lang_button.setCursor(Qt.PointingHandCursor)
+        self.send_lang_button.setPopupMode(QToolButton.InstantPopup)
+        menu = QMenu(self.send_lang_button)
+        group = QActionGroup(menu)
+        self.send_lang_actions: dict[str, QAction] = {}
+        for code in [AUTO] + list(PICK_LANGS):
+            action = menu.addAction("")
+            action.setCheckable(True)
+            action.triggered.connect(lambda _checked=False, code=code: self._send_lang_picked(code))
+            group.addAction(action)
+            self.send_lang_actions[code] = action
+        menu.aboutToShow.connect(self._refresh_send_target)
+        self.send_lang_button.setMenu(menu)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(0)
+        buttons.addWidget(self.send_button)
+        buttons.addWidget(self.send_lang_button)
+        row.addWidget(self.input, 1)
+        row.addLayout(buttons)
+        return self.input_bar
+
+    # ---- from the backend -----------------------------------------------
+
+    def show_status(self, status: Status) -> None:
+        self._status = status
+        color = theme.STATUS_COLORS.get(status.level, theme.WARN)
+        self.dot.setStyleSheet(f"background: {color}; border-radius: 4px;")
+        self.status.setText(tr(status.text))
+        self.status.setToolTip(i18n.tr_lines(status.detail))
+        self.dot.setToolTip(i18n.tr_lines(status.detail))
+
+    def show_utterance(self, utterance: Utterance) -> None:
+        self.log.add_or_update(utterance)
+        if utterance.source == "speaker" and utterance.final:
+            self._refresh_send_target()   # on Auto, the target follows the language just heard
+        if utterance.final and utterance.latency_ms is not None:
+            self.delay.setText(f"{utterance.latency_ms / 1000:.1f} s")
+
+    # ---- user actions ---------------------------------------------------
+
+    def send_typed(self) -> None:
+        text = self.input.text().strip()
+        if text:
+            self.backend.send_text(text)
+            self.input.clear()
+
+    def toggle_maximized(self) -> None:
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
+
+    def open_settings(self) -> None:
+        if self._dialog is None:
+            self._dialog = SettingsWindow(self.settings, self)
+            self._dialog.changed.connect(self.settings_changed)
+        self._dialog.sync()
+        self._dialog.show()
+        self._dialog.raise_()
+        self._dialog.activateWindow()
+
+    def _flip(self, name: str) -> None:
+        setattr(self.settings, name, not getattr(self.settings, name))
+        self.settings_changed()
+
+    def _lang_picked(self) -> None:
+        self.settings.my_lang = self.my_lang.currentData()
+        self.settings.their_lang = self.their_lang.currentData()
+        self.settings_changed()
+
+    def _send_lang_picked(self, code: str) -> None:
+        self.settings.send_lang = code
+        self.settings_changed()
+
+    def _refresh_send_target(self) -> None:
+        """The Send button names the language the next typed line goes into."""
+        choice = self.settings.send_lang
+        target = self.backend.target_lang()
+        short = SHORT.get(target, target)
+        self.send_lang_actions.get(choice, self.send_lang_actions[AUTO]).setChecked(True)
+        name = tr(LANGS.get(target, target))
+        if choice == AUTO:
+            self.send_button.setText(f"{tr('Send')} · {tr('Auto')} {short}")
+            tip = tr("Auto: translates into the language heard last from audio "
+                     "(right now: {lang})").format(lang=name)
+        else:
+            self.send_button.setText(f"{tr('Send')} · {short}")
+            tip = tr("Translates into {lang}").format(lang=name)
+        self.send_button.setToolTip(tip)
+        self.send_lang_button.setToolTip(tr("Pick the language your typed text is translated into"))
+        self.send_lang_button.setAccessibleName(tip)
+
+    def _ui_lang_picked(self, code: str) -> None:
+        self.settings.ui_lang = code
+        self.settings_changed()
+
+    def _retranslate(self) -> None:
+        """Put every fixed text of the window into the current language."""
+        for widget, text in self._tips:
+            widget.setToolTip(tr(text))
+            widget.setAccessibleName(tr(text))
+        for label, text in self._labels:
+            label.setText(tr(text))
+        self.my_lang.setAccessibleName(tr("I speak"))
+        self.their_lang.setAccessibleName(tr("They speak"))
+        retranslate_lang_combo(self.my_lang)
+        retranslate_lang_combo(self.their_lang)
+        self.input.setPlaceholderText(tr("Type a message — Enter translates and sends it"))
+        self.input.setAccessibleName(tr("Message to translate and send"))
+        for code, action in self.send_lang_actions.items():
+            action.setText(tr("Auto — the language heard last") if code == AUTO else tr(LANGS[code]))
+        for code, action in self.ui_lang_actions.items():
+            action.setChecked(code == i18n.lang())
+        self.show_status(self._status)
+        self.log.refresh()
+        if self._dialog:            # the settings window is rebuilt in the new language
+            visible, page = self._dialog.isVisible(), self._dialog.nav.currentRow()
+            self._dialog.close()
+            self._dialog.deleteLater()
+            self._dialog = None
+            if visible:
+                self.open_settings()
+                self._dialog.nav.setCurrentRow(page)
+
+    def _swap(self) -> None:
+        if self.settings.their_lang == AUTO:
+            return
+        self.settings.my_lang, self.settings.their_lang = self.settings.their_lang, self.settings.my_lang
+        self.settings_changed()
+
+    def settings_changed(self) -> None:
+        self.settings.clean()
+        self._apply()
+        if self._dialog:
+            self._dialog.sync()
+        self.backend.apply_settings(self.settings)
+        self._refresh_send_target()
+        self._save_settings()
+
+    # ---- look -----------------------------------------------------------
+
+    def _apply(self) -> None:
+        s = self.settings
+        if i18n.lang() != s.ui_lang:
+            i18n.set_lang(s.ui_lang)
+            self._retranslate()
+        self._toggle_look(self.mic_button, "mic", s.mic_on, "My mic → chatbox")
+        self._toggle_look(self.speaker_button, "speaker", s.subtitles_on, "Other players → subtitles")
+        self._toggle_look(self.vad_button, "wave", s.vad_on, "Voice detector")
+        self.mic_bar.set_active(s.mic_on)
+        self.speaker_bar.set_active(s.subtitles_on)
+        for button, label, value in (
+                (self.mic_device_button, "Microphone input", s.mic_device or tr("Windows default")),
+                (self.speaker_device_button, "Subtitle audio source", s.speaker_device or "VRChat")):
+            tip = f"{tr(label)}: {value}"
+            button.setToolTip(tip)
+            button.setAccessibleName(tip)
+        self.pin_button.setIcon(theme.icon("pin", theme.ACCENT if s.always_on_top else theme.DIM))
+        tip = tr("Always on top: on" if s.always_on_top else "Always on top: off")
+        self.pin_button.setToolTip(tip)
+        self.pin_button.setAccessibleName(tip)
+        select_data(self.my_lang, s.my_lang)
+        select_data(self.their_lang, s.their_lang)
+        self.swap_button.setEnabled(s.their_lang != AUTO)
+        # the background darkness is the only background there is: no boxes behind the rows or
+        # the buttons, so at a low setting only the letters show, with a shadow to stay readable
+        self.log.set_look(s.font_px, s.show_original, s.backdrop < SHADOW_BELOW)
+        on_top = bool(self.windowFlags() & Qt.WindowStaysOnTopHint)
+        if on_top != s.always_on_top:
+            visible = self.isVisible()
+            self.setWindowFlag(Qt.WindowStaysOnTopHint, s.always_on_top)
+            if visible:
+                self.show()   # changing the flag hides the window
+        if not s.auto_hide_bars:
+            self._show_bars(True)
+        self.update()
+
+    @staticmethod
+    def _toggle_look(button: QToolButton, name: str, on: bool, what: str) -> None:
+        button.setIcon(theme.icon(name if on else name + "_off", theme.TEXT if on else theme.ERROR))
+        template = "{what}: on (click to turn off)" if on else "{what}: off (click to turn on)"
+        tip = tr(template).format(what=tr(what))
+        button.setToolTip(tip)
+        button.setAccessibleName(tip)
+
+    def bars_shown(self) -> bool:
+        return not self.bars.isHidden()
+
+    def _show_bars(self, visible: bool) -> None:
+        if self.bars_shown() != visible:
+            self.bars.setVisible(visible)
+            self.input_bar.setVisible(visible)
+            self.update()
+
+    def _check_hover(self) -> None:
+        if not self.settings.auto_hide_bars:
+            return
+        busy = (QApplication.activePopupWidget() is not None or self.input.hasFocus()
+                or bool(QGuiApplication.mouseButtons()))
+        self._show_bars(busy or self.frameGeometry().contains(QCursor.pos()))
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        bars = self.bars_shown()
+        alpha = round(255 * self.settings.backdrop / 100)
+        if bars:
+            alpha = max(alpha, 1)   # alpha 0 lets clicks fall through to the game
+        painter.setBrush(QColor(11, 11, 13, alpha))
+        painter.setPen(QPen(QColor(255, 255, 255, 40)) if bars or alpha else Qt.NoPen)
+        painter.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 10, 10)
+
+    # ---- window ---------------------------------------------------------
+
+    def _place(self) -> None:
+        s = self.settings
+        if (s.x, s.y) != (-1, -1) and QGuiApplication.screenAt(
+                self.rect().translated(s.x, s.y).center()):
+            self.move(s.x, s.y)
+            return
+        area = QGuiApplication.primaryScreen().availableGeometry()
+        self.move(area.right() - self.width() - 40, area.bottom() - self.height() - 60)
+
+    def _save_settings(self) -> None:
+        try:
+            self._save(self.settings)
+        except OSError:
+            pass   # a read-only settings file must not break the window
+
+    def closeEvent(self, event):
+        box = self.normalGeometry() if self.isMaximized() else self.geometry()
+        self.settings.x, self.settings.y = box.x(), box.y()
+        self.settings.w, self.settings.h = box.width(), box.height()
+        self._save_settings()
+        super().closeEvent(event)
+
+    def nativeEvent(self, event_type, message):
+        # the window has no frame, so Windows is told which edge the mouse is on
+        if sys.platform == "win32" and event_type == b"windows_generic_MSG" and not self.isMaximized():
+            msg = wintypes.MSG.from_address(int(message))
+            if msg.message == WM_NCHITTEST:
+                code = self._edge_code(msg)
+                if code:
+                    return True, code
+        return super().nativeEvent(event_type, message)
+
+    @staticmethod
+    def _edge_code(msg) -> int:
+        x = ctypes.c_short(msg.lParam & 0xFFFF).value
+        y = ctypes.c_short((msg.lParam >> 16) & 0xFFFF).value
+        rect = wintypes.RECT()
+        ctypes.windll.user32.GetWindowRect(msg.hWnd, ctypes.byref(rect))
+        grip = max(GRIP * ctypes.windll.user32.GetDpiForWindow(msg.hWnd) // 96, GRIP)
+        side = -1 if x < rect.left + grip else (1 if x >= rect.right - grip else 0)
+        level = -1 if y < rect.top + grip else (1 if y >= rect.bottom - grip else 0)
+        return HT.get((side, level), 0)
