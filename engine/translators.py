@@ -22,7 +22,7 @@ from pathlib import Path
 from vrc.translate import TranslateError, chat_messages
 
 from . import services
-from .stt import mostly_chinese
+from .stt import guess_language, mostly_chinese
 
 log = logging.getLogger(__name__)
 
@@ -52,11 +52,19 @@ class ServiceTranslator:
         name = services.title(self.service)
         if self._http is None:
             import httpx
-            self._http = httpx.Client(timeout=15)
+            timeout = 60 if self.service == "custom" else 15
+            self._http = httpx.Client(timeout=timeout)
         body = {"model": self.model, "temperature": 0, "max_tokens": 1024,
                 "messages": chat_messages(text, target, likely_source, heard=heard)}
+        direct = self.service == "custom" and self.model == "nllb-200-ct2"
         try:
-            answer = services.post_chat(self._http, self.service, body, self._plain)
+            if direct:
+                # This translation-only server accepts language codes, not chat prompts.
+                answer = self._http.post(services.setting(self.service, "url").rstrip("/") + "/translate",
+                                         json={"text": text, "source_language": likely_source or guess_language(text),
+                                               "target_language": target}, headers=services.auth(self.service))
+            else:
+                answer = services.post_chat(self._http, self.service, body, self._plain)
         except Exception as error:
             raise TranslateError(f"{name} can't be reached: {error}") from error
         if answer.status_code >= 400:
@@ -65,7 +73,10 @@ class ServiceTranslator:
                 error.wait = services.retry_after(answer)     # how long to leave it alone
             raise error
         try:
-            text_out = answer.json()["choices"][0]["message"].get("content") or ""
+            response = answer.json()
+            text_out = (response["translated_text"] if direct else response["choices"][0]["message"].get("content")) or ""
+            if not isinstance(text_out, str):
+                raise ValueError("translation is not text")
         except (ValueError, KeyError, IndexError, AttributeError) as error:
             raise TranslateError(f"{name}'s answer could not be read") from error
         if not text_out.strip():
@@ -82,11 +93,13 @@ class ServiceTranslator:
 class Chain:
     """Tries the translators in order; one that fails is skipped for a while."""
 
-    def __init__(self, translators: list[tuple[str, object]], clock=time.monotonic):
+    def __init__(self, translators: list[tuple[str, object]], clock=time.monotonic, on_switch=None):
         self._translators = translators          # (name, translator), best first
         self._clock = clock
         self._skip_until: dict[str, float] = {}
+        self._errors: dict[str, str] = {}
         self.last_used = ""                      # name of the one that answered last
+        self.on_switch = on_switch
 
     def prepare(self) -> None:
         if self._translators:
@@ -97,18 +110,25 @@ class Chain:
         problem: TranslateError | None = None
         for name, translator in self._translators:
             if self._clock() < self._skip_until.get(name, 0.0):
+                if name in self._errors:
+                    problem = TranslateError(self._errors[name])
                 continue
             try:
                 answer = translator.translate(text, target, likely_source, heard=heard)
             except TranslateError as error:
                 problem = error
+                self._errors[name] = str(error)
                 wait = getattr(error, "wait", None)      # the translator said how long
                 if wait is None:
                     limit = "limit" in str(error) or "used up" in str(error)
                     wait = LIMIT_COOL_OFF_S if limit else COOL_OFF_S
                 self._skip_until[name] = self._clock() + wait
                 continue
+            self._errors.pop(name, None)
+            prev_used = self.last_used
             self.last_used = name
+            if self.on_switch and (prev_used != name or not prev_used):
+                self.on_switch(name)
             return answer
         raise problem or TranslateError("every translator is resting after an error; try again soon")
 
@@ -120,8 +140,8 @@ def addon_folder() -> Path:
 def addon_translators(folder: Path | None = None) -> list[tuple[str, object]]:
     """Translators that exist only on this PC. Every .py file in the add-on folder that has a
     translators() function returning (name, translator) pairs is loaded, and its translators
-    are tried before the built-in ones. The program ships with that folder empty: it is how a
-    private engine stays out of the public program. A broken add-on is skipped and logged."""
+    are tried after the selected service's models. The program ships with that folder empty.
+    A broken add-on is skipped and logged."""
     found: list[tuple[str, object]] = []
     for path in sorted((folder or addon_folder()).glob("*.py")):
         name = f"vrchat_translator_addon_{path.stem}"
@@ -138,24 +158,32 @@ def addon_translators(folder: Path | None = None) -> list[tuple[str, object]]:
 
 
 class ServiceChain:
-    """This PC's add-ons first, then the models of the service picked in Settings → Models.
+    """The models picked in Settings → Models first, then this PC's add-ons as fallback.
     `pick()` says which service that is right now; it can change while the program runs."""
 
-    def __init__(self, pick=lambda: "", clock=time.monotonic, addons: list | None = None):
+    def __init__(self, pick=lambda: "", clock=time.monotonic, addons: list | None = None, on_switch=None):
         self._pick = pick
         self._clock = clock
         self._addons = addon_translators() if addons is None else addons
-        self._chains: dict[tuple, Chain] = {}     # one per service and model list, keeping its rests
+        self._chains: dict[tuple, Chain] = {}     # one per provider configuration, keeping its rests
         self.last_used = ""
+        self.on_switch = on_switch
 
     def _chain(self) -> Chain:
         service = self._pick() or services.default_service()
         models = tuple(services.translate_models(service))
-        if (service, models) not in self._chains:
-            self._chains[(service, models)] = Chain(
-                self._addons + [(f"{service}:{model}", ServiceTranslator(service, model)) for model in models],
-                self._clock)
-        return self._chains[(service, models)]
+        key = (service, models, services.setting(service, "url"), services.setting(service, "key"))
+        if key not in self._chains:
+            self._chains[key] = Chain(
+                [(f"{service}:{model}", ServiceTranslator(service, model)) for model in models] + self._addons,
+                self._clock,
+                on_switch=self._on_model_switch)
+        return self._chains[key]
+
+    def _on_model_switch(self, name: str) -> None:
+        self.last_used = name
+        if self.on_switch:
+            self.on_switch(name)
 
     def names(self) -> list[str]:
         return [name for name, _ in self._chain()._translators]
@@ -173,4 +201,6 @@ class ServiceChain:
         answer = chain.translate(text, target, likely_source, heard=heard)
         self.last_used = chain.last_used
         self.last_result = (time.monotonic(), service, models, self.last_used)
+        if self.on_switch and self.last_used:
+            self.on_switch(self.last_used)
         return answer

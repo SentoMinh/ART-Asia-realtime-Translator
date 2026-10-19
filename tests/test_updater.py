@@ -1,4 +1,4 @@
-"""The friends' program updating itself from GitHub releases (ui/updater.py), and the two editions."""
+"""Application release downloads and recovery of saved API settings."""
 from __future__ import annotations
 
 import hashlib
@@ -8,8 +8,8 @@ import pytest
 from ui import updater
 from ui.config import Settings
 
-LATEST = "https://api.github.com/repos/owner/friends-builds/releases/latest"   # conftest's edition
-FILE = "https://github.com/owner/friends-builds/releases/download/v0.9.9/VRChat-Translator.exe"
+LATEST = "https://api.github.com/repos/SentoMinh/ART-Asia-realtime-Translator/releases/latest"
+FILE = "https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/download/v0.9.9/VRChat-Translator.exe"
 
 
 class Answer:
@@ -89,11 +89,6 @@ def test_a_damaged_download_is_thrown_away(program):
     assert not updater.beside(program, ".new").exists() and not updater.beside(program, ".part").exists()
 
 
-def test_the_public_program_never_looks_for_updates(program, public_edition):
-    http = Http(release(b"x"), b"x")
-    assert updater.Updater(program, "0.9.8", http=http).check() == "" and http.asked == []
-
-
 def test_the_download_takes_the_program_s_place_at_the_next_start(program, monkeypatch):
     monkeypatch.setenv("_PYI_APPLICATION_HOME_DIR", r"C:\Temp\_MEI12345")   # this copy's unpacked files
     updater.beside(program, ".new").write_bytes(b"version 0.9.9")
@@ -113,59 +108,62 @@ def test_the_source_version_has_no_program_file_to_update():
     assert updater.program_file() is None
 
 
-@pytest.fixture
-def private_updates(tmp_path, monkeypatch):
-    """The friends' edition with the developer's update service in front of a private repository."""
-    import conftest
+def test_updates_never_send_provider_keys(program):
     from engine import services
-    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
-    monkeypatch.setattr(services, "_edition", lambda: {**conftest.EDITION, "updates": "https://updates.test"})
-    return services
-
-
-def test_a_private_repository_updates_through_the_developer_s_service(program, private_updates):
+    services.save("custom", url="https://custom.test/v1", key="provider-secret")
     data = b"version 0.9.9"
-    answer = release(data)
-    answer["assets"][1]["browser_download_url"] = "https://updates.test/file"
-    http = Http(answer, data)
-    assert updater.Updater(program, "0.9.8", http=http).check() == ""      # no Dev key: not asked
-    assert http.asked == []
-    private_updates.save("dev", key="the-dev-key")
+    http = Http(release(data), data)
     assert updater.Updater(program, "0.9.8", http=http).check() == "0.9.9"
-    assert http.asked == ["https://updates.test/latest", "https://updates.test/file"]
-    assert all(h.get("Authorization") == "Bearer the-dev-key" for h in http.headers)
+    assert http.asked == [LATEST, FILE]
+    assert all("Authorization" not in headers for headers in http.headers)
 
 
-def test_the_dev_key_never_goes_to_another_address(program, private_updates):
-    private_updates.save("dev", key="the-dev-key")
-    data = b"version 0.9.9"
-    http = Http(release(data), data)                       # the file link points at GitHub
-    assert updater.Updater(program, "0.9.8", http=http).check() == "0.9.9"
-    assert "Authorization" in http.headers[0] and "Authorization" not in http.headers[1]
-
-
-# ---- the two editions ----------------------------------------------------------------------
-
-def test_the_public_edition_has_no_dev_key(public_edition):
-    services = public_edition
-    assert services.dev() == {} and services.update_source() == ""
-    assert "dev" not in services.offered() and services.default_service() == "gemini"
+def test_one_service_list_and_default_for_everyone():
+    from engine import services
+    assert "dev" not in services.SERVICES
+    assert services.offered() == tuple(services.SERVICES)
+    assert services.update_source() == "SentoMinh/ART-Asia-realtime-Translator"
     assert (Settings().hearing, Settings().translating) == ("gemini", "gemini")
-    assert Settings(hearing="dev").clean().hearing == "gemini"       # a friend's settings moved over
-    assert "no Dev key" in services.missing("dev")
 
 
-def test_the_friends_edition_reads_its_edition_file(tmp_path, monkeypatch):
+def test_legacy_selection_preserves_saved_api_settings():
+    from engine import services
+    services.save("dev", url="https://old.test/v1", key="saved-key", hear_model="hear", translate_model="chat")
+    settings = Settings(hearing="dev", translating="dev").clean()
+    assert (settings.hearing, settings.translating) == ("custom", "custom")
+    assert services.saved()["custom"] == services.saved()["dev"]
+    assert services.setting("custom", "key") == "saved-key"
+
+
+def test_legacy_selection_keeps_existing_custom_configuration():
+    from engine import services
+    services.save("dev", url="https://old.test/v1", key="old-key")
+    services.save("custom", url="https://current.test/v1", key="current-key", translate_model="current")
+    Settings(hearing="dev", translating="dev").clean()
+    assert services.saved()["custom"] == {"url": "https://current.test/v1", "key": "current-key", "translate_model": "current"}
+
+
+def test_legacy_installation_defaults_and_saved_model_overrides(tmp_path, monkeypatch):
     import json
     from engine import services
-    file = tmp_path / "edition.json"
-    file.write_text(json.dumps({"dev": {"url": "https://d.test/v1", "translate_model": "a, b"},
-                                "updates": "me/builds"}), encoding="utf-8")
-    monkeypatch.undo()                                   # the real _edition, reading EDITION_FILE
-    monkeypatch.setattr(services, "EDITION_FILE", file)
-    services._edition.cache_clear()
-    try:
-        assert services.setting("dev", "url") == "https://d.test/v1" and services.update_source() == "me/builds"
-        assert services.translate_models("dev") == ["a", "b"] and services.default_service() == "dev"
-    finally:
-        services._edition.cache_clear()
+    monkeypatch.setattr(services, "__file__", str(tmp_path / "engine" / "services.py"))
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    (assets / "edition.json").write_text(json.dumps({"dev": {
+        "url": "https://old.test/v1", "key_file": "old_key.txt",
+        "hear_model": "default-hear", "translate_model": "default-chat"}}), encoding="utf-8")
+    services.save("dev", translate_model="chosen-chat")
+    (services.models_file().parent / "old_key.txt").write_text("saved-key", encoding="utf-8")
+    Settings(hearing="dev", translating="dev").clean()
+    assert services.saved()["custom"] == {
+        "url": "https://old.test/v1", "key": "saved-key", "hear_model": "default-hear", "translate_model": "chosen-chat"}
+
+
+def test_missing_legacy_url_does_not_switch_to_an_unconfigured_provider(tmp_path, monkeypatch):
+    from engine import services
+    monkeypatch.setattr(services, "__file__", str(tmp_path / "engine" / "services.py"))
+    services.save("dev", key="saved-key", translate_model="chosen-chat")
+    settings = Settings(hearing="dev", translating="dev").clean()
+    assert settings.hearing == settings.translating == "custom"
+    assert services.setting("custom", "key") == "saved-key"
+    assert "has no address yet" in services.missing("custom")

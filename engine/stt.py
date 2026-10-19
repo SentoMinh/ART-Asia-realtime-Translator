@@ -2,7 +2,7 @@
 
 Two kinds of engine with the same interface, picked in Settings → Models:
   LocalWhisper   Whisper large-v3-turbo on this PC's GPU (2.4 GB of GPU memory, no limits)
-  CloudHearing   an online service (engine/services.py): the developer's relay, OpenAI,
+  CloudHearing   an online service (engine/services.py): Custom domain, OpenAI,
                  Gemini, Qwen, OpenRouter, or any OpenAI-compatible address
 In the benchmark Whisper heard 94-96% right on a clean mic and 87-96% with music behind the voice.
 
@@ -10,30 +10,30 @@ Language focus. With a language given, the model is held to it. Without one ("Th
 Auto-detect") the engines focus on the program's own languages: a language outside them is
 believed only when the model is at least 80% sure. Otherwise the sentence is taken as the main
 language that fits best. That stops noise and half-heard words from turning into Spanish or
-Japanese lines in a Chinese room.
+French lines in a Chinese room.
 """
 from __future__ import annotations
 
 import base64
-import importlib.util
 import io
 import json
 import math
 import os
+import sys
 import time
+import types
 import wave
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 
-from . import services
+from . import local_model, services
 
 RATE = 16000
-MAIN_LANGS = ("en", "zh", "yue", "vi")      # yue = Cantonese, which Whisper tells apart from Mandarin
+MAIN_LANGS = ("en", "zh", "yue", "vi", "ja", "ko")
 CHINESE = ("zh", "yue")
 SURE = 0.8                # a language outside MAIN_LANGS is only believed at this certainty
-ASK_AGAIN = ("en", "zh", "vi")              # what is asked again in; Cantonese goes with zh
+ASK_AGAIN = ("en", "zh", "vi", "ja", "ko")  # Cantonese goes with zh
 LANGUAGE_NAMES = {"english": "en", "chinese": "zh", "mandarin": "zh", "cantonese": "yue",
               "yue chinese": "yue", "vietnamese": "vi", "japanese": "ja", "korean": "ko",
               "spanish": "es", "french": "fr", "german": "de", "russian": "ru", "thai": "th",
@@ -47,7 +47,9 @@ PHANTOMS = ("hãy subscribe cho kênh", "ghiền mì gõ", "đừng quên đăng
             "请不吝点赞", "明镜与点点", "字幕由", "字幕by", "谢谢观看", "感谢观看", "謝謝觀看",
             "ご視聴ありがとうございました", "시청해 주셔서 감사합니다")
 # Languages with a script of their own: text claimed to be in one must be written in it.
-SCRIPTS = {"ja": ((0x3040, 0x30FF),), "ko": ((0xAC00, 0xD7AF), (0x1100, 0x11FF)),
+SCRIPTS = {"ja": ((0x3040, 0x30FF), (0xFF66, 0xFF9F), (0x4E00, 0x9FFF),
+                  (0x3400, 0x4DBF), (0xF900, 0xFAFF)),
+           "ko": ((0xAC00, 0xD7AF), (0x1100, 0x11FF), (0x3130, 0x318F)),
            "ru": ((0x0400, 0x04FF),), "uk": ((0x0400, 0x04FF),), "th": ((0x0E00, 0x0E7F),),
            "ar": ((0x0600, 0x06FF),), "hi": ((0x0900, 0x097F),)}
 # Words only Cantonese writes. Whisper can't tell Cantonese from Mandarin by sound (it calls
@@ -63,7 +65,7 @@ class SttError(Exception):
 @dataclass
 class Heard:
     text: str = ""
-    lang: str = ""            # "en", "zh", "yue", "vi", or another code Whisper found
+    lang: str = ""            # ISO language code (including yue for Cantonese)
 
 
 def looks_cantonese(text: str) -> bool:
@@ -146,22 +148,24 @@ def tidy(text: str, lang: str) -> Heard:
 
 
 def _add_gpu_libraries() -> None:
-    """faster-whisper needs NVIDIA's cuBLAS and cuDNN. They come from the pip packages
-    nvidia-cublas-cu12 / nvidia-cudnn-cu12, or from PyTorch if that is installed."""
-    folders = []
-    for package, sub in (("nvidia.cublas", "bin"), ("nvidia.cudnn", "bin"), ("torch", "lib")):
-        try:
-            spec = importlib.util.find_spec(package)
-        except (ImportError, ValueError):
-            spec = None
-        for location in (spec.submodule_search_locations or []) if spec else []:
-            folder = Path(location) / sub
-            if folder.is_dir():
-                folders.append(str(folder))
+    """faster-whisper needs NVIDIA's cuBLAS, from wherever this copy has it
+    (engine/local_model.py)."""
+    folders = local_model.gpu_folders()
     for folder in folders:
         os.add_dll_directory(folder)
-    if folders:       # cuDNN loads its parts by name later, which only looks at PATH
+    if folders:       # it is loaded by name later, which only looks at PATH
         os.environ["PATH"] = os.pathsep.join(folders + [os.environ.get("PATH", "")])
+
+
+def whisper_class():
+    """faster-whisper's model class. The program file leaves PyAV out (65 MB that only reads
+    sound files; sentences arrive here as samples), but faster-whisper imports it by name."""
+    try:
+        import av  # noqa: F401
+    except ImportError:
+        sys.modules["av"] = types.ModuleType("av")
+    from faster_whisper import WhisperModel
+    return WhisperModel
 
 
 class LocalWhisper:
@@ -174,18 +178,20 @@ class LocalWhisper:
     def load(self) -> None:
         if self._model is not None:
             return
-        if importlib.util.find_spec("faster_whisper") is None:
-            # the downloadable program leaves the local model out (it needs 2 GB of GPU libraries)
-            raise SttError("this download has no Local Model: choose an online service in "
-                           "Settings → Models (the source version adds it)")
+        problem = local_model.missing()
+        if problem:
+            raise SttError(problem)
         try:
             _add_gpu_libraries()
-            import huggingface_hub.file_download as download
-            # Without Windows developer mode the model cache can't use file links, and the
-            # library's own check for that is not thread-safe: always copy instead.
-            download.are_symlinks_supported = lambda cache_dir=None: False
-            from faster_whisper import WhisperModel
-            model = WhisperModel(self._model_id, device="cuda", compute_type="float16")
+            if local_model.ready():
+                source = str(local_model.folder() / "whisper")     # the program's own download
+            else:
+                import huggingface_hub.file_download as download
+                # Without Windows developer mode the model cache can't use file links, and the
+                # library's own check for that is not thread-safe: always copy instead.
+                download.are_symlinks_supported = lambda cache_dir=None: False
+                source = self._model_id                            # faster-whisper fetches it
+            model = whisper_class()(source, device="cuda", compute_type="float16")
             # the first run on a GPU is slow (2 s instead of 0.6 s): spend it on silence now
             list(model.transcribe(np.zeros(RATE, dtype="float32"), language="en", beam_size=1)[0])
             self._model = model
@@ -244,7 +250,7 @@ class CloudHearing:
     """Hearing through an online service, chosen by its id in engine/services.py. The address,
     key and model are read again for every sentence, so a change in Settings works at once."""
 
-    def __init__(self, service: str = "dev", http=None, clock=time.monotonic):
+    def __init__(self, service: str = "gemini", http=None, clock=time.monotonic):
         self.name = service
         self._http = http
         self._clock = clock
@@ -264,7 +270,8 @@ class CloudHearing:
             raise SttError(problem)
         if self._http is None:
             import httpx
-            self._http = httpx.Client(timeout=20)
+            timeout = 60 if self.name == "custom" else 20
+            self._http = httpx.Client(timeout=timeout)
 
     def transcribe(self, samples: np.ndarray, lang: str | None, prefer: tuple = ()) -> Heard:
         """`prefer`: the main languages most likely here (heard last, the user's own), tried
@@ -278,7 +285,7 @@ class CloudHearing:
         if lang is not None:
             return self._ask(samples, lang)[0]
         heard, certainty = self._ask(samples, None)
-        if not heard.text or heard.lang in MAIN_LANGS:
+        if not heard.text or (heard.lang in MAIN_LANGS and in_own_script(heard.text, heard.lang)):
             return heard
         if certainty is None:
             # this service gives no certainty: its language is taken when the words are

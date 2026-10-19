@@ -1,4 +1,4 @@
-"""Model discovery and status must work in both release editions."""
+"""Model discovery and status must work in the single app."""
 import os
 from types import SimpleNamespace
 
@@ -7,6 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import httpx
 import pytest
 from PySide6.QtCore import QTimer
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QWidget
 
 from engine import services
@@ -23,9 +24,15 @@ def model_ui(tmp_path, monkeypatch):
     yield app
 
 
-@pytest.mark.parametrize("friends", [False, True])
-def test_discover_pick_and_save_in_both_editions(model_ui, monkeypatch, friends):
-    monkeypatch.setattr(services, "dev", lambda: {"hear_model": "friend-hearing"} if friends else {})
+def wait_for_fetch(dialog):
+    for _ in range(200):
+        QTest.qWait(10)
+        if not dialog._fetching:
+            return
+    pytest.fail("Model fetch did not finish")
+
+
+def test_discover_pick_and_save_custom_models(model_ui, monkeypatch):
     requests = []
 
     def respond(request):
@@ -38,6 +45,7 @@ def test_discover_pick_and_save_in_both_editions(model_ui, monkeypatch, friends)
         dialog = ServiceDialog("custom", http=http)
         dialog.url.setText("https://models.example")
         dialog.fetch_models()
+        wait_for_fetch(dialog)
         assert "Found 2 models" in dialog.result.text()
         assert [r.url.path for r in requests] == ["/models", "/v1/models"]
         assert all("authorization" not in r.headers for r in requests)
@@ -56,17 +64,17 @@ def test_fetch_error_can_be_retried(model_ui, monkeypatch):
         raise TimeoutError("timed out")
     monkeypatch.setattr(services, "fetch_models", fail)
     dialog.fetch_models()
+    wait_for_fetch(dialog)
     assert "Timed out" in dialog.result.text()
     assert dialog.fetch_btn.isEnabled()
     monkeypatch.setattr(services, "fetch_models", lambda *a, **kw: ["recovered"])
     dialog.fetch_models()
+    wait_for_fetch(dialog)
     assert dialog.hear_picker.findData("recovered") > 0
     dialog.deleteLater()
 
 
-@pytest.mark.parametrize("friends", [False, True])
-def test_labels_refresh_and_ignore_old_configuration(model_ui, monkeypatch, friends):
-    monkeypatch.setattr(services, "dev", lambda: {"hear_model": "friend-hearing"} if friends else {})
+def test_labels_refresh_and_ignore_old_configuration(model_ui, monkeypatch):
     settings = Settings(hearing="custom", translating="custom")
     services.save("custom", url="https://models.example/v1", hear_model="hearing<one>", translate_model="first, second")
     parent = QWidget()
@@ -84,6 +92,8 @@ def test_labels_refresh_and_ignore_old_configuration(model_ui, monkeypatch, frie
     from PySide6.QtTest import QTest
     QTest.qWait(650)
     assert "second" in dialog._translating_desc.text()
+    parent.backend.current_translating_service = "custom"
+    parent.backend.current_translating_model = "second"
     services.save("custom", hear_model="new-hearing", translate_model="new-model")
     dialog.sync()
     assert "new-hearing" in dialog._hearing_desc.text()

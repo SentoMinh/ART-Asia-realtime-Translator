@@ -1,14 +1,7 @@
-"""Updates for the program file (VRChat-Translator.exe) that friends are given.
+"""Download application releases from GitHub and apply them on the next start.
 
-At every start the friends' program asks where its edition file says (engine/services.py →
-update_source()) for the newest release: the developer's own update service, which reads the
-private GitHub repository and answers only to a known Dev key, or a public GitHub repository
-("owner/name"). When that release is newer and has an .exe attached, the file is downloaded
-next to the program in the background (<name>.exe.part, then .new once its size and SHA-256 are
-right) and takes the old one's place the next time the program starts.
-
-The source version updates through git instead (tools/update.py), and the public program has
-no edition file, so for both this does nothing.
+Source checkouts update through tools/update.py instead. Provider credentials are never
+used to check for or download application updates.
 """
 from __future__ import annotations
 
@@ -101,15 +94,8 @@ class Updater:
             import httpx
             http = httpx.Client(timeout=httpx.Timeout(20, read=60), follow_redirects=True)
         headers = {"Accept": "application/vnd.github+json", "User-Agent": "VRChat-Translator"}
-        if source.startswith("https://"):
-            # the developer's update service: it lets in programs that hold a Dev key it knows
-            key = services.setting("dev", "key")
-            if not key:
-                return ""
-            latest, mine = f"{source.rstrip('/')}/latest", {**headers, "Authorization": f"Bearer {key}"}
-        else:
-            latest, mine = f"https://api.github.com/repos/{source}/releases/latest", headers
-        answer = http.get(latest, headers=mine)
+        latest = f"https://api.github.com/repos/{source}/releases/latest"
+        answer = http.get(latest, headers=headers)
         if answer.status_code != 200:
             return ""
         release = answer.json()
@@ -127,8 +113,7 @@ class Updater:
         part = beside(self.program, ".part")
         digest, received = hashlib.sha256(), 0
         link = str(asset["browser_download_url"])
-        # the Dev key goes only to the service that asked for it, never to another address
-        with http.stream("GET", link, headers=mine if link.startswith(source) else headers) as stream:
+        with http.stream("GET", link, headers=headers) as stream:
             if stream.status_code != 200:
                 return ""
             with open(part, "wb") as out:

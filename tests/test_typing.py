@@ -218,7 +218,7 @@ class Hears:
 
 
 def engine(window, hears):
-    return SpeechEngine(window, engines={"local": hears, "dev": hears}, translator=Upper(),
+    return SpeechEngine(window, engines={"local": hears, "gemini": hears}, translator=Upper(),
                         vads={MIC: LoudIsSpeech(), "speaker": LoudIsSpeech()})
 
 
@@ -234,7 +234,7 @@ def test_starting_to_talk_into_my_microphone_turns_the_dots_on():
     assert window.events == ["dots on"]
 
 
-@pytest.mark.parametrize("hears", [Hears(""), Hears(error="no Dev key yet")])
+@pytest.mark.parametrize("hears", [Hears(""), Hears(error="no provider key yet")])
 def test_a_sentence_of_mine_that_brings_no_text_turns_the_dots_off(hears):
     window = Window()
     engine(window, hears).hear(MIC, sentence())
@@ -255,6 +255,9 @@ class RoutingTranslator:
     ("en", "vi", "en", "zh", "vi"),       # sending typed English must not skip voice translation
     ("vi", "en", "zh", "vi", "en"),       # swapped voice languages
     ("en", "yue", "zh", "vi", "yue"),     # Cantonese is separate from Mandarin
+    ("ja", "ko", "ja", "vi", "ko"),
+    ("ko", "ja", "ko", "en", "ja"),
+    ("en", "auto", "ko", "ja", "ja"),
     ("en", "auto", "zh", "vi", "vi"),     # only Auto follows the last other player
     ("en", "auto", "vi", "yue", "yue"),
     ("vi", "auto", "zh", "", "en"),       # nobody heard yet: keep the English fallback
@@ -268,7 +271,7 @@ def test_voice_and_typed_messages_use_separate_languages(
     translator = RoutingTranslator()
     live._translator = translator
     hears = Hears("hello")
-    eng = SpeechEngine(live, engines={"dev": hears, "local": hears}, translator=translator,
+    eng = SpeechEngine(live, engines={"gemini": hears, "local": hears}, translator=translator,
                        clock=clock, vads={MIC: LoudIsSpeech(), SPEAKER: LoudIsSpeech()})
     finished = []
     live.utterance.connect(lambda line: finished.append(line) if line.final else None)
@@ -287,7 +290,7 @@ def test_voice_and_typed_messages_use_separate_languages(
         typed_target = last_heard if typed == "auto" else typed
         assert (text.source, text.dst_lang, text.sent) == ("typed", typed_target, True)
         assert translator.asked[-1] == ("typed hello", typed_target, mine, False)
-        voice_text = "hello" if mine == voice_target else f"{voice_target}: hello"
+        voice_text = "hello" if mine == voice_target else f"hello\n{voice_target}: hello"
         assert [text for event, text in box.events if event == "send"] == [
             voice_text, f"{typed_target}: typed hello"]
     finally:
@@ -298,7 +301,7 @@ def test_other_players_become_subtitles_in_my_language_when_typed_target_differs
     live, box, clock = backend(app, my_lang="en", their_lang="vi", send_lang="zh")
     translator = RoutingTranslator()
     hears = Hears("xin chào")
-    eng = SpeechEngine(live, engines={"dev": hears, "local": hears}, translator=translator,
+    eng = SpeechEngine(live, engines={"gemini": hears, "local": hears}, translator=translator,
                        clock=clock, vads={MIC: LoudIsSpeech(), SPEAKER: LoudIsSpeech()})
     seen = []
     live.utterance.connect(seen.append)
@@ -317,7 +320,7 @@ def test_add_speaker_words_sends_both_texts_independently_of_my_words(app, enabl
     live, box, clock = backend(app, my_lang="en", their_lang="vi", send_lang="zh", mic_on=False,
                                show_original=False, chatbox_speaker=enabled, chatbox_original=own_words)
     translator, hears = RoutingTranslator(), Hears("xin chào")
-    eng = SpeechEngine(live, engines={"dev": hears, "local": hears}, translator=translator,
+    eng = SpeechEngine(live, engines={"gemini": hears, "local": hears}, translator=translator,
                        clock=clock, vads={MIC: LoudIsSpeech(), SPEAKER: LoudIsSpeech()})
     seen = []
     live.utterance.connect(seen.append)
@@ -339,7 +342,7 @@ def test_add_speaker_words_keeps_the_original_when_translation_fails(app):
 
     live, box, clock = backend(app, my_lang="en", their_lang="vi", chatbox_speaker=True)
     hears = Hears("xin chào")
-    eng = SpeechEngine(live, engines={"dev": hears, "local": hears}, translator=Unavailable(),
+    eng = SpeechEngine(live, engines={"gemini": hears, "local": hears}, translator=Unavailable(),
                        clock=clock, vads={MIC: LoudIsSpeech(), SPEAKER: LoudIsSpeech()})
     seen = []
     live.utterance.connect(seen.append)
@@ -397,6 +400,26 @@ def test_speaker_words_report_osc_off_without_sending(app):
     try:
         line = Utterance(id=100, source=SPEAKER, original="xin chào", translation="hello", final=True)
         live.send_to_chatbox(line)
-        assert box.events == [] and line.sent is False and "OSC is off" in line.note
+        assert box.events == [] and line.sent is False
+    finally:
+        live.stop()
+
+
+
+def test_two_voice_translations_send_together_and_do_not_change_typed_target(app):
+    live, box, clock = backend(app, my_lang="en", their_lang="vi", their_lang2="ja", send_lang="ko")
+    translator = RoutingTranslator()
+    live._translator = translator
+    hears = Hears("hello")
+    eng = SpeechEngine(live, engines={"gemini": hears, "local": hears}, translator=translator,
+                       clock=clock, vads={MIC: LoudIsSpeech(), SPEAKER: LoudIsSpeech()})
+    try:
+        eng.hear(MIC, sentence())
+        assert translator.asked == [("hello", "vi", "en", True), ("hello", "ja", "en", True)]
+        assert [text for event, text in box.events if event == "send"] == ["hello\nvi: hello\nja: hello"]
+        clock.now += 2
+        live.send_text("typed hello")
+        assert translator.asked[-1] == ("typed hello", "ko", "en", False)
+        assert [text for event, text in box.events if event == "send"][-1] == "ko: typed hello"
     finally:
         live.stop()

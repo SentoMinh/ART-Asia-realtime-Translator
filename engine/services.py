@@ -8,49 +8,22 @@ them all; what differs is the address, the models, and how sound is sent:
 
 Keys and chosen models are kept in %APPDATA%\\VRChat-Translator\\models.json:
     {"openai": {"key": "...", "hear_model": "whisper-1", "translate_model": "gpt-5.4-mini"},
-     "custom": {"url": "https://.../v1", "key": "..."}, "dev": {"key": "..."}}
+     "custom": {"url": "https://.../v1", "key": "..."}}
 A model left empty there means the service's default below. Several translating models can be
 listed with commas: when one is at its limit, the next answers.
 
-The friends' edition. Only the developer's own copy, and the program built from it for friends,
-has assets/edition.json. It adds the "Dev key" service (its address and models are in that file,
-the key comes from the developer) and says where the program updates itself from (ui/updater.py):
-    {"edition": "friends",
-     "dev": {"url": "https://.../v1", "hear_model": "...", "translate_model": "a, b, c",
-             "key_file": "<an older key file in %APPDATA%\\VRChat-Translator, still read>"},
-     "updates": "https://<update service>"  or  "<owner>/<public repository>"}
-The public program has no such file: no Dev key, no self-update; everyone brings their own key.
+All users share the same app. Custom domain accepts a user-supplied API URL and key.
 """
 from __future__ import annotations
 
 import json
 import os
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
-EDITION_FILE = Path(__file__).resolve().parent.parent / "assets" / "edition.json"
-
-
-@lru_cache(maxsize=1)
-def _edition() -> dict:
-    try:
-        data = json.loads(EDITION_FILE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def dev() -> dict:
-    """The Dev key service of the friends' edition; {} in the public program."""
-    entry = _edition().get("dev")
-    return entry if isinstance(entry, dict) and entry.get("url") else {}
-
-
 def update_source() -> str:
-    """Where the friends' program gets its updates ("" = none): the developer's update service
-    (an https address, for a private repository) or a public GitHub repository ("owner/name")."""
-    return str(_edition().get("updates") or "").strip()
+    """The GitHub repository that publishes application releases."""
+    return "SentoMinh/ART-Asia-realtime-Translator"
 
 
 @dataclass(frozen=True)
@@ -70,7 +43,6 @@ class Service:
 
 
 SERVICES = {s.id: s for s in (
-    Service("dev", "Dev key", "", "", "whisper", ""),     # address and models: dev(), from edition.json
     Service("openai", "OpenAI", "https://api.openai.com/v1", "whisper-1", "whisper", "gpt-5.4-mini",
             "https://platform.openai.com/api-keys", (("reasoning_effort", "none"),)),
     Service("gemini", "Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai",
@@ -86,20 +58,19 @@ SERVICES = {s.id: s for s in (
             "google/gemini-3.5-flash-lite", "https://openrouter.ai/settings/keys"),
     Service("custom", "Custom domain", "", "", "whisper", ""),
 )}
-HEARING = ("dev", "local", "openai", "gemini", "qwen", "openrouter", "custom")   # "local": this PC
-TRANSLATING = ("dev", "openai", "gemini", "qwen", "mimo", "openrouter", "custom")
+HEARING = ("local", "openai", "gemini", "qwen", "openrouter", "custom")   # "local": this PC
+TRANSLATING = ("openai", "gemini", "qwen", "mimo", "openrouter", "custom")
 FIELDS = ("url", "key", "hear_model", "translate_model")
 
 
 def offered(choices: tuple[str, ...] = tuple(SERVICES)) -> tuple[str, ...]:
-    """The choices this copy offers: the Dev key only in the friends' edition."""
-    return tuple(choice for choice in choices if choice != "dev" or dev())
+    """The services available in the app."""
+    return tuple(choice for choice in choices if choice in SERVICES or choice == "local")
 
 
 def default_service() -> str:
-    """Friends hear and translate with the Dev key; everyone else starts with Gemini, which
-    has a free daily allowance and translated best in the benchmark."""
-    return "dev" if dev() else "gemini"
+    """New profiles start with Gemini."""
+    return "gemini"
 
 
 def models_file() -> Path:
@@ -132,20 +103,13 @@ def setting(service: str, field: str) -> str:
     value = str(entry.get(field) or "").strip() if isinstance(entry, dict) else ""
     if value:
         return value
-    if service == "dev":
-        if field != "key":
-            return str(dev().get(field) or "").strip()
-        older = str(dev().get("key_file") or "")      # where version 0.9.7 kept the Dev key
-        try:
-            return (models_file().parent / older).read_text(encoding="utf-8-sig").strip() if older else ""
-        except OSError:
-            return ""
     known = SERVICES.get(service)
     return getattr(known, field, "") if known and field != "key" else ""
 
 
 def save(service: str, **values: str) -> None:
     """Stores the given fields of one service ("" removes a field: back to the default)."""
+    global _cache
     data = dict(saved())
     entry = dict(data.get(service) or {})
     for field, value in values.items():
@@ -162,6 +126,36 @@ def save(service: str, **values: str) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
     tmp.replace(path)
+    _cache = (None, {})  # Rapid same-size writes can share a Windows file timestamp.
+
+
+def migrate_legacy_settings() -> None:
+    """Copy recoverable old API settings without overwriting a configured custom API."""
+    data = saved()
+    if data.get("custom"):
+        return
+    legacy = data.get("dev")
+    entry = dict(legacy) if isinstance(legacy, dict) else {}
+    # Older source/folder installs may still have this file. New builds never bundle it.
+    path = Path(__file__).resolve().parent.parent / "assets" / "edition.json"
+    try:
+        config = json.loads(path.read_text(encoding="utf-8-sig"))
+        defaults = config.get("dev", {}) if isinstance(config, dict) else {}
+    except (OSError, ValueError):
+        defaults = {}
+    if isinstance(defaults, dict):
+        for field in FIELDS:
+            if not entry.get(field) and isinstance(defaults.get(field), str):
+                entry[field] = defaults[field]
+        older = defaults.get("key_file")
+        if not entry.get("key") and isinstance(older, str) and Path(older).name == older:
+            try:
+                entry["key"] = (models_file().parent / older).read_text(encoding="utf-8-sig").strip()
+            except OSError:
+                pass
+    values = {field: value for field, value in entry.items() if field in FIELDS and isinstance(value, str)}
+    if values:
+        save("custom", **values)
 
 
 def ready(service: str) -> bool:
@@ -220,22 +214,19 @@ def error_message(answer) -> str:
 def failure(service: str, answer) -> str:
     """A refused request in plain words."""
     name, message = title(service), error_message(answer)
-    if service == "dev":
-        message = ""          # the service's own words would name it and show its account
     if answer.status_code == 429:
         return f"{name}: {message}" if message else f"{name}'s limit was reached"
     if answer.status_code in (401, 403):
-        if service == "dev":
-            return "the Dev key was not accepted (Settings → Models), or this network is blocked (e.g. a VPN)"
         return f"{name} did not accept the key (Settings → Models), or blocks this network (e.g. a VPN)"
     return f"{name} error {answer.status_code}" + (f": {message}" if message else "")
 
 
-def check(service: str, url: str = "", key: str = "", http=None) -> tuple[bool, str]:
+def check(service: str, url: str = "", key: str = "", http=None, *, use_saved: bool = True) -> tuple[bool, str]:
     """Asks the service whether the address and key work (typed values first, then saved
-    ones), without using up anything: its list of models."""
-    url = (url.strip() or setting(service, "url")).rstrip("/")
-    key = key.strip() or setting(service, "key")
+    ones), without using up anything: its list of models. Set use_saved=False when
+    checking a credential snapshot so an empty key stays empty."""
+    url = (url.strip() or (setting(service, "url") if use_saved else "")).rstrip("/")
+    key = key.strip() or (setting(service, "key") if use_saved else "")
     if not url:
         return False, "no address yet"
     if not key and service != "custom":
@@ -254,7 +245,7 @@ def check(service: str, url: str = "", key: str = "", http=None) -> tuple[bool, 
     if answer.status_code == 200:
         return True, "the key works" if key else "the address works"
     if answer.status_code == 404 and service == "custom":
-        return True, "the address answers (it has no model list, so the key was not checked)"
+        return False, failure(service, answer) + "; check the API base address and model-list endpoint"
     return False, failure(service, answer).replace(" (Settings → Models)", "")
 
 
@@ -309,10 +300,6 @@ def fetch_models(service: str = "custom", url: str = "", key: str = "", http=Non
 
 def missing(service: str) -> str:
     """What to do before this service works, in plain words; "" when it is ready."""
-    if service == "dev":
-        if not dev():
-            return "this version has no Dev key: choose a service in Settings → Models"
-        return "" if setting("dev", "key") else "no Dev key yet: ask the developer (Settings → Models)"
     name = SERVICES[service].name if service in SERVICES else service
     if not setting(service, "url"):
         return f"{name} has no address yet (Settings → Models)"

@@ -10,13 +10,14 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QObject, Signal
 
-LANGS = {"en": "English", "zh": "Chinese", "yue": "Cantonese", "vi": "Vietnamese"}   # zh = Mandarin
+LANGS = {"en": "English", "zh": "Chinese", "yue": "Cantonese", "vi": "Vietnamese",
+         "ja": "Japanese", "ko": "Korean"}   # zh = Mandarin
 # What the pickers offer. Picking a language makes the engine focus on it (Cantonese can't be
 # told from Mandarin by sound alone, so it needs its own entry).
 PICK_LANGS = tuple(LANGS)
 # Languages the app does not translate: a line in one of them is only announced in the chat
-# log ("【Speaking Korean】"). Codes as the speech model reports them; others show as the code.
-OTHER_LANGS = {"ko": "Korean", "ja": "Japanese", "es": "Spanish", "fr": "French", "de": "German",
+# log ("【Speaking Spanish】"). Codes as the speech model reports them; others show as the code.
+OTHER_LANGS = {"es": "Spanish", "fr": "French", "de": "German",
                "ru": "Russian", "th": "Thai", "id": "Indonesian", "pt": "Portuguese",
                "it": "Italian", "ar": "Arabic", "hi": "Hindi"}
 AUTO = "auto"
@@ -43,6 +44,8 @@ class Utterance:
     latency_ms: int | None = None
     sent: bool | None = None       # chatbox: True sent, False failed, None not sent (yet)
     note: str = ""                 # e.g. "cut to 144 characters"
+    dst_lang2: str = ""            # optional second microphone translation, captured per utterance
+    translation2: str = ""
 
 
 class Backend(QObject):
@@ -50,6 +53,12 @@ class Backend(QObject):
     mic_level = Signal(float)         # 0.0 – 1.0
     speaker_level = Signal(float)     # 0.0 – 1.0
     utterance = Signal(object)        # Utterance
+    setting_switched = Signal(str, str)   # (setting_name, new_value) when auto-switched
+    switch_prompt_requested = Signal(str, str, str)  # (category, failed_service, reason)
+    current_translating_model: str = ""
+    current_translating_service: str = ""
+    current_hearing_model: str = ""
+    current_hearing_service: str = ""
 
     def start(self) -> None:
         pass

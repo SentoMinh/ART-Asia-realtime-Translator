@@ -14,16 +14,16 @@ from ui.config import Settings
 from vrc.translate import TranslateError
 
 
-from conftest import DEV
+from conftest import CUSTOM_URL
 
 
 @pytest.fixture(autouse=True)
 def models(tmp_path, monkeypatch):
-    """Every test gets its own models.json (never this PC's keys), with a Dev key for the
-    pretend friends' edition (conftest.py); other services start without keys."""
+    """A configured custom API; other services start without keys."""
     from engine import services
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
-    services.save("dev", key="k")
+    services.save("custom", key="k", url=CUSTOM_URL, hear_model="whisper-large-v3-turbo",
+                  translate_model="model-a, model-b")
     return services
 
 
@@ -163,25 +163,25 @@ class Http:
 
 def test_cloud_hearing_reports_the_language_as_a_code_and_writes_simplified_chinese():
     http = Http(Answer(body={"text": " 聯合國 ", "language": "Chinese"}))
-    heard = CloudHearing("dev", http=http).transcribe(np.zeros(RATE, dtype="float32"), None)
+    heard = CloudHearing("custom", http=http).transcribe(np.zeros(RATE, dtype="float32"), None)
     assert heard == Heard("联合国", "zh")
     assert "language" not in http.calls[0][1]["data"]
 
 
 def test_cloud_hearing_knows_cantonese_and_keeps_its_traditional_characters():
     http = Http(Answer(body={"text": "佢哋係邊度嚟㗎", "language": "Cantonese"}))
-    heard = CloudHearing("dev", http=http).transcribe(np.zeros(RATE, dtype="float32"), None)
+    heard = CloudHearing("custom", http=http).transcribe(np.zeros(RATE, dtype="float32"), None)
     assert heard == Heard("佢哋係邊度嚟㗎", "yue")
 
 
 def test_cloud_hearing_chinese_means_mandarin_or_cantonese():
     quiet = np.zeros(RATE, dtype="float32")
     http = Http(Answer(body={"text": "你食咗飯未", "language": "cantonese"}))
-    assert CloudHearing("dev", http=http).transcribe(quiet, "zh").lang == "yue"
+    assert CloudHearing("custom", http=http).transcribe(quiet, "zh").lang == "yue"
     assert "language" not in http.calls[0][1]["data"]           # asked without forcing Mandarin
     http = Http(Answer(body={"text": "knee how", "language": "english"}),
                 Answer(body={"text": "你好", "language": "chinese"}))
-    assert CloudHearing("dev", http=http).transcribe(quiet, "zh") == Heard("你好", "zh")
+    assert CloudHearing("custom", http=http).transcribe(quiet, "zh") == Heard("你好", "zh")
     assert http.calls[1][1]["data"]["language"] == "zh"         # heard as something else: insist
 
 
@@ -216,14 +216,14 @@ def test_cantonese_can_be_a_translation_target():
 
 def test_cloud_hearing_passes_a_known_language_and_keeps_it():
     http = Http(Answer(body={"text": "xin chào", "language": "vietnamese"}))
-    heard = CloudHearing("dev", http=http).transcribe(np.zeros(RATE, dtype="float32"), "vi")
+    heard = CloudHearing("custom", http=http).transcribe(np.zeros(RATE, dtype="float32"), "vi")
     assert heard.lang == "vi" and http.calls[0][1]["data"]["language"] == "vi"
 
 
 def test_cloud_hearing_waits_out_a_limit_without_asking_again():
     clock = Clock()
     http = Http(Answer(status=429, headers={"retry-after": "30"}), Answer(body={"text": "hi", "language": "english"}))
-    engine = CloudHearing("dev", http=http, clock=clock)
+    engine = CloudHearing("custom", http=http, clock=clock)
     with pytest.raises(SttError, match="limit"):
         engine.transcribe(np.zeros(RATE, dtype="float32"), None)
     with pytest.raises(SttError, match="limit"):
@@ -236,18 +236,18 @@ def test_cloud_hearing_waits_out_a_limit_without_asking_again():
 def test_cloud_hearing_without_a_key_says_so(models):
     with pytest.raises(SttError, match="no OpenAI key yet"):
         CloudHearing("openai", http=Http()).transcribe(np.zeros(RATE, dtype="float32"), None)
-    models.save("dev", key="")
-    with pytest.raises(SttError, match="no Dev key yet: ask the developer"):
-        CloudHearing("dev", http=Http()).transcribe(np.zeros(RATE, dtype="float32"), None)
+    models.save("custom", url="")
+    with pytest.raises(SttError, match="Custom domain has no address yet"):
+        CloudHearing("custom", http=Http()).transcribe(np.zeros(RATE, dtype="float32"), None)
 
 
 def test_cloud_hearing_sends_the_sound_to_the_chosen_address_with_its_key(models):
     http = Http(Answer(body={"text": "hi", "language": "english"}))
-    CloudHearing("dev", http=http).transcribe(np.zeros(RATE, dtype="float32"), "en")
+    CloudHearing("custom", http=http).transcribe(np.zeros(RATE, dtype="float32"), "en")
     url, sent = http.calls[0]
-    assert url == f"{DEV}/audio/transcriptions" and sent["headers"]["Authorization"] == "Bearer k"
+    assert url == f"{CUSTOM_URL}/audio/transcriptions" and sent["headers"]["Authorization"] == "Bearer k"
     assert sent["data"]["response_format"] == "verbose_json"
-    assert sent["data"]["model"] == "whisper-large-v3-turbo"   # from the edition file
+    assert sent["data"]["model"] == "whisper-large-v3-turbo"   # from saved settings
     models.save("openai", key="sk-1", hear_model="gpt-4o-mini-transcribe")
     http = Http(Answer(body={"text": "xin chào các bạn"}))      # no language in the answer
     heard = CloudHearing("openai", http=http).transcribe(np.zeros(RATE, dtype="float32"), None)
@@ -329,9 +329,9 @@ def test_chain_uses_the_first_translator_that_answers():
 def test_the_chain_follows_the_service_picked_in_settings(models, tmp_path, monkeypatch):
     from engine import translators
     monkeypatch.setattr(translators, "addon_folder", lambda: tmp_path / "no such folder")
-    picked = ["dev"]
+    picked = ["custom"]
     chain = ServiceChain(lambda: picked[0])
-    assert chain.names() == ["dev:model-a", "dev:model-b"]   # the edition file's models, in order
+    assert chain.names() == ["custom:model-a", "custom:model-b"]   # saved models, in order
     models.save("openrouter", key="o", translate_model="qwen/qwen3-32b, xiaomi/mimo-v2.6-flash")
     picked[0] = "openrouter"
     assert chain.names() == ["openrouter:qwen/qwen3-32b", "openrouter:xiaomi/mimo-v2.6-flash"]
@@ -339,7 +339,7 @@ def test_the_chain_follows_the_service_picked_in_settings(models, tmp_path, monk
     assert chain.names() == ["mimo:mimo-v2-flash"]           # the service's default model
     with pytest.raises(TranslateError, match="no Xiaomi MiMo key yet"):
         chain.translate("x", "vi")
-    models.save("custom", url="http://127.0.0.1:8000/v1", key="c")
+    models.save("custom", url="http://127.0.0.1:8000/v1", key="c", translate_model="")
     picked[0] = "custom"
     with pytest.raises(TranslateError, match="no translating model yet"):
         chain.translate("x", "vi")
@@ -349,8 +349,8 @@ def test_a_translator_rests_as_long_as_the_service_says(models):
     clock = Clock()
     busy = Answer(status=429, headers={"retry-after": "30"}, body={"error": {"message": "busy"}})
     http = Http(busy, Answer(body={"choices": [{"message": {"content": "ok"}}]}))
-    chain = Chain([("dev", ServiceTranslator("dev", "model-a", http=http))], clock=clock)
-    with pytest.raises(TranslateError, match="Dev key's limit was reached"):   # its own words stay hidden
+    chain = Chain([("custom", ServiceTranslator("custom", "model-a", http=http))], clock=clock)
+    with pytest.raises(TranslateError, match="Custom domain: busy"):
         chain.translate("x", "vi")
     clock.now += 31
     assert chain.translate("x", "vi") == "ok"
@@ -360,8 +360,8 @@ def test_a_model_that_answers_in_chinese_instead_of_translating_lets_the_next_on
     said = lambda text: Answer(body={"choices": [{"message": {"content": text}}]})
     first = Http(said("今天天气真好"), said("Hôm nay trời đẹp"))
     second = Http(said("Hôm nay thời tiết đẹp"))
-    chain = Chain([("a", ServiceTranslator("dev", "model-a", http=first)),
-                   ("b", ServiceTranslator("dev", "model-b", http=second))])
+    chain = Chain([("a", ServiceTranslator("custom", "model-a", http=first)),
+                   ("b", ServiceTranslator("custom", "model-b", http=second))])
     assert chain.translate("今天天气很好", "vi", "zh", heard=True) == "Hôm nay thời tiết đẹp"
     assert chain.translate("今天天气很好", "vi", "zh", heard=True) == "Hôm nay trời đẹp"   # not rested
     assert stt.mostly_chinese("今天天气真好") and not stt.mostly_chinese("Hôm nay, 你好 friend")
@@ -383,40 +383,30 @@ def test_services_keep_keys_and_fall_back_to_their_defaults(models):
     models.save("openai", hear_model="")                      # empty: back to the default
     import json
     saved = json.loads(models.models_file().read_text(encoding="utf-8"))
-    assert saved["openai"] == {"key": "sk-1"} and saved["dev"] == {"key": "k"}
-    assert models.setting("dev", "url") == DEV                # from the edition file
-
-
-def test_the_dev_key_falls_back_to_the_file_version_0_9_7_kept_it_in(models, monkeypatch):
-    import conftest
-    edition = {**conftest.EDITION, "dev": {**conftest.EDITION["dev"], "key_file": "old_key.txt"}}
-    monkeypatch.setattr(models, "_edition", lambda: edition)
-    models.save("dev", key="")
-    (models.models_file().parent / "old_key.txt").write_text(" from-0.9.7 \n", encoding="utf-8")
-    assert models.setting("dev", "key") == "from-0.9.7" and models.ready("dev")
-    models.save("dev", key="newer")                           # one pasted in Settings wins
-    assert models.setting("dev", "key") == "newer"
+    assert saved["openai"] == {"key": "sk-1"} and saved["custom"]["key"] == "k"
+    assert models.setting("custom", "url") == CUSTOM_URL                # from saved settings
 
 
 def test_a_refused_request_is_explained_in_plain_words(models):
-    assert models.failure("dev", Answer(status=401)).startswith("the Dev key was not accepted (Settings → Models)")
+    assert models.failure("custom", Answer(status=401)).startswith("Custom domain did not accept the key (Settings → Models)")
     limit = Answer(status=429, body={"error": {"message": "Rate limit reached in organization org_123"}})
-    assert models.failure("dev", limit) == "Dev key's limit was reached"   # no account details shown
+    assert models.failure("custom", limit) == "Custom domain: Rate limit reached in organization org_123"
     assert models.failure("openai", Answer(status=500, body={"error": {"message": "oops"}})) == "OpenAI error 500: oops"
 
 
 def test_the_set_up_window_can_test_a_key(models):
     http = Http(Answer(body={"data": []}))
-    assert models.check("dev", http=http) == (True, "the key works")
-    assert http.calls[0][0] == f"{DEV}/models"
+    assert models.check("custom", http=http) == (True, "the key works")
+    assert http.calls[0][0] == f"{CUSTOM_URL}/models"
     ok, text = models.check("openai", key="sk-bad", http=Http(Answer(status=401)))
     assert not ok and "did not accept the key" in text
     http = Http(Answer(body={"data": {}}))
     assert models.check("openrouter", key="o", http=http)[0] and http.calls[0][0].endswith("/api/v1/key")
+    models.save("custom", url="")
     assert models.check("custom", key="c") == (False, "no address yet")
 
 
-def test_a_pc_s_own_add_on_translators_are_tried_first(tmp_path, monkeypatch):
+def test_a_pc_s_own_add_on_translators_are_fallback(models, tmp_path, monkeypatch):
     from engine import translators
     (tmp_path / "mine.py").write_text(
         "class Mine:\n"
@@ -426,9 +416,30 @@ def test_a_pc_s_own_add_on_translators_are_tried_first(tmp_path, monkeypatch):
     (tmp_path / "broken.py").write_text("this is not python", encoding="utf-8")
     (tmp_path / "notes.txt").write_text("ignored", encoding="utf-8")
     monkeypatch.setattr(translators, "addon_folder", lambda: tmp_path)
-    chain = ServiceChain()
-    assert chain.names() == ["mine", "dev:model-a", "dev:model-b"]
+    calls = []
+    def unavailable(self, *args, **kwargs):
+        calls.append(self.model)
+        raise TranslateError("unavailable")
+    monkeypatch.setattr(ServiceTranslator, "translate", unavailable)
+    chain = ServiceChain(lambda: "custom")
+    assert chain.names() == ["custom:model-a", "custom:model-b", "mine"]
     assert chain.translate("hello", "vi") == "from mine" and chain.last_used == "mine"
+    assert calls == ["model-a", "model-b"]
+
+
+def test_selected_custom_model_takes_priority_over_gemini_addon(models, monkeypatch):
+    models.save("custom", translate_model="qwen/qwen3.8-27b")
+    addon = Fixed("from gemini")
+    calls = []
+    def translate(self, *args, **kwargs):
+        calls.append((self.service, self.model))
+        return "from selected model"
+    monkeypatch.setattr(ServiceTranslator, "translate", translate)
+    chain = ServiceChain(lambda: "custom", addons=[("gemini", addon)])
+    assert chain.translate("hello", "vi") == "from selected model"
+    assert calls == [("custom", "qwen/qwen3.8-27b")]
+    assert addon.calls == 0
+    assert chain.last_used == "custom:qwen/qwen3.8-27b"
 
 
 def test_chain_skips_a_translator_that_hit_its_limit_until_it_rested():
@@ -444,14 +455,14 @@ def test_chain_skips_a_translator_that_hit_its_limit_until_it_rested():
 
 
 def test_chain_gives_the_last_reason_when_nobody_answers():
-    chain = Chain([("a", Fixed(error="no internet")), ("b", Fixed(error="no Dev key yet"))])
-    with pytest.raises(TranslateError, match="no Dev key yet"):
+    chain = Chain([("a", Fixed(error="no internet")), ("b", Fixed(error="no provider key yet"))])
+    with pytest.raises(TranslateError, match="no provider key yet"):
         chain.translate("x", "vi")
 
 
 def test_service_translator_sends_the_chat_prompt_and_cleans_the_answer():
     http = Http(Answer(body={"choices": [{"message": {"content": " 你好\n吗 "}}]}))
-    assert ServiceTranslator("dev", "qwen/qwen3.8-27b", http=http).translate("xin chào", "zh", "vi") == "你好 吗"
+    assert ServiceTranslator("custom", "qwen/qwen3.8-27b", http=http).translate("xin chào", "zh", "vi") == "你好 吗"
     body = http.calls[0][1]["json"]
     assert body["model"] == "qwen/qwen3.8-27b" and "Simplified Chinese" in body["messages"][0]["content"]
     assert "reasoning_effort" not in body
@@ -459,9 +470,9 @@ def test_service_translator_sends_the_chat_prompt_and_cleans_the_answer():
 
 def test_service_translator_limit_and_empty_answers_are_translate_errors():
     with pytest.raises(TranslateError, match="limit"):
-        ServiceTranslator("dev", "m", http=Http(Answer(status=429))).translate("x", "vi")
+        ServiceTranslator("custom", "m", http=Http(Answer(status=429))).translate("x", "vi")
     with pytest.raises(TranslateError, match="empty"):
-        ServiceTranslator("dev", "m", http=Http(Answer(body={"choices": [{"message": {"content": ""}}]}))).translate("x", "vi")
+        ServiceTranslator("custom", "m", http=Http(Answer(body={"choices": [{"message": {"content": ""}}]}))).translate("x", "vi")
 
 
 # ---- the whole engine ----------------------------------------------------------------------
@@ -508,7 +519,7 @@ class Hears:
 
 
 def engine(window, hears, translator=None, clock=None) -> SpeechEngine:
-    return SpeechEngine(window, engines={"local": hears, "dev": Hears("from the service", "en")},
+    return SpeechEngine(window, engines={"local": hears, "custom": Hears("from the service", "en")},
                         translator=translator or Fixed("xin chào"), clock=clock or Clock(),
                         vads={SPEAKER: LoudIsSpeech(), MIC: LoudIsSpeech()})
 
@@ -536,7 +547,7 @@ def test_spoken_lines_tell_the_translator_that_words_may_be_misheard():
 def test_service_translator_adds_the_misheard_note_only_for_spoken_lines():
     answer = {"choices": [{"message": {"content": "ok"}}]}
     http = Http(Answer(body=answer), Answer(body=answer))
-    chat = ServiceTranslator("dev", "m", http=http)
+    chat = ServiceTranslator("custom", "m", http=http)
     chat.translate("x", "vi", heard=True)
     chat.translate("x", "vi")
     spoken, typed = (call[1]["json"]["messages"][0]["content"] for call in http.calls)
@@ -606,7 +617,7 @@ def test_nothing_heard_shows_nothing_and_a_problem_becomes_the_status():
 
 
 def test_the_hearing_engine_follows_the_setting():
-    clock, window = Clock(), Window(hearing="dev")
+    clock, window = Clock(), Window(hearing="custom")
     engine(window, Hears("local", "en"), clock=clock).hear(SPEAKER, sentence(clock))
     assert window.utterance.seen[0].original == "from the service"
 
@@ -637,8 +648,8 @@ def test_no_key_and_no_local_model_names_both_reasons():
                                     "and the speech model could not be loaded")
 
 
-def test_developer_access_hears_and_translates_by_default():
-    assert (Settings().hearing, Settings().translating) == ("dev", "dev")
+def test_gemini_hears_and_translates_by_default():
+    assert (Settings().hearing, Settings().translating) == ("gemini", "gemini")
 
 
 def test_the_microphone_has_its_own_strictness_setting():
@@ -676,9 +687,36 @@ def test_the_voice_detector_brings_its_own_model_file():
 
 
 def test_without_the_local_model_this_pc_hearing_says_what_to_do(monkeypatch):
-    monkeypatch.setattr(stt.importlib.util, "find_spec", lambda name: None)
+    monkeypatch.setattr(stt.local_model, "installed", lambda: False)
     with pytest.raises(SttError, match="choose an online service"):
         stt.LocalWhisper().load()
+
+
+def test_before_its_download_the_local_model_says_where_to_get_it(monkeypatch):
+    monkeypatch.setattr(stt.local_model, "installed", lambda: True)
+    monkeypatch.setattr(stt.local_model, "nvidia_card", lambda: True)
+    monkeypatch.setattr(stt.local_model, "gpu_folders", lambda: [])
+    with pytest.raises(SttError, match="not downloaded yet"):
+        stt.LocalWhisper().load()
+
+
+def test_the_local_model_loads_from_the_program_s_own_download(monkeypatch, tmp_path):
+    made = []
+
+    class Model:
+        def __init__(self, source, **options):
+            made.append((source, options))
+
+        def transcribe(self, samples, **options):
+            return [], None
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(stt.local_model, "missing", lambda: "")
+    monkeypatch.setattr(stt.local_model, "ready", lambda root=None: True)
+    monkeypatch.setattr(stt.local_model, "gpu_folders", lambda: [])
+    monkeypatch.setattr(stt, "whisper_class", lambda: Model)
+    stt.LocalWhisper().load()
+    assert made == [(str(tmp_path / "VRChat-Translator" / "local-model" / "whisper"),
+                     {"device": "cuda", "compute_type": "float16"})]
 
 
 # ---- on Auto, focus on our languages -------------------------------------------------------
@@ -692,10 +730,10 @@ def whisper_answer(text, language, certainty):
 def test_cloud_hearing_believes_another_language_only_when_sure_and_in_its_own_script():
     quiet = np.zeros(RATE, dtype="float32")
     http = Http(whisper_answer("안녕하세요 반갑습니다", "Korean", 0.9))
-    assert CloudHearing("dev", http=http).transcribe(quiet, None) == Heard("안녕하세요 반갑습니다", "ko")
+    assert CloudHearing("custom", http=http).transcribe(quiet, None) == Heard("안녕하세요 반갑습니다", "ko")
     assert len(http.calls) == 1
     http = Http(whisper_answer("Hola, ¿qué tal estás hoy?", "Spanish", 0.85))
-    assert CloudHearing("dev", http=http).transcribe(quiet, None).lang == "es"
+    assert CloudHearing("custom", http=http).transcribe(quiet, None).lang == "es"
 
 
 def test_cloud_hearing_unsure_of_another_language_takes_the_main_language_that_fits_best():
@@ -703,23 +741,24 @@ def test_cloud_hearing_unsure_of_another_language_takes_the_main_language_that_f
     http = Http(whisper_answer("Te tomé de ahí, ¿no?", "Spanish", 0.45),      # the guess: not sure
                 whisper_answer("the tome day, no?", "english", 0.40),         # asked again as English
                 whisper_answer("他从那儿来的，对吧", "chinese", 0.70),            # ... as Chinese: best
-                whisper_answer("tê tô mê đây nô", "vietnamese", 0.30))
-    heard = CloudHearing("dev", http=http).transcribe(quiet, None, prefer=("en",))
+                whisper_answer("tê tô mê đây nô", "vietnamese", 0.30),
+                whisper_answer("こんにちは", "japanese", 0.20), whisper_answer("안녕", "korean", 0.20))
+    heard = CloudHearing("custom", http=http).transcribe(quiet, None, prefer=("en",))
     assert heard == Heard("他从那儿来的，对吧", "zh")
-    assert [call[1]["data"].get("language") for call in http.calls] == [None, "en", "zh", "vi"]
+    assert [call[1]["data"].get("language") for call in http.calls] == [None, "en", "zh", "vi", "ja", "ko"]
 
 
 def test_cloud_hearing_asks_first_in_the_language_heard_last_and_stops_when_sure():
     quiet = np.zeros(RATE, dtype="float32")
-    http = Http(whisper_answer("こんにちは", "Japanese", 0.5), whisper_answer("你好啊", "chinese", 0.9))
-    heard = CloudHearing("dev", http=http).transcribe(quiet, None, prefer=("yue", "en"))
+    http = Http(whisper_answer("Привет", "Russian", 0.5), whisper_answer("你好啊", "chinese", 0.9))
+    heard = CloudHearing("custom", http=http).transcribe(quiet, None, prefer=("yue", "en"))
     assert heard.lang == "zh" and len(http.calls) == 2      # Cantonese is asked as Chinese
 
 
 def test_cloud_hearing_wrong_script_is_never_believed():
     quiet = np.zeros(RATE, dtype="float32")
     http = Http(whisper_answer("thank you very much", "Korean", 0.95), whisper_answer("thank you very much", "english", 0.95))
-    assert CloudHearing("dev", http=http).transcribe(quiet, None).lang == "en"
+    assert CloudHearing("custom", http=http).transcribe(quiet, None).lang == "en"
     assert stt.in_own_script("ありがとう", "ja") and not stt.in_own_script("arigato", "ja")
     assert stt.in_own_script("anything", "es")
 
@@ -753,15 +792,50 @@ def test_local_whisper_at_80_percent_or_more_keeps_the_other_language():
     assert local.transcribe(np.zeros(RATE, dtype="float32"), None) == Heard("hola a todos", "es")
 
 
+@pytest.mark.parametrize("code, text", [("ja", "今日は何をしますか？"), ("ko", "오늘 뭐 해요?")])
+def test_japanese_and_korean_auto_detection_and_explicit_language(code, text):
+    quiet = np.zeros(RATE, dtype="float32")
+    for hint in (None, code):
+        http = Http(whisper_answer(text, code, 0.6))
+        assert CloudHearing("custom", http=http).transcribe(quiet, hint) == Heard(text, code)
+        assert len(http.calls) == 1
+        assert http.calls[0][1]["data"].get("language") == hint
+        local = stt.LocalWhisper()
+        local._model = FakeWhisper((text, code, 0.6))
+        assert local.transcribe(quiet, hint) == Heard(text, code)
+        assert local._model.asked == [hint]
+    assert stt.in_own_script(text, code)
+    assert stt.in_own_script("東京駅", "ja")
+
+
+@pytest.mark.parametrize("code, text", [("ja", "こんにちは"), ("ko", "안녕하세요")])
+@pytest.mark.parametrize("send_chatbox", [False, True])
+def test_japanese_and_korean_speakers_translate_and_update_auto_target(code, text, send_chatbox):
+    clock, window, translator = Clock(), Window(my_lang="en", chatbox_speaker=send_chatbox), Fixed("Hello")
+    engine(window, Hears(text, code), translator, clock).hear(SPEAKER, sentence(clock))
+    final = window.sent[-1] if send_chatbox else window.utterance.seen[-1]
+    assert (final.original, final.translation, final.src_lang, final.dst_lang) == (text, "Hello", code, "en")
+    assert window.last_heard == code and translator.calls == 1
+    assert bool(window.sent) == send_chatbox
+
+
+@pytest.mark.parametrize("code, name, text", [("ja", "Japanese", "こんにちは"), ("ko", "Korean", "안녕하세요")])
+def test_translation_request_supports_japanese_and_korean_targets(code, name, text):
+    http = Http(Answer(body={"choices": [{"message": {"content": text}}]}))
+    result = ServiceTranslator("custom", "model-a", http=http).translate("hello", code, "en")
+    assert result == text
+    assert "into " + name in http.calls[0][1]["json"]["messages"][0]["content"]
+
+
 def test_another_language_is_announced_not_translated():
     clock, window, translator = Clock(), Window(my_lang="en", chatbox_speaker=True), Fixed("never")
     window.last_heard = "zh"
-    eng = engine(window, Hears("안녕하세요", "ko"), translator, clock)
+    eng = engine(window, Hears("Привет", "ru"), translator, clock)
     eng.hear(SPEAKER, sentence(clock))
     (line,) = window.utterance.seen
-    assert (line.final, line.source, line.src_lang, line.original, line.translation) == (True, "speaker", "ko", "", "")
+    assert (line.final, line.source, line.src_lang, line.original, line.translation) == (True, "speaker", "ru", "", "")
     assert translator.calls == 0 and window.last_heard == "zh" and window.sent == []
-    eng.hear(SPEAKER, sentence(clock))                    # still Korean: not said again at once
+    eng.hear(SPEAKER, sentence(clock))                    # still Russian: not said again at once
     assert len(window.utterance.seen) == 1
     clock.now += 60
     eng.hear(SPEAKER, sentence(clock))
@@ -778,28 +852,206 @@ def test_the_hearing_engine_is_told_which_of_our_languages_to_try_first():
 
 def test_cloud_hearing_under_80_percent_still_believes_a_language_that_beats_all_of_ours():
     quiet = np.zeros(RATE, dtype="float32")
-    http = Http(whisper_answer("오늘 뭐 하고 있어요?", "Korean", 0.62), whisper_answer("今天干什么", "chinese", 0.33),
-                whisper_answer("oh no more hugger", "english", 0.35), whisper_answer("ô nô mô ha gô", "vietnamese", 0.5))
-    assert CloudHearing("dev", http=http).transcribe(quiet, None, prefer=("zh",)).lang == "ko"
+    http = Http(whisper_answer("Что ты делаешь?", "Russian", 0.62), whisper_answer("今天干什么", "chinese", 0.33),
+                whisper_answer("oh no more hugger", "english", 0.35), whisper_answer("ô nô mô ha gô", "vietnamese", 0.5),
+                whisper_answer("こんにちは", "japanese", 0.20), whisper_answer("안녕", "korean", 0.20))
+    assert CloudHearing("custom", http=http).transcribe(quiet, None, prefer=("zh",)).lang == "ru"
 
 
 def test_cloud_hearing_made_up_sign_off_lines_never_win():
     quiet = np.zeros(RATE, dtype="float32")
-    http = Http(whisper_answer("안녕하세요, 만나서 반갑습니다.", "Korean", 0.62), whisper_answer("你好", "chinese", 0.3),
+    http = Http(whisper_answer("Привет, приятно познакомиться.", "Russian", 0.62), whisper_answer("你好", "chinese", 0.3),
                 whisper_answer("on your say oh", "english", 0.35),
-                whisper_answer("Hãy subscribe cho kênh Ghiền Mì Gõ Để không bỏ lỡ những video hấp dẫn", "vietnamese", 0.9))
-    assert CloudHearing("dev", http=http).transcribe(quiet, None).lang == "ko"
+                whisper_answer("Hãy subscribe cho kênh Ghiền Mì Gõ Để không bỏ lỡ những video hấp dẫn", "vietnamese", 0.9),
+                whisper_answer("こんにちは", "japanese", 0.20), whisper_answer("안녕", "korean", 0.20))
+    assert CloudHearing("custom", http=http).transcribe(quiet, None).lang == "ru"
     assert stt.tidy("Thanks for watching!", "en") == Heard("", "en")
     assert stt.tidy("Thank you.", "en") == Heard("Thank you.", "en")       # people do say this
 
 
 def test_cloud_hearing_a_language_believed_lately_is_not_asked_about_again():
     quiet, clock = np.zeros(RATE, dtype="float32"), Clock()
-    http = Http(whisper_answer("안녕하세요 반갑습니다", "Korean", 0.9), whisper_answer("오늘 뭐 해요", "Korean", 0.55),
-                whisper_answer("그래요", "Korean", 0.55), whisper_answer("okay", "english", 0.2),
-                whisper_answer("好的", "chinese", 0.7), whisper_answer("ô kê", "vietnamese", 0.2))
-    engine_ = CloudHearing("dev", http=http, clock=clock)
-    assert engine_.transcribe(quiet, None).lang == "ko"
-    assert engine_.transcribe(quiet, None).lang == "ko" and len(http.calls) == 2    # no second opinion
+    http = Http(whisper_answer("Привет всем", "Russian", 0.9), whisper_answer("Что делаешь", "Russian", 0.55),
+                whisper_answer("Хорошо", "Russian", 0.55), whisper_answer("okay", "english", 0.2),
+                whisper_answer("好的", "chinese", 0.7), whisper_answer("ô kê", "vietnamese", 0.2),
+                whisper_answer("こんにちは", "japanese", 0.20), whisper_answer("안녕", "korean", 0.20))
+    engine_ = CloudHearing("custom", http=http, clock=clock)
+    assert engine_.transcribe(quiet, None).lang == "ru"
+    assert engine_.transcribe(quiet, None).lang == "ru" and len(http.calls) == 2    # no second opinion
     clock.now += 120
-    assert engine_.transcribe(quiet, None).lang == "zh" and len(http.calls) == 6    # a minute later: checked again
+    assert engine_.transcribe(quiet, None).lang == "zh" and len(http.calls) == 8    # a minute later: checked again
+
+
+from engine import services
+
+
+def test_fetch_models_returns_sorted_list_of_ids():
+    http = Http(Answer(body={"data": [{"id": "whisper-1"}, {"id": "gpt-4o"}]}))
+    assert services.fetch_models("custom", url="http://127.0.0.1:8000/v1", key="c", http=http) == ["gpt-4o", "whisper-1"]
+    assert http.calls[0][0] == "http://127.0.0.1:8000/v1/models"
+    assert http.calls[0][1]["headers"]["Authorization"] == "Bearer c"
+
+
+def test_fetch_models_handles_ollama_and_list_formats():
+    http1 = Http(Answer(body={"models": [{"name": "qwen2.5:7b"}, {"name": "llama3.2:3b"}]}))
+    assert services.fetch_models("custom", url="http://127.0.0.1:11434", key="", http=http1) == ["llama3.2:3b", "qwen2.5:7b"]
+    http2 = Http(Answer(body=["model-b", "model-a"]))
+    assert services.fetch_models("custom", url="http://127.0.0.1:8000/v1", http=http2) == ["model-a", "model-b"]
+
+
+def test_fetch_models_falls_back_to_v1_if_404():
+    http = Http(Answer(status=404), Answer(body={"data": [{"id": "model-1"}]}))
+    assert services.fetch_models("custom", url="http://127.0.0.1:8000", http=http) == ["model-1"]
+    assert http.calls[0][0] == "http://127.0.0.1:8000/models"
+    assert http.calls[1][0] == "http://127.0.0.1:8000/v1/models"
+
+
+def test_fetch_models_error_handling():
+    http = Http(Answer(status=401, body={"error": {"message": "Invalid key"}}))
+    with pytest.raises(OSError, match="Custom domain did not accept the key"):
+        services.fetch_models("custom", url="http://127.0.0.1:8000/v1", key="bad", http=http)
+    services.save("custom", url="")
+    assert services.fetch_models("custom", url="", key="") == []
+
+
+def test_speech_engine_auto_switches_hearing_to_local_when_cloud_unavailable():
+    clock, window = Clock(), Window(hearing="openai")
+    switched = []
+    window.setting_switched = type("Sig", (), {"emit": lambda s, k, v: switched.append((k, v))})()
+    eng = SpeechEngine(window, engines={"local": Hears("local", "en"), "openai": CloudHearing("openai", http=Http())},
+                       translator=Fixed("x"), clock=clock)
+    eng.hear(SPEAKER, sentence(clock))
+    assert window.utterance.seen[0].original == "local"
+    assert ("hearing", "local") in switched
+    assert window.settings.hearing == "local"
+
+
+def test_chain_notifies_on_switch_when_model_is_used():
+    switched = []
+    first, second = Fixed(error="limit"), Fixed("ok")
+    chain = Chain([("a:m1", first), ("a:m2", second)], on_switch=lambda name: switched.append(name))
+    assert chain.translate("hello", "vi") == "ok"
+    assert switched == ["a:m2"]
+
+
+
+def test_microphone_translates_into_two_targets_and_keeps_success_on_partial_failure():
+    class Translator:
+        def __init__(self, failed=""):
+            self.calls = []
+            self.failed = failed
+        def translate(self, text, target, source, heard=False):
+            self.calls.append((target, heard))
+            if target == self.failed:
+                raise TranslateError("offline")
+            return {"vi": "Xin chào", "ja": "こんにちは"}[target]
+    for failed in ("", "vi", "ja"):
+        clock, window = Clock(), Window(my_lang="en", their_lang="vi", their_lang2="ja")
+        window.speech_target_lang = lambda: "vi"
+        translator = Translator(failed)
+        engine(window, Hears("Hello", "en"), translator, clock).hear(MIC, sentence(clock))
+        line = window.sent[0]
+        assert translator.calls == [("vi", True), ("ja", True)]
+        assert line.translation == ("" if failed == "vi" else "Xin chào")
+        assert line.translation2 == ("" if failed == "ja" else "こんにちは")
+        assert ("offline" in line.note) == bool(failed)
+
+
+def test_two_targets_are_captured_before_settings_change():
+    class Pending:
+        def submit(self, function, *args):
+            self.function, self.args = function, args
+    clock, window = Clock(), Window(my_lang="en", their_lang="vi", their_lang2="ja")
+    window.speech_target_lang = lambda: "vi"
+    speech = engine(window, Hears("Hello", "en"), clock=clock)
+    pending = Pending()
+    speech._mic_pool = pending
+    speech.hear(MIC, sentence(clock))
+    window.settings.their_lang2 = "ko"
+    pending.function(*pending.args)
+    assert window.sent[0].dst_lang2 == "ja"
+
+
+def test_auto_resolving_to_second_target_does_not_translate_twice():
+    clock, window, translator = Clock(), Window(my_lang="en", their_lang2="ja"), Fixed("こんにちは")
+    window.last_heard = "ja"
+    engine(window, Hears("Hello", "en"), translator, clock).hear(MIC, sentence(clock))
+    assert translator.calls == 1
+    assert window.sent[0].dst_lang2 == ""
+
+
+def test_two_their_languages_allow_detection_and_prefer_both():
+    clock, hears = Clock(), Hears("こんにちは", "ja")
+    window = Window(my_lang="en", their_lang="vi", their_lang2="ja")
+    engine(window, hears, clock=clock).hear(SPEAKER, sentence(clock))
+    assert hears.asked == [None]
+    assert hears.prefer[:2] == ("vi", "ja")
+    assert window.utterance.seen[-1].dst_lang == "en"
+    assert not window.utterance.seen[-1].dst_lang2
+
+
+def test_saved_model_change_is_seen_even_when_file_stamp_is_unchanged(models):
+    import os
+    models.save("custom", translate_model="model-a")
+    assert models.setting("custom", "translate_model") == "model-a"
+    path = models.models_file()
+    before = path.stat()
+    models.save("custom", translate_model="model-b")
+    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+    assert path.stat().st_size == before.st_size
+    assert models.setting("custom", "translate_model") == "model-b"
+
+
+def test_cooldown_keeps_the_original_error_without_retrying():
+    clock = Clock()
+    translator = Fixed(error="Custom domain error 404: endpoint not found")
+    chain = Chain([("custom:chat", translator)], clock=clock)
+    for _ in range(2):
+        with pytest.raises(TranslateError, match="Custom domain error 404: endpoint not found"):
+            chain.translate("hello", "vi")
+    assert translator.calls == 1
+
+
+@pytest.mark.parametrize("field,value", [("url", "https://fixed.test/v1"), ("key", "replacement-key")])
+def test_changing_api_credentials_clears_translation_cooldown(models, monkeypatch, field, value):
+    clock = Clock()
+    models.save("custom", translate_model="chat")
+    calls = []
+    def translate(self, *a, **kw):
+        calls.append(True)
+        if len(calls) == 1:
+            raise TranslateError("endpoint or key rejected")
+        return "xin chào"
+    monkeypatch.setattr(ServiceTranslator, "translate", translate)
+    chain = ServiceChain(lambda: "custom", clock=clock, addons=[])
+    for _ in range(2):
+        with pytest.raises(TranslateError, match="endpoint or key rejected"):
+            chain.translate("hello", "vi")
+    assert len(calls) == 1
+    models.save("custom", **{field: value})
+    assert chain.translate("hello", "vi") == "xin chào"
+    assert len(calls) == 2
+
+
+def test_custom_404_is_not_reported_as_a_working_connection(models):
+    ok, message = models.check("custom", http=Http(Answer(status=404, body={"error": "endpoint missing"})))
+    assert not ok
+    assert "404" in message and "check the API base address" in message
+
+
+@pytest.mark.parametrize("source,expected", [("vi", "vi"), ("", "zh")])
+def test_nllb_custom_model_uses_direct_translation_api(source, expected):
+    http = Http(Answer(body={"translated_text": " hello\nworld "}))
+    translator = ServiceTranslator("custom", "nllb-200-ct2", http=http)
+    assert translator.translate("你好", "en", source) == "hello world"
+    url, request = http.calls[0]
+    assert url == CUSTOM_URL + "/translate"
+    assert request["json"] == {"text": "你好", "source_language": expected, "target_language": "en"}
+    assert request["headers"]["Authorization"] == "Bearer k"
+
+
+@pytest.mark.parametrize("answer", [Answer(status=429), Answer(body={"translated_text": ""}),
+                                  Answer(body={"wrong": "shape"}), Answer(body={"translated_text": 12})])
+def test_nllb_errors_follow_normal_translation_fallback(answer):
+    with pytest.raises(TranslateError):
+        ServiceTranslator("custom", "nllb-200-ct2", http=Http(answer)).translate("hello", "vi", "en")

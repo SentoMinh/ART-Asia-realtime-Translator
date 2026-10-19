@@ -3,14 +3,18 @@ from __future__ import annotations
 
 import ctypes
 import sys
+import time
 from ctypes import wintypes
 
-from PySide6.QtCore import QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QColor, QCursor, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit,
-                               QMenu, QPushButton, QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGraphicsDropShadowEffect,
+                               QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton,
+                               QToolButton, QVBoxLayout, QWidget)
 
-from . import config, i18n, theme
+from engine import local_model
+
+from . import config, i18n, local_download, theme
 from .backend import AUTO, LANGS, PICK_LANGS, Backend, Status, Utterance
 from .config import Settings
 from .i18n import tr
@@ -27,14 +31,83 @@ HT = {(-1, -1): 13, (0, -1): 12, (1, -1): 14, (-1, 0): 10, (1, 0): 11,
 
 
 class TitleBar(QWidget):
-    """Drag it to move the window; double-click to maximise."""
+    """Draggable header, including meters and click buttons without menus."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._press_position = None
+        self._press_window_position = None
+        self._dragging = False
+        self._manual_drag = False
+
+    def enable_child_dragging(self):
+        for child in self.findChildren(QWidget):
+            if isinstance(child, (QLabel, LevelBar)) or (
+                    isinstance(child, QToolButton) and child.menu() is None):
+                child.installEventFilter(self)
+
+    def _start_system_move(self):
+        handle = self.window().windowHandle()
+        return bool(handle and handle.startSystemMove())
+
+    def _begin_drag(self, target):
+        self._dragging = True
+        if isinstance(target, QToolButton):
+            target.setDown(False)  # dragging must not activate the button
+        self._manual_drag = not self._start_system_move()
+
+    def _mouse_event(self, target, event):
+        button = isinstance(target, QToolButton)
+        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            self._press_position = event.globalPosition().toPoint()
+            self._press_window_position = self.window().pos()
+            self._dragging = self._manual_drag = False
+            if not button:
+                self._begin_drag(target)
+            return not button
+        if event.type() == QEvent.MouseMove and self._press_position is not None:
+            if not event.buttons() & Qt.LeftButton:
+                return False
+            delta = event.globalPosition().toPoint() - self._press_position
+            if not self._dragging and delta.manhattanLength() >= QApplication.startDragDistance():
+                self._begin_drag(target)
+            if self._manual_drag:
+                self.window().move(self._press_window_position + delta)
+            return self._dragging
+        if event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton:
+            dragged = self._dragging
+            self._press_position = None
+            self._dragging = self._manual_drag = False
+            if dragged and button:
+                target.setDown(False)
+            return dragged or not button
+        if event.type() == QEvent.MouseButtonDblClick and event.button() == Qt.LeftButton and not button:
+            self.window().toggle_maximized()
+            return True
+        return False
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.MouseButtonPress, QEvent.MouseMove,
+                            QEvent.MouseButtonRelease, QEvent.MouseButtonDblClick):
+            if self._mouse_event(watched, event):
+                return True
+        return super().eventFilter(watched, event)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and self.window().windowHandle():
-            self.window().windowHandle().startSystemMove()
+        if not self._mouse_event(self, event):
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if not self._mouse_event(self, event):
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if not self._mouse_event(self, event):
+            super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event):
-        self.window().toggle_maximized()
+        if not self._mouse_event(self, event):
+            super().mouseDoubleClickEvent(event)
 
 
 class MainWindow(QWidget):
@@ -44,6 +117,10 @@ class MainWindow(QWidget):
         self.settings = settings
         self._save = save
         self._dialog: SettingsWindow | None = None
+        self._music_dialog = None
+        self._music_active = False
+        self._music_level = 0.0
+        self._music_glow_effect = None
         self._tips: list[tuple[QWidget, str]] = []     # (widget, English tooltip), for retranslating
         self._labels: list[tuple[QLabel, str]] = []
         self._status = Status("warn", "Starting…", "")
@@ -68,10 +145,15 @@ class MainWindow(QWidget):
         root.addWidget(self.log, 1)
         root.addWidget(self._build_input_bar())
 
+        self._declined_switches: dict[tuple[str, str], float] = {}
+        self._switch_dialog = None
         backend.status_changed.connect(self.show_status)
         backend.mic_level.connect(self.mic_bar.set_level)
         backend.speaker_level.connect(self.speaker_bar.set_level)
         backend.utterance.connect(self.show_utterance)
+        backend.setting_switched.connect(self._on_setting_switched)
+        backend.switch_prompt_requested.connect(self._on_switch_requested)
+        local_download.shared().finished.connect(self._local_model_arrived)
 
         self._hover = QTimer(self)
         self._hover.timeout.connect(self._check_hover)
@@ -109,6 +191,9 @@ class MainWindow(QWidget):
         self.dot.setFixedSize(8, 8)
         self.status = QLabel()
         self.status.setObjectName("dim")
+        self.status.setFixedWidth(self.status.fontMetrics().horizontalAdvance("VRChat") + 4)
+        self.music_button = self._button("music", "Music to microphone", self.open_music)
+        self.music_button.setFixedSize(28, 28)
         self.mic_button = self._button("mic", "", lambda: self._flip("mic_on"))
         self.mic_device_button = self._audio_picker("mic_device", "Microphone input")
         self.mic_bar = LevelBar()
@@ -138,6 +223,7 @@ class MainWindow(QWidget):
         self.pin_button = self._button("pin", "", lambda: self._flip("always_on_top"))
         row.addWidget(self.dot)
         row.addWidget(self.status)
+        row.addWidget(self.music_button)
         row.addSpacing(8)
         row.addWidget(self.mic_device_button)
         row.addWidget(self.mic_button)
@@ -157,6 +243,7 @@ class MainWindow(QWidget):
         row.addWidget(self._button("min", "Minimise", self.showMinimized))
         row.addWidget(self._button("max", "Maximise", self.toggle_maximized))
         row.addWidget(self._button("close", "Close", self.close, "close"))
+        bar.enable_child_dragging()
         return bar
 
     def _audio_picker(self, setting: str, tip: str) -> QToolButton:
@@ -192,7 +279,7 @@ class MainWindow(QWidget):
         self.settings_changed()
 
     def _build_lang_row(self) -> QWidget:
-        box = QWidget()
+        box = TitleBar()
         row = QHBoxLayout(box)
         row.setContentsMargins(4, 0, 0, 0)
         row.setSpacing(6)
@@ -202,14 +289,18 @@ class MainWindow(QWidget):
         self.their_lang = QComboBox()
         fill_lang_combo(self.their_lang, with_auto=True)
         self.their_lang.currentIndexChanged.connect(self._lang_picked)
+        self.their_lang2 = QComboBox()
+        fill_lang_combo(self.their_lang2, with_auto=False, optional=True)
+        self.their_lang2.currentIndexChanged.connect(self._lang_picked)
         self._tips.extend([
             (self.my_lang, "Your language. Subtitles are translated into it."),
+            (self.their_lang2, "Optional second translation of your microphone. OSC shows the original and each translation on a separate line."),
             (self.their_lang, "Your microphone is translated into this language. Auto-detect uses the "
                               "language heard last. Typed text uses the Send menu."),
         ])
         self.swap_button = self._button("swap", "Swap the two languages", self._swap)
         for text, widget in (("I speak", self.my_lang), ("", self.swap_button),
-                             ("They speak", self.their_lang)):
+                             ("They speak", self.their_lang), ("+", self.their_lang2)):
             if text:
                 label = QLabel(text)
                 label.setObjectName("dim")
@@ -218,6 +309,7 @@ class MainWindow(QWidget):
             row.addWidget(widget)
         row.addStretch(1)
         row.addWidget(self._button("trash", "Clear the chat log", self.log.clear))
+        box.enable_child_dragging()
         return box
 
     def _build_input_bar(self) -> QWidget:
@@ -266,7 +358,8 @@ class MainWindow(QWidget):
         self._status = status
         color = theme.STATUS_COLORS.get(status.level, theme.WARN)
         self.dot.setStyleSheet(f"background: {color}; border-radius: 4px;")
-        self.status.setText(tr(status.text))
+        self.status.setText("VRChat")
+        self.status.setAccessibleName(f"VRChat: {tr(status.text)}")
         self.status.setToolTip(i18n.tr_lines(status.detail))
         self.dot.setToolTip(i18n.tr_lines(status.detail))
 
@@ -278,6 +371,52 @@ class MainWindow(QWidget):
             self.delay.setText(f"{utterance.latency_ms / 1000:.1f} s")
 
     # ---- user actions ---------------------------------------------------
+
+    def _on_music_state_changed(self, active: bool) -> None:
+        self._music_active = active
+        if not active:
+            self._music_level = 0.0
+            self.music_button.setGraphicsEffect(None)
+            self._music_glow_effect = None
+            self.music_button.setIcon(theme.icon("music", theme.TEXT))
+            self.music_button.setIconSize(QSize(18, 18))
+        else:
+            self._update_music_glow(0.0)
+
+    def _update_music_glow(self, peak: float) -> None:
+        if not getattr(self, "_music_active", False):
+            return
+        prev = getattr(self, "_music_level", 0.0)
+        level = peak if peak > prev else max(peak, prev * 0.8)
+        self._music_level = level
+
+        size = 18 + int(round(level * 4))
+        self.music_button.setIcon(theme.icon("music", theme.OK, size))
+        self.music_button.setIconSize(QSize(size, size))
+
+        if self._music_glow_effect is None:
+            self._music_glow_effect = QGraphicsDropShadowEffect(self.music_button)
+            self._music_glow_effect.setOffset(0, 0)
+            self.music_button.setGraphicsEffect(self._music_glow_effect)
+        blur = 6 + int(round(level * 14))
+        alpha = min(255, int(130 + round(level * 125)))
+        glow_color = QColor(theme.OK)
+        glow_color.setAlpha(alpha)
+        self._music_glow_effect.setColor(glow_color)
+        self._music_glow_effect.setBlurRadius(blur)
+
+    def open_music(self) -> None:
+        if self._music_dialog is None:
+            from .music_dialog import MusicDialog
+            self._music_dialog = MusicDialog(self.settings, self)
+            self._music_dialog.state_changed.connect(self._on_music_state_changed)
+            self._music_dialog.peak_changed.connect(self._update_music_glow)
+        self._music_dialog.refresh()
+        self._music_dialog.show()
+        self._music_dialog.raise_()
+        self._music_dialog.activateWindow()
+        if self._music_dialog._attachment is None and not self._music_dialog._setup_prompted:
+            self._music_dialog.offer_setup()
 
     def send_typed(self) -> None:
         text = self.input.text().strip()
@@ -300,6 +439,74 @@ class MainWindow(QWidget):
         self._dialog.raise_()
         self._dialog.activateWindow()
 
+    def _local_model_arrived(self, problem: str) -> None:
+        """The Local Model was asked for in Settings and its download is complete: hear with it
+        from now on (also when the settings window was closed meanwhile)."""
+        if not problem and not local_model.missing():
+            self.settings.hearing = "local"
+            self.settings_changed()
+
+    def _on_setting_switched(self, setting: str, value: str) -> None:
+        if hasattr(self.settings, setting):
+            if getattr(self.settings, setting, None) != value:
+                setattr(self.settings, setting, value)
+                self.settings_changed()
+        if self._dialog:
+            self._dialog.sync()
+
+    def _on_switch_requested(self, category: str, failed_service: str, reason: str = "") -> None:
+        if getattr(self, "_switch_dialog", None) is not None and self._switch_dialog.isVisible():
+            return
+        now = time.time()
+        last_declined = self._declined_switches.get((category, failed_service), 0)
+        if now - last_declined < 60:
+            return
+        current_active = getattr(self.settings, category, "")
+        if current_active != failed_service:
+            return
+
+        from .switch_dialog import SwitchModelDialog
+        dialog = SwitchModelDialog(category, failed_service, self.settings, reason=reason, parent=self)
+        self._switch_dialog = dialog
+        dialog.switched.connect(self._handle_model_switched)
+        dialog.declined.connect(lambda: self._declined_switches.update({(category, failed_service): time.time()}))
+        dialog.open_local_download.connect(self._open_local_model_download)
+        dialog.open_settings_page.connect(self._open_settings_models)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _handle_model_switched(self, category: str, service: str, model_name: str) -> None:
+        if getattr(self.settings, category, None) != service:
+            setattr(self.settings, category, service)
+            self.settings_changed()
+        if category == "translating":
+            self.backend.current_translating_service = service
+            if model_name:
+                self.backend.current_translating_model = model_name
+                self.backend.setting_switched.emit("translating_model", model_name)
+            self.backend.setting_switched.emit("translating", service)
+        elif category == "hearing":
+            self.backend.current_hearing_service = service
+            if model_name:
+                self.backend.current_hearing_model = model_name
+                self.backend.setting_switched.emit("hearing_model", model_name)
+            self.backend.setting_switched.emit("hearing", service)
+        if self._dialog:
+            self._dialog.sync()
+
+    def _open_local_model_download(self) -> None:
+        from .settings_window import LocalModelDialog
+        LocalModelDialog(self).show()
+
+    def _open_settings_models(self, page_name: str = "Models") -> None:
+        self.open_settings()
+        if self._dialog:
+            for i in range(self._dialog.nav.count()):
+                if self._dialog.nav.item(i).text() == tr("Models"):
+                    self._dialog.nav.setCurrentRow(i)
+                    break
+
     def _flip(self, name: str) -> None:
         setattr(self.settings, name, not getattr(self.settings, name))
         self.settings_changed()
@@ -307,6 +514,7 @@ class MainWindow(QWidget):
     def _lang_picked(self) -> None:
         self.settings.my_lang = self.my_lang.currentData()
         self.settings.their_lang = self.their_lang.currentData()
+        self.settings.their_lang2 = self.their_lang2.currentData()
         self.settings_changed()
 
     def _send_lang_picked(self, code: str) -> None:
@@ -344,8 +552,10 @@ class MainWindow(QWidget):
             label.setText(tr(text))
         self.my_lang.setAccessibleName(tr("I speak"))
         self.their_lang.setAccessibleName(tr("They speak"))
+        self.their_lang2.setAccessibleName(tr("Second language"))
         retranslate_lang_combo(self.my_lang)
         retranslate_lang_combo(self.their_lang)
+        retranslate_lang_combo(self.their_lang2)
         self.input.setPlaceholderText(tr("Type a message — Enter translates and sends it"))
         self.input.setAccessibleName(tr("Message to translate and send"))
         for code, action in self.send_lang_actions.items():
@@ -364,7 +574,7 @@ class MainWindow(QWidget):
                 self._dialog.nav.setCurrentRow(page)
 
     def _swap(self) -> None:
-        if self.settings.their_lang == AUTO:
+        if self.settings.their_lang == AUTO or self.settings.their_lang2:
             return
         self.settings.my_lang, self.settings.their_lang = self.settings.their_lang, self.settings.my_lang
         self.settings_changed()
@@ -402,7 +612,8 @@ class MainWindow(QWidget):
         self.pin_button.setAccessibleName(tip)
         select_data(self.my_lang, s.my_lang)
         select_data(self.their_lang, s.their_lang)
-        self.swap_button.setEnabled(s.their_lang != AUTO)
+        select_data(self.their_lang2, s.their_lang2)
+        self.swap_button.setEnabled(s.their_lang != AUTO and not s.their_lang2)
         # the background darkness is the only background there is: no boxes behind the rows or
         # the buttons, so at a low setting only the letters show, with a shadow to stay readable
         self.log.set_look(s.font_px, s.show_original, s.backdrop < SHADOW_BELOW)
@@ -469,6 +680,8 @@ class MainWindow(QWidget):
             pass   # a read-only settings file must not break the window
 
     def closeEvent(self, event):
+        if self._music_dialog is not None:
+            self._music_dialog.shutdown()
         box = self.normalGeometry() if self.isMaximized() else self.geometry()
         self.settings.x, self.settings.y = box.x(), box.y()
         self.settings.w, self.settings.h = box.width(), box.height()

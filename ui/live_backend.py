@@ -13,7 +13,7 @@ from collections import deque
 
 from PySide6.QtCore import QTimer, Signal
 
-from vrc.chatbox import MIN_GAP_S, Chatbox, TypingDots, VRChatState, find_vrchat, fit, fit_bilingual
+from vrc.chatbox import MIN_GAP_S, Chatbox, TypingDots, VRChatState, find_vrchat, fit, fit_bilingual, fit_lines
 from vrc.translate import NoTranslator, TranslateError
 
 from .backend import AUTO, Backend, Status, Utterance
@@ -259,6 +259,7 @@ class LiveBackend(Backend):
             translation = self._translator.translate(utterance.original, target, source)
         except TranslateError as problem:
             error = str(problem)
+            self.switch_prompt_requested.emit("translating", self.settings.translating, str(problem))
         except Exception as problem:   # the worker must survive anything, or typing goes silent
             error = f"translation failed: {problem}"
         self._translated.emit(utterance, translation, error, int((time.perf_counter() - started) * 1000))
@@ -291,7 +292,9 @@ class LiveBackend(Backend):
             return
         notes = [utterance.note] if utterance.note else []
         translation = utterance.translation
-        if speaker:
+        if utterance.source == "mic":
+            outgoing, cut = fit_lines(utterance.original, translation, utterance.translation2)
+        elif speaker:
             outgoing, cut = fit_bilingual(translation, utterance.original)
         else:
             outgoing = translation or utterance.original
@@ -304,7 +307,6 @@ class LiveBackend(Backend):
         if not self.state.ready:
             utterance.sent = False
             self._dots.cancelled()
-            notes.append("VRChat is not running" if not self.state.running else "OSC is off in VRChat")
         else:
             self._outbox.append((utterance, outgoing))
         utterance.note = ", ".join(notes)

@@ -1,23 +1,11 @@
-"""Shared by all tests: they run as the friends' edition (a pretend Dev key service and update
-repository), in the developer's copy and in the public one alike. Tests of the public edition
-switch it off."""
+"""Keep every test away from this PC's provider credentials."""
 import pytest
 
-DEV = "https://dev.test/v1"
-EDITION = {"edition": "friends",
-           "dev": {"url": DEV, "hear_model": "whisper-large-v3-turbo", "translate_model": "model-a, model-b"},
-           "updates": "owner/friends-builds"}
+CUSTOM_URL = "https://custom.test/v1"
 
 
 @pytest.fixture(autouse=True)
-def friends_edition(monkeypatch):
+def isolated_models(tmp_path, monkeypatch):
     from engine import services
-    monkeypatch.setattr(services, "_edition", lambda: EDITION)
-
-
-@pytest.fixture
-def public_edition(monkeypatch):
-    """No edition file: the program as the public download has it."""
-    from engine import services
-    monkeypatch.setattr(services, "_edition", lambda: {})
-    return services
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    monkeypatch.setattr(services, "_cache", (None, {}))

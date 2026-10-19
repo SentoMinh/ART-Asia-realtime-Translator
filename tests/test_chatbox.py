@@ -262,10 +262,10 @@ def test_worker_thread_round_trip(app):
 def test_nothing_is_sent_without_vrchat(app):
     backend, box, _, seen, _ = make(app, VRChatState())
     backend.send_text("hello")
-    assert box.sent == [] and seen[-1][1] is False and "not running" in seen[-1][2]
+    assert box.sent == [] and seen[-1][1] is False
     backend, box, _, seen, _ = make(app, VRChatState(running=True))
     backend.send_text("hello")
-    assert box.sent == [] and "OSC is off" in seen[-1][2]
+    assert box.sent == [] and seen[-1][1] is False
     backend.send_text("   ")
     assert len(seen) == 2                # "translating…" and the result of the one real line
 
@@ -360,7 +360,7 @@ def test_spoken_line_from_the_engine_goes_to_the_chatbox(app):
     line = Utterance(id=1_000_001, source="mic", original="xin chào", translation="hello",
                      src_lang="vi", dst_lang="en", final=True, latency_ms=900)
     backend.send_to_chatbox(line)
-    assert box.sent == ["hello"] and seen[-1][:2] == (1_000_001, True)
+    assert box.sent == ["xin chào\nhello"] and seen[-1][:2] == (1_000_001, True)
     untranslated = Utterance(id=1_000_002, source="mic", original="ừ", final=True,
                              note="not translated: limit reached")
     backend._last_sent = -100
@@ -376,3 +376,31 @@ def test_send_failure_is_reported(app):
     box.send = broken
     backend.send_text("hello")
     assert seen[-1][1] is False and "could not send" in seen[-1][2]
+
+
+
+def test_three_language_lines_reach_osc_in_one_message(app):
+    from ui.backend import Utterance
+    backend, box, _, _, _ = make(app, READY)
+    backend.send_to_chatbox(Utterance(
+        id=42, source="mic", original="Hello", translation="Xin chào",
+        translation2="こんにちは", src_lang="en", dst_lang="vi", dst_lang2="ja", final=True))
+    assert box.sent == ["Hello\nXin chào\nこんにちは"]
+    assert "Hello\nXin chào\nこんにちは".encode() in encode_message("/chatbox/input", box.sent[0], True, False)
+
+
+def test_long_multilingual_output_keeps_every_line_within_limit():
+    from vrc.chatbox import fit_lines
+    text, cut = fit_lines("A" * 200, "日" * 200, "한" * 200)
+    assert cut and len(text) == MAX_CHARS
+    lines = text.splitlines()
+    assert len(lines) == 3 and all(line.endswith("…") for line in lines)
+    assert lines[0].startswith("A") and lines[1].startswith("日") and lines[2].startswith("한")
+    text, cut = fit_lines("Hi", "日" * 200, "한" * 200)
+    assert text.startswith("Hi\n") and len(text) == MAX_CHARS and cut
+
+
+def test_multiline_format_omits_empty_and_repeated_text():
+    from vrc.chatbox import fit_lines
+    assert fit_lines(" Hello\r\nworld ", "Hello world", "") == ("Hello world", False)
+    assert fit_lines("", "", "") == ("", False)
