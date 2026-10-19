@@ -178,13 +178,13 @@ class LocalWhisper:
     def load(self) -> None:
         if self._model is not None:
             return
-        problem = local_model.missing()
+        problem = local_model.missing(self._model_id)
         if problem:
             raise SttError(problem)
         try:
             _add_gpu_libraries()
-            if local_model.ready():
-                source = str(local_model.folder() / "whisper")     # the program's own download
+            if local_model.ready(model=self._model_id):
+                source = str(local_model.model_folder(self._model_id))     # the program's own download
             else:
                 import huggingface_hub.file_download as download
                 # Without Windows developer mode the model cache can't use file links, and the

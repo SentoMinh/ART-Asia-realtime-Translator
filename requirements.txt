@@ -9,8 +9,11 @@ onnxruntime>=1.20        # runs the voice detector (engine/assets/silero_vad_v6.
 httpx>=0.28              # the online hearing and translating services
 zhconv>=1.4              # simplified / traditional Chinese
 
-# only for "This PC (Whisper)" on an NVIDIA GPU:
+# Local speech recognition and translation:
 faster-whisper>=1.2
+sherpa-onnx>=1.12       # SenseVoice on CPU
+ctranslate2>=4.6        # local NLLB translation
+tokenizers>=0.21        # NLLB tokenizer, without a PyTorch runtime
 nvidia-cublas-cu12
 nvidia-cudnn-cu12
 

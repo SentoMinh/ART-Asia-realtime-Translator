@@ -35,6 +35,7 @@ The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run
 
 | Service | Hears speech | Translates | Good to know |
 |---|---|---|---|
+| Local Model | ✓ SenseVoice or Whisper | ✓ NLLB-200 (CTranslate2) | download the chosen models; no API key |
 | OpenAI | ✓ Whisper-style transcription | ✓ | uses the configured models |
 | Google Gemini | ✓ audio chat | ✓ | uses the configured models |
 | Qwen (Alibaba Cloud) | ✓ ASR | ✓ | hearing and translation models are separate |
@@ -42,7 +43,7 @@ The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run
 | OpenRouter | ✓ with a suitable audio model | ✓ | capabilities depend on the chosen model |
 | Custom | ✓ | ✓ | any OpenAI-compatible address, e.g. a Whisper server on your own PC |
 
-Each service's **Set up…** window has key/model fields and **Test**; **Get a key** appears where a provider link is configured. Empty model fields use the shown defaults. Several translating models can be listed with commas for fallback.
+Each online service's **Set up…** window has key/model fields and **Test**; **Get a key** appears where a provider link is configured. Empty model fields use the shown defaults. Several translating models can be listed with commas for fallback.
 
 Custom servers offering `nllb-200-ct2` use their `/translate` endpoint with explicit language codes; other translation models use `/chat/completions`.
 
@@ -50,11 +51,20 @@ Custom servers offering `nllb-200-ct2` use their `/translate` endpoint with expl
 
 Every normal startup checks configured APIs silently in the background. In **Settings → Models**, status moves from **Checking connection…** to **Online** or **Connection issue**, with a maximum 30-second wait per check. Hover for details. Saving a provider triggers another check. Unconfigured services are skipped. These are connection/authentication checks, not speech or translation requests; an online result does not guarantee that every model works. A missing model-list endpoint is reported as a connection issue; check the API base URL and server configuration.
 
-### The Local Model: hearing on your own graphics card
+### Local models: hearing and translation on your PC
 
-**Local Model (this PC)** is Whisper large-v3-turbo running on your own NVIDIA graphics card: no key and no limits, and what is said never leaves your PC to be heard (the text still goes to the translating service). It uses about 2.4 GB of the card's memory.
+Open **Settings → Models → Local Model → Set up…** and choose a model:
 
-Pick it in **Settings → Models → Hearing**. The first time, its window offers a one-time download of 2.0 GB (NVIDIA's cuBLAS library from PyPI and the model from Hugging Face). You can close the window and keep using the program; hearing switches to the Local Model when everything has arrived. A download that broke off continues where it stopped.
+| Model | Job | Hardware and languages |
+|---|---|---|
+| Whisper large-v3-turbo | Hearing | NVIDIA GPU; includes Vietnamese. |
+| Whisper large-v3 | Hearing | NVIDIA GPU; needs more memory than turbo. |
+| SenseVoice Small | Hearing | CPU; Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese. |
+| NLLB-200 · CTranslate2 | Translation | CPU, INT8; English, Vietnamese, Chinese, Cantonese, Japanese and Korean. |
+
+Each choice shows its download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** switches to a model already installed. Hearing and translation keep separate selections. Whisper shares the downloaded NVIDIA cuBLAS library between its two choices.
+
+Local inference needs no API key. Select Local Model for both Hearing and Translating to run both steps on your PC. The first download needs internet access. Optional translation add-ons retain their existing fallback behavior.
 
 ## The window
 
@@ -95,7 +105,7 @@ Existing saved API settings are retained where recoverable. If an older installa
 - `%APPDATA%\VRChat-Translator\ui.json` — settings; `models.json` — keys and chosen models in plain text under your Windows profile. The app does not encrypt them or apply a separate file ACL.
 - `%APPDATA%\VRChat-Translator\addons\` — empty unless you add your own translator (below).
 - `%LOCALAPPDATA%\VRChat-Translator\engine.log` — every sentence heard, its language, the translation and the delay. Look here first when nothing appears.
-- `%LOCALAPPDATA%\VRChat-Translator\local-model\` — the Local Model's files (2.2 GB), only after you downloaded them. Deleting the folder frees the space; the program offers the download again.
+- `%LOCALAPPDATA%\VRChat-Translator\local-model\` — downloaded local model files; size depends on your choices. Deleting the folder frees the space; the program offers the downloads again.
 
 What you type or say, and what other players say, is sent to the service picked in Settings → Models to be heard and translated.
 
@@ -118,7 +128,7 @@ run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
 - Build the one-file program: `pwsh -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10` (use your validated native build directory; see [APO build instructions](apo/README.md)). `-Folder` builds a folder and ZIP. Without `-MixerBuild`, native mixer DLLs are not explicitly included by the build command.
 - Check a build: `VRChat-Translator.exe --selfcheck` writes `%LOCALAPPDATA%\VRChat-Translator\selfcheck.txt`
 
-Source validation for 0.11.6: **371 tests passed**, and a live custom NLLB translation succeeded. No new EXE was built for this source update.
+Source validation for 0.11.7: **385 tests passed**, plus actual CPU inference with SenseVoice on a sample recording and NLLB translating English to Vietnamese. No new EXE was built; the new Whisper large-v3 choice has not been tested with downloaded weights on a GPU.
 
 Historical 0.11.5 checks covered automated tests, packaged self-checks, source/bundled-code privacy scans, and ZIP/checksum verification. A new package must be verified separately. These checks do not establish fresh-PC installation, live Windows 10 behavior or Japanese/Korean recognition accuracy with real services.
 
@@ -126,7 +136,7 @@ Historical 0.11.5 checks covered automated tests, packaged self-checks, source/b
 
 - `ui\` — the window (PySide6): main window, settings, chat log, the three window languages.
 - `vrc\` — VRChat itself: finding it, the chatbox (OSC), sound capture, text translation.
-- `engine\` — speech: voice detector → sentences → speech-to-text (an online service or local Whisper) → translation. `engine\services.py` lists the services.
+- `engine\` — speech: voice detector → sentences → speech-to-text (online or local Whisper/SenseVoice) → translation (online or local NLLB). `engine\services.py` lists the services.
 - `apo\` — native microphone mixer and development validation/removal tools; `driver\` retains the earlier unused virtual-microphone prototype.
 - [MUSIC_SETUP.md](MUSIC_SETUP.md) — music routing and current compatibility limits; [CODEBASE.md](CODEBASE.md) — developer map and verification status.
 - [BENCHMARK.md](BENCHMARK.md) — how the speech and translation models were chosen.

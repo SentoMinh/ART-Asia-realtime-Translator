@@ -4,6 +4,15 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Local model": "本地模型",
+    "Use model": "使用模型",
+    "Choose a hearing or translation model to download and run on this PC. No API key is needed.": "选择语音识别或翻译模型，下载后在本机运行。无需 API 密钥。",
+    "Download: {size}. The model becomes active when the download finishes. You can close this window while it continues.": "下载大小：{size}。下载完成后会启用此模型。关闭此窗口后下载仍会继续。",
+    "SenseVoice runs on CPU: Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese.": "SenseVoice 使用 CPU，支持普通话、粤语、英语、日语和韩语。越南语请使用 Whisper。",
+    "NLLB-200 translates locally on CPU using CTranslate2 (INT8).": "NLLB-200 使用 CTranslate2（INT8）在本机 CPU 上翻译。",
+    "Whisper runs on your NVIDIA graphics card. Large-v3 needs more memory than turbo.": "Whisper 使用 NVIDIA 显卡。Large-v3 比 turbo 需要更多显存。",
+    "You can switch to your downloaded local hearing model.": "可以切换到已下载的本地语音识别模型。",
+    "Choose a local hearing model to download and run on this PC.": "选择本地语音识别模型，下载后在本机运行。",
     "None": "无",
     "Second language": "第二种语言",
     "Optional second translation of your microphone. OSC shows the original and each translation on a separate line.": "可选的第二种麦克风翻译语言。OSC 将原文和每种译文分别显示在独立的一行。",
@@ -257,6 +266,15 @@ _ZH = {
 }
 
 _VI = {
+    "Local model": "Mô hình cục bộ",
+    "Use model": "Dùng mô hình",
+    "Choose a hearing or translation model to download and run on this PC. No API key is needed.": "Chọn mô hình nhận dạng giọng nói hoặc dịch để tải về và chạy trên máy này. Không cần khóa API.",
+    "Download: {size}. The model becomes active when the download finishes. You can close this window while it continues.": "Dung lượng tải: {size}. Mô hình sẽ được dùng khi tải xong. Bạn có thể đóng cửa sổ này trong khi vẫn tiếp tục tải.",
+    "SenseVoice runs on CPU: Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese.": "SenseVoice chạy trên CPU: tiếng Trung, Quảng Đông, Anh, Nhật và Hàn. Hãy dùng Whisper cho tiếng Việt.",
+    "NLLB-200 translates locally on CPU using CTranslate2 (INT8).": "NLLB-200 dịch trên CPU của máy bằng CTranslate2 (INT8).",
+    "Whisper runs on your NVIDIA graphics card. Large-v3 needs more memory than turbo.": "Whisper chạy trên card NVIDIA. Large-v3 cần nhiều bộ nhớ hơn turbo.",
+    "You can switch to your downloaded local hearing model.": "Bạn có thể chuyển sang mô hình nhận dạng giọng nói cục bộ đã tải.",
+    "Choose a local hearing model to download and run on this PC.": "Chọn mô hình nhận dạng giọng nói cục bộ để tải về và chạy trên máy này.",
     "None": "Không",
     "Second language": "Ngôn ngữ thứ hai",
     "Optional second translation of your microphone. OSC shows the original and each translation on a separate line.": "Ngôn ngữ dịch thứ hai cho micrô (tùy chọn). OSC hiển thị bản gốc và mỗi bản dịch trên một dòng riêng.",
