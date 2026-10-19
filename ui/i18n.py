@@ -4,6 +4,9 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Name": "名称",
+    "Add domain": "添加域名",
+    "Remove domain": "移除域名",
     "Local model": "本地模型",
     "Use model": "使用模型",
     "Choose a hearing or translation model to download and run on this PC. No API key is needed.": "选择语音识别或翻译模型，下载后在本机运行。无需 API 密钥。",
@@ -266,6 +269,9 @@ _ZH = {
 }
 
 _VI = {
+    "Name": "Tên",
+    "Add domain": "Thêm tên miền",
+    "Remove domain": "Xóa tên miền",
     "Local model": "Mô hình cục bộ",
     "Use model": "Dùng mô hình",
     "Choose a hearing or translation model to download and run on this PC. No API key is needed.": "Chọn mô hình nhận dạng giọng nói hoặc dịch để tải về và chạy trên máy này. Không cần khóa API.",

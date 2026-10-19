@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Current source version: **0.11.6**. Everyone uses the same app; enter their API URL and key under **Custom domain**. This source update does not publish a new EXE release.
+Version **0.11.7**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
@@ -20,14 +20,14 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 1. Use a published ZIP or EXE, when available, downloaded from [Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
-4. Open **Settings (gear) → Models** and set up your provider key, or enter your API URL and key under **Custom domain**. New profiles default to Google Gemini; available models and account limits depend on your provider. Select separate hearing and translation models, then **Save**.
+4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Select separate hearing and translation models, then **Save**.
 5. Open **Settings → Sound → Microphone** and pick the microphone you use in VRChat.
 
 VRChat has to run in windowed or borderless mode for the window to stay on top of it.
 
 Builds use `VRChat-Translator-<version>.exe` or `VRChat-Translator-<version>-win64.zip`, with one package for everyone. Settings and provider keys stay in your Windows profile.
 
-The packaged app checks GitHub for newer releases, downloads updates in the background, and applies them on the next start. No provider key is sent to GitHub. A source commit does not publish an application update. Downloads come from [GitHub Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases).
+The packaged app checks GitHub for newer releases, downloads updates in the background, and applies them on the next start. No provider key is sent to GitHub. A source commit does not publish an application update. The old 0.9.15 EXE did not have an update source configured: download this release manually once to enable future automatic updates. Downloads come from [GitHub Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases).
 
 The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run `install_windows.bat` if the Microsoft Visual C++ runtime is needed, or `install_windows.bat --check` for a read-only platform precheck. The script's microphone-permission reminder is general guidance, not detection of blocked access. Live Windows 10 testing remains outstanding. On Windows 10, speaker capture may include other apps sharing the audio output; selected-app music injection currently requires Windows 11.
 
@@ -36,14 +36,9 @@ The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run
 | Service | Hears speech | Translates | Good to know |
 |---|---|---|---|
 | Local Model | ✓ SenseVoice or Whisper | ✓ NLLB-200 (CTranslate2) | download the chosen models; no API key |
-| OpenAI | ✓ Whisper-style transcription | ✓ | uses the configured models |
-| Google Gemini | ✓ audio chat | ✓ | uses the configured models |
-| Qwen (Alibaba Cloud) | ✓ ASR | ✓ | hearing and translation models are separate |
-| Xiaomi MiMo | – | ✓ | translation only in this app |
-| OpenRouter | ✓ with a suitable audio model | ✓ | capabilities depend on the chosen model |
-| Custom | ✓ | ✓ | any OpenAI-compatible address, e.g. a Whisper server on your own PC |
+| Custom domain | ✓ | ✓ | an OpenAI-compatible API address; add more with **+** |
 
-Each online service's **Set up…** window has key/model fields and **Test**; **Get a key** appears where a provider link is configured. Empty model fields use the shown defaults. Several translating models can be listed with commas for fallback.
+The **Services** section lists only your custom domains. **Set up…** has a name, API address, key, model fields, **Fetch models** and **Test**. Use **+** beside a row to add another domain, or **−** to remove an added one. The first domain remains available. Removing a selected domain switches that role back to the first domain. Previously selected, configured providers are preserved as custom domains when upgrading. Several translating models can be listed with commas for fallback.
 
 Custom servers offering `nllb-200-ct2` use their `/translate` endpoint with explicit language codes; other translation models use `/chat/completions`.
 
@@ -128,7 +123,7 @@ run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
 - Build the one-file program: `pwsh -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10` (use your validated native build directory; see [APO build instructions](apo/README.md)). `-Folder` builds a folder and ZIP. Without `-MixerBuild`, native mixer DLLs are not explicitly included by the build command.
 - Check a build: `VRChat-Translator.exe --selfcheck` writes `%LOCALAPPDATA%\VRChat-Translator\selfcheck.txt`
 
-Source validation for 0.11.7: **385 tests passed**, plus actual CPU inference with SenseVoice on a sample recording and NLLB translating English to Vietnamese. No new EXE was built; the new Whisper large-v3 choice has not been tested with downloaded weights on a GPU.
+Source validation for 0.11.7: **394 tests passed**, plus actual CPU inference with SenseVoice on a sample recording and NLLB translating English to Vietnamese. The EXE includes the local runtimes and microphone mixer. Whisper large-v3 has not been tested with downloaded weights on a GPU.
 
 Historical 0.11.5 checks covered automated tests, packaged self-checks, source/bundled-code privacy scans, and ZIP/checksum verification. A new package must be verified separately. These checks do not establish fresh-PC installation, live Windows 10 behavior or Japanese/Korean recognition accuracy with real services.
 

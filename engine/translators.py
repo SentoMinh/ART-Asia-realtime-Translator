@@ -52,11 +52,11 @@ class ServiceTranslator:
         name = services.title(self.service)
         if self._http is None:
             import httpx
-            timeout = 60 if self.service == "custom" else 15
+            timeout = 60 if services.is_custom(self.service) else 15
             self._http = httpx.Client(timeout=timeout)
         body = {"model": self.model, "temperature": 0, "max_tokens": 1024,
                 "messages": chat_messages(text, target, likely_source, heard=heard)}
-        direct = self.service == "custom" and self.model == "nllb-200-ct2"
+        direct = services.is_custom(self.service) and self.model == "nllb-200-ct2"
         try:
             if direct:
                 # This translation-only server accepts language codes, not chat prompts.

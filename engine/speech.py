@@ -192,7 +192,7 @@ class SpeechEngine:
 
     def _engine(self):
         name = getattr(self.backend.settings, "hearing", "") or services.default_service()
-        if name not in self._engines and name in services.SERVICES:
+        if name not in self._engines and (name in services.SERVICES or services.is_custom(name)):
             self._engines[name] = CloudHearing(name)
         engine = self._engines.get(name) or self._engines["local"]
         self._missing = ""

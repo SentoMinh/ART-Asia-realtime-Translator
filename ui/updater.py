@@ -60,7 +60,13 @@ def apply_pending(program: Path, launch=subprocess.Popen) -> bool:
     except OSError:
         log.exception("the update could not be put in place")
         return False
-    launch([str(program), *sys.argv[1:]], close_fds=True, env=fresh_environment())
+    try:
+        launch([str(program), *sys.argv[1:]], close_fds=True, env=fresh_environment())
+    except OSError:
+        log.exception("the updated program could not be started; restoring the previous version")
+        program.rename(new)
+        old.rename(program)
+        return False
     return True
 
 
@@ -101,15 +107,20 @@ class Updater:
         release = answer.json()
         version = str(release.get("tag_name") or "").lstrip("vV")
         asset = next((a for a in release.get("assets") or []
-                      if str(a.get("name", "")).lower().endswith(".exe")), None)
+                      if str(a.get("name", "")).lower().startswith("vrchat-translator")
+                      and str(a.get("name", "")).lower().endswith(".exe")), None)
         if not version or asset is None or version_tuple(version) <= version_tuple(self.current):
             return ""
         size = int(asset.get("size") or 0)
         expected = str(asset.get("digest") or "").lower().removeprefix("sha256:")
         new = beside(self.program, ".new")
-        if new.exists() and new.stat().st_size == size:
-            self._on_ready(version)             # downloaded before, not started yet
-            return version
+        if new.exists() and new.stat().st_size == size and expected:
+            with new.open("rb") as cached:
+                valid = hashlib.file_digest(cached, "sha256").hexdigest() == expected
+            if valid:
+                self._on_ready(version)
+                return version
+        new.unlink(missing_ok=True)             # A stale or damaged pending file must not be applied.
         part = beside(self.program, ".part")
         digest, received = hashlib.sha256(), 0
         link = str(asset["browser_download_url"])

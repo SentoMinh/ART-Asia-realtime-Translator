@@ -28,12 +28,12 @@ def get_ready_models(category: str, exclude: str = "") -> list[tuple[str, str, s
             if category == "hearing":
                 model = services.setting(svc, "hear_model")
                 if not model and svc in services.SERVICES:
-                    model = services.SERVICES[svc].hear_model
+                    model = services.info(svc).hear_model
             else:
                 models = services.translate_models(svc)
                 model = models[0] if models else services.setting(svc, "translate_model")
                 if not model and svc in services.SERVICES:
-                    model = services.SERVICES[svc].translate_model
+                    model = services.info(svc).translate_model
             title = services.title(svc)
             label = f"{model} ({title})" if model else title
             results.append((svc, model, label))

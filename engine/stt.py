@@ -270,7 +270,7 @@ class CloudHearing:
             raise SttError(problem)
         if self._http is None:
             import httpx
-            timeout = 60 if self.name == "custom" else 20
+            timeout = 60 if services.is_custom(self.name) else 20
             self._http = httpx.Client(timeout=timeout)
 
     def transcribe(self, samples: np.ndarray, lang: str | None, prefer: tuple = ()) -> Heard:
@@ -329,7 +329,7 @@ class CloudHearing:
         model = services.setting(self.name, "hear_model")
         if not model:
             raise SttError(f"{title} has no hearing model yet (Settings → Models)")
-        style = services.SERVICES[self.name].hear_style if self.name in services.SERVICES else "whisper"
+        style = services.info(self.name).hear_style
         url = services.setting(self.name, "url").rstrip("/")
         sound = wav_bytes(samples)
         try:
