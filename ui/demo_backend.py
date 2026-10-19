@@ -87,13 +87,15 @@ class DemoBackend(Backend):
         heard = texts[src]
         if self._current is None:
             self._current = Utterance(id=self._take_id(), source="mic" if mine else "speaker",
-                                      speaker=who, src_lang=src, dst_lang=dst)
+                                      speaker=who, src_lang=src, dst_lang=dst,
+                                      dst_lang2=self.settings.their_lang2 if mine and self.settings.their_lang2 != dst else "")
         self._pos += 1 if src == "zh" else 3
         u = self._current
         u.original = heard[:self._pos]
         if self._pos >= len(heard):
             u.final = True
             u.translation = "" if src == dst else texts[dst]
+            u.translation2 = texts.get(u.dst_lang2, "") if u.dst_lang2 != src else ""
             u.latency_ms = random.randint(600, 1400)
             if mine:
                 u.sent = False

@@ -1,0 +1,287 @@
+"""The Local Model's big files, and whether it can run on this PC.
+
+The program file (.exe) carries the speech model's code but not its 2 GB of data. When "Local
+Model" is first chosen (Settings → Models), these are downloaded into
+%LOCALAPPDATA%\\VRChat-Translator\\local-model:
+    gpu\\      cuBLAS, the one NVIDIA library the model loads, taken out of NVIDIA's package on PyPI
+    whisper\\  Whisper large-v3-turbo in faster-whisper's format, from Hugging Face
+Each download is checked against its known SHA-256 before it is used. One that broke off
+continues where it stopped.
+
+The source version gets cuBLAS as a Python package (requirements.txt) and lets faster-whisper
+fetch the model, so it needs none of this. When these files are there, it uses them too.
+"""
+from __future__ import annotations
+
+import ctypes
+import hashlib
+import importlib.util
+import os
+import shutil
+import time
+import zipfile
+from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+
+NAME = "Whisper"
+BLOCK = 1 << 20
+TRIES = 5                 # a connection that breaks this often in a row, without a byte arriving, ends it
+WAITING = "downloading"   # unfinished downloads wait in this folder
+
+
+class DownloadError(Exception):
+    """The download did not finish; the message says why in plain words."""
+
+
+class Stopped(DownloadError):
+    """The user stopped it. What arrived so far is kept for the next time."""
+
+
+@dataclass(frozen=True)
+class Part:
+    url: str
+    size: int                 # bytes to download
+    sha256: str               # of the download
+    place: str = ""           # where it goes in the folder; or, for a zip:
+    unzip: tuple[tuple[str, str, int], ...] = ()    # (name in the zip, where it goes, its size)
+
+    @property
+    def name(self) -> str:
+        return self.url.rsplit("/", 1)[-1]
+
+    def files(self) -> tuple[tuple[str, int], ...]:
+        """(place, size) of every file this part leaves in the folder."""
+        return tuple((place, size) for _, place, size in self.unzip) or ((self.place, self.size),)
+
+
+_WHISPER = ("https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo/resolve/"
+            "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/")
+PARTS = (
+    # of the 2 GB of NVIDIA libraries the source version installs, the model loads these two files
+    Part("https://files.pythonhosted.org/packages/20/e2/fc9a0e985249d873150276d5afb02e39a66817fedbf1a385724393e505ed/"
+         "nvidia_cublas_cu12-12.9.2.10-py3-none-win_amd64.whl", 553162896,
+         "623f43027d40d44ceadf0043f002bd25cf353e8f13ce90b9a87057019f560661",
+         unzip=(("nvidia/cublas/bin/cublas64_12.dll", "gpu/cublas64_12.dll", 102518272),
+                ("nvidia/cublas/bin/cublasLt64_12.dll", "gpu/cublasLt64_12.dll", 668673536))),
+    Part(_WHISPER + "config.json", 2263,
+         "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e", "whisper/config.json"),
+    Part(_WHISPER + "preprocessor_config.json", 340,
+         "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711", "whisper/preprocessor_config.json"),
+    Part(_WHISPER + "tokenizer.json", 2710337,
+         "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd", "whisper/tokenizer.json"),
+    Part(_WHISPER + "vocabulary.json", 1068114,
+         "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1", "whisper/vocabulary.json"),
+    Part(_WHISPER + "model.bin", 1617884929,
+         "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da", "whisper/model.bin"),
+)
+
+
+def folder() -> Path:
+    base = os.environ.get("LOCALAPPDATA") or str(Path.home())
+    return Path(base) / "VRChat-Translator" / "local-model"
+
+
+def gb(count: float) -> str:
+    return f"{count / 2**30:.1f} GB"
+
+
+def _has(part: Part, root: Path) -> bool:
+    try:
+        return all((root / place).stat().st_size == size for place, size in part.files())
+    except OSError:
+        return False
+
+
+def ready(root: Path | None = None) -> bool:
+    """Every file is in place (each was checked when it arrived)."""
+    root = root or folder()
+    return all(_has(part, root) for part in PARTS)
+
+
+def size() -> int:
+    """Bytes of the whole download."""
+    return sum(part.size for part in PARTS)
+
+
+def arrived(root: Path | None = None) -> int:
+    """Bytes that are here already: whole parts, and the start of one that broke off."""
+    root = root or folder()
+    count = 0
+    for part in PARTS:
+        if _has(part, root):
+            count += part.size
+        else:
+            try:
+                count += min((root / WAITING / part.name).stat().st_size, part.size)
+            except OSError:
+                pass
+    return count
+
+
+# ---- can it run here? ----------------------------------------------------------------------
+
+def installed() -> bool:
+    """The model's code is part of this copy: the program file has it; from source, the
+    faster-whisper package."""
+    return importlib.util.find_spec("faster_whisper") is not None
+
+
+@lru_cache(maxsize=1)
+def nvidia_card() -> bool:
+    """NVIDIA's driver is installed (it brings nvcuda.dll). The model runs on nothing else."""
+    try:
+        ctypes.WinDLL("nvcuda.dll")
+    except (OSError, AttributeError):      # AttributeError: not Windows
+        return False
+    return True
+
+
+def gpu_folders() -> list[str]:
+    """The folders that hold cuBLAS: the pip packages nvidia-cublas-cu12 / nvidia-cudnn-cu12 or
+    PyTorch (from source), and this download."""
+    folders = []
+    for package, sub in (("nvidia.cublas", "bin"), ("nvidia.cudnn", "bin"), ("torch", "lib")):
+        try:
+            spec = importlib.util.find_spec(package)
+        except (ImportError, ValueError):
+            spec = None
+        for location in (spec.submodule_search_locations or []) if spec else []:
+            place = Path(location) / sub
+            if place.is_dir():
+                folders.append(str(place))
+    if ready():
+        folders.append(str(folder() / "gpu"))
+    return folders
+
+
+def missing() -> str:
+    """What the Local Model lacks on this PC, in plain words; "" when it can run."""
+    if not installed():
+        return "this copy has no Local Model: choose an online service in Settings → Models"
+    if not nvidia_card():
+        return "the Local Model needs an NVIDIA graphics card, and this PC has none"
+    if not gpu_folders():
+        return "the Local Model is not downloaded yet (Settings → Models)"
+    return ""
+
+
+# ---- the download --------------------------------------------------------------------------
+
+def download(progress=lambda done, total: None, stop=lambda: False, http=None,
+             root: Path | None = None, wait=time.sleep) -> None:
+    """Fetches the parts that are missing. `progress(done, total)` is told the bytes that are
+    here; when `stop()` turns true the download ends with Stopped. Any other reason it can't
+    finish is a DownloadError."""
+    root = root or folder()
+    waiting = root / WAITING
+    total = size()
+    todo = [part for part in PARTS if not _has(part, root)]
+    done = total - sum(part.size for part in todo)
+    try:
+        waiting.mkdir(parents=True, exist_ok=True)
+        _check_room(todo, waiting)
+        if http is None and todo:
+            import httpx
+            http = httpx.Client(timeout=httpx.Timeout(20, read=30), follow_redirects=True)
+        for part in todo:
+            file = waiting / part.name
+            _fetch(http, part, file, lambda have: progress(done + have, total), stop, wait)
+            if _sha256(file, stop) != part.sha256:
+                file.unlink()
+                raise DownloadError(f"{part.name} arrived damaged and was thrown away; download again")
+            _put(part, file, root)
+            done += part.size
+            progress(done, total)
+        shutil.rmtree(waiting, ignore_errors=True)
+    except (OSError, zipfile.BadZipFile) as error:
+        raise DownloadError(f"the files could not be written: {error}") from error
+
+
+def _check_room(todo: list[Part], waiting: Path) -> None:
+    """A zip needs room for itself and for what comes out of it."""
+    need = 0
+    for part in todo:
+        try:
+            have = (waiting / part.name).stat().st_size
+        except OSError:
+            have = 0
+        need += max(part.size - have, 0) + sum(size for _, _, size in part.unzip)
+    free = shutil.disk_usage(waiting).free
+    if free < need:
+        drive = waiting.drive or str(waiting)
+        raise DownloadError(f"not enough free space on {drive}: {gb(need)} are needed, {gb(free)} are free")
+
+
+def _fetch(http, part: Part, file: Path, progress, stop, wait) -> None:
+    """Downloads `part` into `file`, continuing after what is already there."""
+    host = part.url.split("/")[2]
+    failures = 0
+    while True:
+        have = file.stat().st_size if file.exists() else 0
+        if have > part.size:
+            file.unlink()                       # not this file's beginning: start over
+            have = 0
+        if have == part.size:
+            return
+        before, problem = have, "it sent nothing"
+        try:
+            headers = {"Range": f"bytes={have}-"} if have else {}
+            with http.stream("GET", part.url, headers=headers) as answer:
+                if answer.status_code == 200:
+                    have = 0                    # the server sends everything again
+                elif answer.status_code != 206:
+                    raise DownloadError(f"{host} refused the download (error {answer.status_code})")
+                with open(file, "ab" if have else "wb") as out:
+                    for block in answer.iter_bytes(BLOCK):
+                        if stop():
+                            raise Stopped("stopped")
+                        try:
+                            out.write(block)
+                        except OSError as error:
+                            raise DownloadError(f"the files could not be written: {error}") from error
+                        have += len(block)
+                        progress(have)
+        except DownloadError:
+            raise
+        except Exception as error:              # the connection broke: go on from where it was
+            problem = str(error) or type(error).__name__
+        if stop():
+            raise Stopped("stopped")
+        if have >= part.size:
+            continue
+        failures = 0 if have > before else failures + 1
+        if failures >= TRIES:
+            raise DownloadError(f"the connection to {host} keeps breaking ({problem}); "
+                                "download again to continue from here")
+        wait(2 * max(failures, 1))
+
+
+def _sha256(file: Path, stop) -> str:
+    digest = hashlib.sha256()
+    with open(file, "rb") as source:
+        for block in iter(lambda: source.read(BLOCK), b""):
+            if stop():
+                raise Stopped("stopped")
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _put(part: Part, file: Path, root: Path) -> None:
+    """Moves a checked download to its place. Of a zip, only the files named in `unzip` stay."""
+    if not part.unzip:
+        target = root / part.place
+        target.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(file, target)
+        return
+    with zipfile.ZipFile(file) as archive:
+        for name, place, _ in part.unzip:
+            target = root / place
+            target.parent.mkdir(parents=True, exist_ok=True)
+            half = target.with_name(target.name + ".part")
+            with archive.open(name) as source, open(half, "wb") as out:
+                shutil.copyfileobj(source, out, BLOCK)
+            os.replace(half, target)
+    file.unlink()
+    if not _has(part, root):
+        raise DownloadError(f"{part.name} does not hold the files it should; download again")

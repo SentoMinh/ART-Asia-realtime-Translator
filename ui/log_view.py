@@ -14,7 +14,7 @@ from .i18n import tr, tr_note
 
 MAX_ROWS = 200
 FLOATING_DIM = "#d9d9e3"   # the small grey text, lighter when there is no background behind it
-SHORT = {"en": "EN", "zh": "ZH", "vi": "VI", "yue": "ZH(HK)"}   # yue = Cantonese, as the engine hears it
+SHORT = {"en": "EN", "zh": "ZH", "vi": "VI", "yue": "ZH(HK)", "ja": "JA", "ko": "KO"}
 
 
 class LogRow(QFrame):
@@ -33,7 +33,8 @@ class LogRow(QFrame):
         self.header = QLabel()
         self.original = QLabel()
         self.translation = QLabel()
-        for label in (self.header, self.original, self.translation):
+        self.translation2 = QLabel()
+        for label in (self.header, self.original, self.translation, self.translation2):
             label.setWordWrap(True)
             label.setTextFormat(Qt.RichText)
             label.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -49,7 +50,7 @@ class LogRow(QFrame):
         self.refresh()
 
     def other_language(self) -> str:
-        """"【Speaking Korean】" for another player's finished line in a language the app does
+        """"【Speaking Spanish】" for another player's finished line in a language the app does
         not translate; "" for every other line. (The engine only reports such a language when
         it is at least 80% sure; below that it treats the line as one of ours.)"""
         u = self.utterance
@@ -75,6 +76,8 @@ class LogRow(QFrame):
         other = self.other_language()
         if u.src_lang and u.dst_lang and u.src_lang != u.dst_lang and not other:
             meta.append(f"{SHORT.get(u.src_lang, u.src_lang)} → {SHORT.get(u.dst_lang, u.dst_lang)}")
+        if u.translation2:
+            meta.append(SHORT.get(u.dst_lang2, u.dst_lang2))
         if u.source == "typed":
             meta.append(tr("typed"))
         # the delay and "sent to chatbox" were shown while testing; engine.log still has the delay.
@@ -112,6 +115,8 @@ class LogRow(QFrame):
             self.original.setText(self._span(u.original, theme.TEXT, self._font_px))
             self.original.setVisible(True)
             self.translation.setVisible(False)
+        self.translation2.setText(self._span(u.translation2, theme.TEXT, self._font_px))
+        self.translation2.setVisible(bool(u.final and u.translation2 and not other))
         self._shade_letters(self._shadow)
 
     def _shade_letters(self, on: bool) -> None:

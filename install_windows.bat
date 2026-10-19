@@ -11,7 +11,7 @@ exit /b %setup_result%
 $ErrorActionPreference = 'Stop'
 $downloadDirectory = $null
 try {
-    Write-Host 'VRChat Translator - setup for the packaged Friends or Public EXE'
+    Write-Host 'VRChat Translator - setup for the packaged EXE'
     Write-Host 'Python and app libraries are already included in the release EXE.'
     Write-Host ''
     $os = Get-CimInstance Win32_OperatingSystem
@@ -55,8 +55,8 @@ try {
         default { throw ('Microsoft runtime installation failed (exit code {0}). Try again after restarting Windows.' -f $process.ExitCode) }
     }
     Write-Host ''
-    Write-Host 'Setup complete. Open your VRChat-Translator-Friends or Public EXE.'
-    Write-Host 'In the app, configure your provider API keys or authorized Friends access.'
+    Write-Host 'Setup complete. Open your VRChat-Translator EXE.'
+    Write-Host 'In the app, configure your provider API key or Custom domain URL and key.'
     Write-Host 'In VRChat, enable OSC from the action menu to use the chatbox.'
     Write-Host 'Allow microphone access in Windows Settings if microphone capture is blocked.'
     Write-Host 'An internet connection is required for online translation.'

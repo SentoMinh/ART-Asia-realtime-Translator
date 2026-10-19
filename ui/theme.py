@@ -30,6 +30,11 @@ def speaker_color(number: int) -> str:
 
 
 _SVG = {
+    "play": '<path d="M8 5l11 7-11 7z" fill="currentColor"/>',
+    "stop": '<rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor"/>',
+    "reload": '<path d="M20 7v5h-5M20 12a8 8 0 1 0-2.3 5.7"/>',
+    "music": '<path d="M9 17V5l11-2v12M9 8l11-2"/><ellipse cx="6" cy="17" rx="3" ry="2.5"/>'
+             '<ellipse cx="17" cy="15" rx="3" ry="2.5"/>',
     "mic": '<rect x="9" y="3" width="6" height="11" rx="3"/>'
            '<path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
     "mic_off": '<rect x="9" y="3" width="6" height="11" rx="3"/>'
@@ -115,6 +120,8 @@ def style_sheet() -> str:
     QSlider::groove:horizontal {{ height: 4px; background: {LINE}; border-radius: 2px; }}
     QSlider::sub-page:horizontal {{ background: {ACCENT}; border-radius: 2px; }}
     QSlider::handle:horizontal {{ background: {ACCENT}; width: 16px; margin: -6px 0; border-radius: 8px; }}
+    QProgressBar {{ background: {LINE}; border: none; border-radius: 3px; max-height: 6px; }}
+    QProgressBar::chunk {{ background: {ACCENT}; border-radius: 3px; }}
     QDialog#settings {{ background: #202024; }}
     QFrame#navPanel {{ background: transparent; border: none; border-right: 1px solid {LINE}; }}
     QListWidget#nav {{ background: transparent; border: none; outline: none; padding: 8px 6px; }}

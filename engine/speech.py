@@ -36,7 +36,7 @@ SPEAKER_THRESHOLD = 0.7   # game sound has music: stricter
 STALE_S = 10.0            # another player's sentence that waited this long is dropped: stay live
 REPEAT_S = 15.0           # the same line again within this time is music fooling the model
 REPORT_S = 30             # how often the log says how much sound arrived
-ANNOUNCE_S = 20.0         # "【Speaking Korean】" is shown again only after this long
+ANNOUNCE_S = 20.0         # "【Speaking Spanish】" is shown again only after this long
 MIC, SPEAKER = "mic", "speaker"
 
 
@@ -47,6 +47,8 @@ class SpeechEngine:
         self._engines = engines or {"local": LocalWhisper()}   # online ones are added when picked
         self._translator = translator or ServiceChain(
             lambda: getattr(backend.settings, "translating", ""))
+        if hasattr(self._translator, "on_switch") and getattr(self._translator, "on_switch") is None:
+            self._translator.on_switch = self._on_translator_switch
         self._clock = clock
         self._ids = itertools.count(FIRST_ID)
         self._order = itertools.count()
@@ -99,6 +101,44 @@ class SpeechEngine:
         if getattr(self.backend, "speech_status", None) != text:
             log.info("status: %s", text)
         self.backend.speech_status = text
+
+    def _switch_hearing(self, fallback: str = "local") -> None:
+        current = getattr(self.backend.settings, "hearing", "")
+        if current != fallback:
+            log.info("auto-switching hearing from %s to %s", current, fallback)
+            if hasattr(self.backend, "settings"):
+                self.backend.settings.hearing = fallback
+            tell = getattr(self.backend, "setting_switched", None)
+            if tell is not None and hasattr(tell, "emit"):
+                tell.emit("hearing", fallback)
+
+    def _request_switch(self, category: str, failed_service: str, reason: str = "") -> None:
+        tell = getattr(self.backend, "switch_prompt_requested", None)
+        if tell is not None and hasattr(tell, "emit"):
+            tell.emit(category, failed_service, reason)
+        else:
+            self._switch_hearing("local")
+
+    def _on_translator_switch(self, name: str) -> None:
+        tell = getattr(self.backend, "setting_switched", None)
+        if ":" in name:
+            svc, model = name.split(":", 1)
+            if hasattr(self.backend, "current_translating_service"):
+                self.backend.current_translating_service = svc
+            if getattr(self.backend, "current_translating_model", "") != model:
+                self.backend.current_translating_model = model
+                if tell is not None and hasattr(tell, "emit"):
+                    tell.emit("translating_model", model)
+            if hasattr(self.backend, "settings") and getattr(self.backend.settings, "translating", "") != svc:
+                if tell is not None and hasattr(tell, "emit"):
+                    tell.emit("translating", svc)
+                else:
+                    self.backend.settings.translating = svc
+        else:
+            if getattr(self.backend, "current_translating_model", "") != name:
+                self.backend.current_translating_model = name
+                if tell is not None and hasattr(tell, "emit"):
+                    tell.emit("translating_model", name)
 
     # ---- cut: sound -> sentences ---------------------------------------------------------
 
@@ -192,15 +232,38 @@ class SpeechEngine:
         if source == MIC:
             lang = settings.my_lang
         else:
-            lang = None if settings.their_lang == AUTO else settings.their_lang
-        prefer = tuple(code for code in (self.backend.last_heard, settings.my_lang) if code)
+            lang = None if settings.their_lang == AUTO or settings.their_lang2 else settings.their_lang
+        prefer = tuple(dict.fromkeys(code for code in (
+            settings.their_lang if settings.their_lang2 else "", settings.their_lang2,
+            self.backend.last_heard, settings.my_lang) if code and code != AUTO))
+        engine = self._engine()
         try:
-            heard = self._engine().transcribe(segment.samples, lang, prefer=prefer)
+            heard = engine.transcribe(segment.samples, lang, prefer=prefer)
         except SttError as error:
-            self._status(self._problem(error))
-            if source == MIC:
-                self._typing("typing_cancelled")
-            return
+            if engine is not self._engines.get("local") and "local" in self._engines:
+                local_eng = self._engines["local"]
+                if getattr(local_eng, "available", lambda: True)():
+                    log.warning("hearing failed on cloud, falling back to local: %s", error)
+                    try:
+                        heard = local_eng.transcribe(segment.samples, lang, prefer=prefer)
+                        self._request_switch("hearing", getattr(settings, "hearing", ""), str(error))
+                    except SttError as local_error:
+                        self._status(self._problem(local_error))
+                        if source == MIC:
+                            self._typing("typing_cancelled")
+                        return
+                else:
+                    self._status(self._problem(error))
+                    if source == MIC:
+                        self._typing("typing_cancelled")
+                    return
+            else:
+                self._status(self._problem(error))
+                if source == MIC:
+                    self._typing("typing_cancelled")
+                return
+        if engine is self._engines.get("local") and getattr(settings, "hearing", "") != "local":
+            self._request_switch("hearing", getattr(settings, "hearing", ""), self._missing)
         self._status("Listening")
         text = heard.text.strip()
         log.info("%s (%.1f s of sound, %s): %s", source, len(segment.samples) / 16000,
@@ -222,6 +285,8 @@ class SpeechEngine:
             target = self.backend.speech_target_lang()
         line = Utterance(id=next(self._ids), source=source, original=text,
                          src_lang=heard.lang, dst_lang=target)
+        if source == MIC and settings.their_lang2 != target:
+            line.dst_lang2 = settings.their_lang2
         self.backend.utterance.emit(line)          # shown at once, as "translating…"
         pool = self._mic_pool if source == MIC else self._pool
         if pool is not None:
@@ -231,7 +296,7 @@ class SpeechEngine:
 
     def _announce(self, lang: str, segment: Segment) -> None:
         """Someone speaks a language the program does not translate (the hearing engine was
-        at least 80% sure): the window only says so, e.g. "【Speaking Korean】". Said once per
+        at least 80% sure): the window only says so, e.g. "【Speaking Spanish】". Said once per
         while, not for every sentence, and "the language heard last" stays as it was."""
         last, when = self._announced
         if lang == last and self._clock() - when < ANNOUNCE_S:
@@ -266,10 +331,24 @@ class SpeechEngine:
                     heard=True)
             except TranslateError as error:
                 line.note = f"not translated: {error}"
+                tell = getattr(self.backend, "switch_prompt_requested", None)
+                if tell is not None and hasattr(tell, "emit"):
+                    tell.emit("translating", getattr(self.backend.settings, "translating", ""), str(error))
             except Exception as error:
                 line.note = f"not translated: {error}"
         if not line.translation:
             line.dst_lang = line.src_lang                # the row then shows only the heard text
+        if line.dst_lang2 and line.dst_lang2 != line.src_lang:
+            try:
+                line.translation2 = self._translator.translate(
+                    line.original, line.dst_lang2, line.src_lang if line.src_lang in LANGS else "",
+                    heard=True)
+            except Exception as error:
+                line.note = ", ".join(filter(None, [line.note, f"not translated ({line.dst_lang2}): {error}"]))
+                if isinstance(error, TranslateError):
+                    tell = getattr(self.backend, "switch_prompt_requested", None)
+                    if tell is not None and hasattr(tell, "emit"):
+                        tell.emit("translating", getattr(self.backend.settings, "translating", ""), str(error))
         line.latency_ms = int((self._clock() - segment.speech_end) * 1000)
         log.info("%s line %d done in %d ms: %s %s", line.source, line.id, line.latency_ms,
                  line.translation or "(no translation)", line.note)

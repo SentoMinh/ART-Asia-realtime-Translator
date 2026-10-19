@@ -146,6 +146,27 @@ def fit_bilingual(translation: str, original: str) -> tuple[str, bool]:
     return f"{translation} ({original})", translated_cut or original_cut
 
 
+def fit_lines(*texts: str) -> tuple[str, bool]:
+    """Keep each nonempty, distinct language line within a shared OSC budget."""
+    lines = list(dict.fromkeys(" ".join(text.split()) for text in texts if text.strip()))
+    if not lines:
+        return "", False
+    budget = MAX_CHARS - (len(lines) - 1)
+    lengths = [0] * len(lines)
+    # Distribute space evenly, giving unused space from short lines to longer ones.
+    while budget:
+        pending = [i for i, line in enumerate(lines) if lengths[i] < len(line)]
+        if not pending:
+            break
+        for i in pending:
+            if not budget:
+                break
+            lengths[i] += 1
+            budget -= 1
+    fitted = [fit(line, length) for line, length in zip(lines, lengths)]
+    return "\n".join(text for text, _ in fitted), any(cut for _, cut in fitted)
+
+
 class Chatbox:
     def __init__(self, host: str = HOST, port: int = PORT):
         self._target = (host, port)

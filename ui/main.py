@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtGui import QIcon
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from . import __version__, config, theme
@@ -32,13 +33,31 @@ from .live_backend import LiveBackend
 from .main_window import MainWindow
 
 
-def speech_translator(pick=lambda: ""):
-    """The engine's translation chain (this PC's add-ons, then the models of the service that
-    `pick()` names, each taking over when the one before hits its limit), also used for typed
+def make_on_switch(backend):
+    def on_switch(name: str):
+        if ":" in name:
+            svc, model = name.split(":", 1)
+            if hasattr(backend, "current_translating_service"):
+                backend.current_translating_service = svc
+            if getattr(backend, "current_translating_model", "") != model:
+                backend.current_translating_model = model
+                backend.setting_switched.emit("translating_model", model)
+            if hasattr(backend, "settings") and getattr(backend.settings, "translating", "") != svc:
+                backend.setting_switched.emit("translating", svc)
+        else:
+            if getattr(backend, "current_translating_model", "") != name:
+                backend.current_translating_model = name
+                backend.setting_switched.emit("translating_model", name)
+    return on_switch
+
+
+def speech_translator(pick=lambda: "", on_switch=None):
+    """The engine's translation chain (the models of the service that `pick()` names, then
+    this PC's add-ons, each taking over when the one before hits its limit), also used for typed
     text. None = no engine: typed text is then sent untranslated."""
     try:
         from engine.translators import ServiceChain
-        return ServiceChain(pick)
+        return ServiceChain(pick, on_switch=on_switch)
     except Exception:
         return None
 
@@ -59,8 +78,7 @@ def attach_speech(backend: LiveBackend) -> None:
 
 
 def look_for_update(backend) -> None:
-    """The friends' program updates itself from the developer's relay (ui/updater.py): the
-    download runs in the background, the status tooltip says when it is ready."""
+    """Download application updates in the background; show readiness in the status tooltip."""
     from .updater import Updater, program_file
     program = program_file()
     if program is None:
@@ -82,10 +100,19 @@ def run(backend: Backend | None = None) -> int:
             backend = DemoBackend()
         else:
             # the window hands its settings to the backend; the chain asks them which service
-            backend = LiveBackend(translator=speech_translator(lambda: backend.settings.translating))
+            backend = LiveBackend()
+            backend._translator = speech_translator(
+                lambda: backend.settings.translating,
+                on_switch=make_on_switch(backend))
             attach_speech(backend)
+    if isinstance(backend, LiveBackend):
+        from .service_health import ServiceHealth
+        backend.service_health = ServiceHealth(backend)
+        app.aboutToQuit.connect(backend.service_health.stop)
     window = MainWindow(backend, config.load())
     window.show()
+    if isinstance(backend, LiveBackend):
+        QTimer.singleShot(0, backend.service_health.start)
     backend.start()
     look_for_update(backend)
     code = app.exec()

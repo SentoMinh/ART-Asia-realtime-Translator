@@ -1,7 +1,6 @@
 """Settings window: a list of pages on the left, cards with rows on the right."""
 from __future__ import annotations
 
-import importlib.util
 import threading
 import time
 from html import escape
@@ -10,12 +9,14 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFormLayout, QFrame,
-                               QHBoxLayout, QLabel, QLineEdit, QListWidget, QPushButton,
-                               QScrollArea, QSlider, QStackedWidget, QVBoxLayout, QWidget)
+                               QHBoxLayout, QLabel, QLineEdit, QListWidget, QProgressBar,
+                               QPushButton, QScrollArea, QSlider, QStackedWidget, QVBoxLayout,
+                               QWidget)
 
-from engine import services   # the online services: names, default models, saved keys
+from engine import local_model   # Whisper on this PC: can it run, and its one-time download
+from engine import services      # the online services: names, default models, saved keys
 
-from . import __version__, theme
+from . import __version__, local_download, theme
 from .backend import AUTO, LANGS, PICK_LANGS
 from .config import BACKDROP_RANGE, FONT_RANGE, VAD_RANGE, Settings
 from .i18n import tr
@@ -28,8 +29,11 @@ except ImportError:      # numpy missing: no microphone list, only the Windows d
 from .widgets import Switch
 
 LOCAL_MODEL = "Local Model (this PC)"
+LOCAL_NOTE = "Whisper on your own NVIDIA graphics card: no key and no limits. Downloaded once."
+LOCAL_DOWNLOAD_NOTE = ("The download is {size}; the model then uses about 2.4 GB of the graphics card's "
+                       "memory. When everything has arrived, hearing switches to the Local Model. You "
+                       "can close this window: the download carries on.")
 SERVICE_NOTES = {
-    "dev": "Ask the developer for a key. It is used to hear speech and to translate.",
     "openai": "Whisper hears, GPT translates. Paid per use.",
     "gemini": "Hears and translates. Google gives a small free daily allowance.",
     "qwen": "Qwen3-ASR knows Cantonese; its open version heard best in the benchmark. Paid per use.",
@@ -39,12 +43,9 @@ SERVICE_NOTES = {
 }
 
 
-def local_model_installed() -> bool:
-    """The download leaves the local model out (it needs 2 GB of GPU libraries)."""
-    return importlib.util.find_spec("faster_whisper") is not None
-
-
-def fill_lang_combo(combo: QComboBox, with_auto: bool) -> None:
+def fill_lang_combo(combo: QComboBox, with_auto: bool, optional: bool = False) -> None:
+    if optional:
+        combo.addItem("", "")
     if with_auto:
         combo.addItem("", AUTO)
     for code in PICK_LANGS:
@@ -56,7 +57,7 @@ def fill_lang_combo(combo: QComboBox, with_auto: bool) -> None:
 def retranslate_lang_combo(combo: QComboBox) -> None:
     for index in range(combo.count()):
         code = combo.itemData(index)
-        combo.setItemText(index, tr("Auto-detect") if code == AUTO else tr(LANGS[code]))
+        combo.setItemText(index, tr("None") if not code else tr("Auto-detect") if code == AUTO else tr(LANGS[code]))
     fit_combo(combo)
 
 
@@ -99,6 +100,9 @@ class SettingsWindow(QDialog):
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
         self.settings = settings
+        self._service_health = getattr(getattr(parent, "backend", None), "service_health", None)
+        if self._service_health:
+            self._service_health.changed.connect(self.show_service_status)
         self.setObjectName("settings")
         self.setWindowTitle(tr("Settings"))
         self.resize(680, 470)
@@ -146,16 +150,21 @@ class SettingsWindow(QDialog):
         fill_lang_combo(self.their_lang, with_auto=True)
         self.their_lang.currentIndexChanged.connect(
             lambda: self._set("their_lang", self.their_lang.currentData()))
+        self.their_lang2 = QComboBox()
+        fill_lang_combo(self.their_lang2, with_auto=False, optional=True)
+        self.their_lang2.currentIndexChanged.connect(
+            lambda: self._set("their_lang2", self.their_lang2.currentData()))
 
         self._page("Translation", [
             ("I speak", "Your language. Subtitles are translated into it.", self.my_lang),
             ("They speak", "Your microphone is translated into this language. Auto-detect uses the "
                            "language heard last. Typed text uses the Send menu.", self.their_lang),
+            ("Second language", "Optional second translation of your microphone. OSC shows the original and each translation on a separate line.", self.their_lang2),
             ("Voice detector", "Only listens while someone talks. Turn it off if it cuts words or "
                                "misses quiet voices.", self._switch("vad_on")),
             ("Show the original text", "Shows what was heard above its translation.",
              self._switch("show_original")),
-            ("Add my own words", "The chatbox shows the translation, then what you said.",
+            ("Add my own words", "Include the original with typed translations. Microphone messages always include the original on its own line.",
              self._switch("chatbox_original")),
             ("Add Speaker words", "Send other players' translation and original words to your VRChat "
                                   "chatbox.", self._switch("chatbox_speaker")),
@@ -194,17 +203,19 @@ class SettingsWindow(QDialog):
              self._slider("mic_vad_sensitivity", (round(VAD_RANGE[0] * 100), round(VAD_RANGE[1] * 100)),
                           "%", scale=100)),
         ])
-        # the Dev key only in the developer's and friends' copies (engine/services.py)
         self.hearing = self._service_combo("hearing", services.offered(services.HEARING))
         self.translating = self._service_combo("translating", services.offered(services.TRANSLATING))
         self._hearing_desc = QLabel()
         self._translating_desc = QLabel()
         self._service_status: dict[str, QLabel] = {}
+        set_up = [(services.title(service), SERVICE_NOTES[service], self._service_row(service))
+                  for service in services.offered()]
+        if local_model.installed():      # first, as in the Hearing list
+            set_up.insert(0, (LOCAL_MODEL, LOCAL_NOTE, self._local_row()))
         self._page("Models", [
             ("Hearing", self._hearing_desc, self.hearing),
             ("Translating", self._translating_desc, self.translating),
-        ], more=[("Services", [(services.title(service), SERVICE_NOTES[service], self._service_row(service))
-                               for service in services.offered()])])
+        ], more=[("Services", set_up)])
         self.nav.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.nav.setCurrentRow(0)
         self.sync()
@@ -212,7 +223,6 @@ class SettingsWindow(QDialog):
         self._model_timer.setInterval(500)
         self._model_timer.timeout.connect(self._update_model_labels)
         self._model_timer.start()
-
 
     def _active_hearing_model(self) -> str:
         parent = self.parent()
@@ -225,7 +235,6 @@ class SettingsWindow(QDialog):
             model = services.setting(svc, "hear_model")
         model = model or title
         return f"{model} ({title})" if model != title else title
-
 
     def _active_translating_model(self) -> str:
         parent = self.parent()
@@ -246,13 +255,12 @@ class SettingsWindow(QDialog):
             return name  # a local translation add-on answered
         current_model = getattr(backend, "current_translating_model", "")
         current_svc = getattr(backend, "current_translating_service", "")
-        if current_model and (not current_svc or current_svc == svc):
+        if current_model in configured and (not current_svc or current_svc == svc):
             model = current_model
         else:
             model = configured[0] if configured else services.setting(svc, "translate_model")
         model = model or title
         return f"{model} ({title})" if model != title else title
-
 
     def _update_model_labels(self) -> None:
         hear_model = escape(self._active_hearing_model())
@@ -267,11 +275,11 @@ class SettingsWindow(QDialog):
             f"{trans_base}<br><span style='color: #5ab8ff;'>{in_use}</span> <b>{trans_model}</b>"
         )
 
-
     def sync(self) -> None:
         """Show the current values (also after a change made in the main window)."""
         select_data(self.my_lang, self.settings.my_lang)
         select_data(self.their_lang, self.settings.their_lang)
+        select_data(self.their_lang2, self.settings.their_lang2)
         self.mic_device.blockSignals(True)
         self.mic_device.setCurrentIndex(max(self.mic_device.findData(self.settings.mic_device), 0))
         self.mic_device.blockSignals(False)
@@ -295,46 +303,107 @@ class SettingsWindow(QDialog):
         combo = QComboBox()
         for service in choices:
             if service == "local":
-                if local_model_installed() or self.settings.hearing == "local":
+                if local_model.installed() or self.settings.hearing == "local":
                     combo.addItem(tr(LOCAL_MODEL), "local")
             else:
                 combo.addItem(tr(services.title(service)), service)
-        combo.currentIndexChanged.connect(lambda: self._set(setting, combo.currentData()))
+        combo.currentIndexChanged.connect(lambda: self._pick(setting, combo))
         combo.currentIndexChanged.connect(lambda: fit_combo(combo))
         fit_combo(combo)
         return combo
 
-    def _service_row(self, service: str) -> QWidget:
-        """"Ready" / "Not set up" and a button that opens the service's own small window.
-        The engines read the saved values on every request, so a change works at once."""
-        status = QLabel()
+    def _pick(self, setting: str, combo: QComboBox) -> None:
+        if combo.currentData() == "local" and local_model.missing():
+            # not on this PC yet: the choice stays as it was, and the Local Model's window offers
+            # the download (the main window switches to it when everything has arrived)
+            select_data(combo, getattr(self.settings, setting))
+            self.set_up_local()
+            return
+        new_svc = combo.currentData()
+        self._set(setting, new_svc)
+        parent = self.parent()
+        backend = getattr(parent, "backend", None) if parent else None
+        if backend:
+            if setting == "translating":
+                backend.current_translating_service = new_svc
+                models = services.translate_models(new_svc)
+                backend.current_translating_model = models[0] if models else services.setting(new_svc, "translate_model")
+                if hasattr(backend, "setting_switched") and hasattr(backend.setting_switched, "emit"):
+                    backend.setting_switched.emit("translating", new_svc)
+            elif setting == "hearing":
+                backend.current_hearing_service = new_svc
+                backend.current_hearing_model = getattr(local_model, "NAME", "Whisper") if new_svc == "local" else services.setting(new_svc, "hear_model")
+                if hasattr(backend, "setting_switched") and hasattr(backend.setting_switched, "emit"):
+                    backend.setting_switched.emit("hearing", new_svc)
+        self._update_model_labels()
+
+    @staticmethod
+    def _status_row(status: QLabel, set_up) -> QWidget:
+        """A status text and a "Set up…" button."""
         status.setObjectName("dim")
-        self._service_status[service] = status
         button = QPushButton(tr("Set up…"))
         button.setObjectName("plain")
         button.setCursor(Qt.PointingHandCursor)
-        button.clicked.connect(lambda: self.set_up(service))
+        button.clicked.connect(set_up)
         box = QWidget()
         row = QHBoxLayout(box)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(10)
         row.addWidget(status)
         row.addWidget(button)
+        return box
+
+    def _service_row(self, service: str) -> QWidget:
+        """"Ready" / "Not set up" and a button that opens the service's own small window.
+        The engines read the saved values on every request, so a change works at once."""
+        self._service_status[service] = QLabel()
+        box = self._status_row(self._service_status[service], lambda: self.set_up(service))
         self.show_service_status(service)
         return box
 
     def show_service_status(self, service: str) -> None:
-        self._service_status[service].setText(tr("Ready") if services.ready(service) else tr("Not set up"))
+        if service not in self._service_status:
+            return
+        label = self._service_status[service]
+        health = self._service_health.status(service) if self._service_health else None
+        label.setText(tr(health[0]) if health else tr("Ready") if services.ready(service) else tr("Not set up"))
+        label.setToolTip(tr(health[1]) if health else "")
+        color = theme.OK if health and health[0] == "Online" else theme.WARN if health else theme.DIM
+        label.setStyleSheet(f"color: {color};")
 
     def set_up(self, service: str) -> None:
         if ServiceDialog(service, self).exec():
+            if self._service_health:
+                self._service_health.check(service)
             self.show_service_status(service)
             self._update_model_labels()
             self.changed.emit()      # the status line may now have something else to say
 
+    def _local_row(self) -> QWidget:
+        """The Local Model is no service, but it is set up in the same place: "Ready", "Not
+        downloaded" or how far the download is, and a button that opens its small window."""
+        self._local_status = QLabel()
+        box = self._status_row(self._local_status, self.set_up_local)
+        download = local_download.shared()
+        download.progress.connect(self.show_local_status)
+        download.finished.connect(self.show_local_status)
+        self.show_local_status()
+        return box
+
+    def show_local_status(self, *_) -> None:
+        if not local_model.missing():
+            text = tr("Ready")
+        elif local_download.shared().active:
+            text = f"{100 * local_model.arrived() // local_model.size()}%"
+        else:
+            text = tr("Not downloaded")
+        self._local_status.setText(text)
+
+    def set_up_local(self) -> None:
+        LocalModelDialog(self).exec()
+
     def _set(self, name: str, value) -> None:
         setattr(self.settings, name, value)
-        self._update_model_labels()
         self.changed.emit()
 
     def _switch(self, name: str) -> Switch:
@@ -364,7 +433,7 @@ class SettingsWindow(QDialog):
         row.addWidget(value)
         return box
 
-    def _page(self, name: str, rows: list[tuple[str, str, QWidget]],
+    def _page(self, name: str, rows: list[tuple[str, str | QLabel, QWidget]],
               more: list[tuple[str, list[tuple[str, str, QWidget]]]] = ()) -> None:
         """A page: its heading and one card of rows, then `more` cards, each under a small
         heading of its own. A page taller than the window scrolls."""
@@ -437,7 +506,6 @@ class ServiceDialog(QDialog):
         self.setWindowTitle(tr(info.name))
         self.setMinimumWidth(460)
         saved = services.saved().get(service) or {}
-        code = service == "dev"
 
         def field(name: str, default: str) -> QLineEdit:
             edit = QLineEdit(str(saved.get(name) or ""))
@@ -462,45 +530,41 @@ class ServiceDialog(QDialog):
         layout.addWidget(note)
         form = QFormLayout()
         form.setSpacing(8)
-        if code:
-            form.addRow(tr("Dev key"), self.key)
-        else:
-            form.addRow(tr("Address"), self.url)
-            form.addRow(tr("Key"), self.key)
+        form.addRow(tr("Address"), self.url)
+        form.addRow(tr("Key"), self.key)
+        if self.service == "custom":
+            self.fetch_btn = QPushButton(tr("Fetch models"))
+            self.fetch_btn.setObjectName("plain")
+            self.fetch_btn.setCursor(Qt.PointingHandCursor)
+            self.fetch_btn.clicked.connect(self.fetch_models)
+            form.addRow("", self.fetch_btn)
+        if info.can_hear:
             if self.service == "custom":
-                self.fetch_btn = QPushButton(tr("Fetch models"))
-                self.fetch_btn.setObjectName("plain")
-                self.fetch_btn.setCursor(Qt.PointingHandCursor)
-                self.fetch_btn.clicked.connect(self.fetch_models)
-                form.addRow("", self.fetch_btn)
-            if info.can_hear:
-                if self.service == "custom":
-                    self.hear_picker = QComboBox()
-                    self.hear_picker.addItem(tr("Pick a model…"), "")
-                    self.hear_picker.currentIndexChanged.connect(self._pick_hear_model)
-                    hear_row = QHBoxLayout()
-                    hear_row.addWidget(self.hear_model, 1)
-                    hear_row.addWidget(self.hear_picker, 0)
-                    form.addRow(tr("Hearing model"), hear_row)
-                else:
-                    form.addRow(tr("Hearing model"), self.hear_model)
-            if self.service == "custom":
-                self.translate_picker = QComboBox()
-                self.translate_picker.addItem(tr("Pick a model…"), "")
-                self.translate_picker.currentIndexChanged.connect(self._pick_translate_model)
-                trans_row = QHBoxLayout()
-                trans_row.addWidget(self.translate_model, 1)
-                trans_row.addWidget(self.translate_picker, 0)
-                form.addRow(tr("Translating models"), trans_row)
+                self.hear_picker = QComboBox()
+                self.hear_picker.addItem(tr("Pick a model…"), "")
+                self.hear_picker.currentIndexChanged.connect(self._pick_hear_model)
+                hear_row = QHBoxLayout()
+                hear_row.addWidget(self.hear_model, 1)
+                hear_row.addWidget(self.hear_picker, 0)
+                form.addRow(tr("Hearing model"), hear_row)
             else:
-                form.addRow(tr("Translating models"), self.translate_model)
+                form.addRow(tr("Hearing model"), self.hear_model)
+        if self.service == "custom":
+            self.translate_picker = QComboBox()
+            self.translate_picker.addItem(tr("Pick a model…"), "")
+            self.translate_picker.currentIndexChanged.connect(self._pick_translate_model)
+            trans_row = QHBoxLayout()
+            trans_row.addWidget(self.translate_model, 1)
+            trans_row.addWidget(self.translate_picker, 0)
+            form.addRow(tr("Translating models"), trans_row)
+        else:
+            form.addRow(tr("Translating models"), self.translate_model)
         layout.addLayout(form)
-        if not code:
-            hint = QLabel(tr("Empty fields use the defaults shown. Several translating models can be "
-                             "listed with commas: when one is at its limit, the next answers."))
-            hint.setObjectName("dim")
-            hint.setWordWrap(True)
-            layout.addWidget(hint)
+        hint = QLabel(tr("Empty fields use the defaults shown. Several translating models can be "
+                         "listed with commas: when one is at its limit, the next answers."))
+        hint.setObjectName("dim")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
         if info.get_key:
             link = QLabel(f'<a href="{info.get_key}" style="color: {theme.ACCENT}">{tr("Get a key")}</a>')
             link.setOpenExternalLinks(True)
@@ -524,6 +588,39 @@ class ServiceDialog(QDialog):
         buttons.addWidget(cancel)
         buttons.addWidget(save)
         layout.addLayout(buttons)
+        self._fetching = False
+        self._fetch_again = False
+        self._auto_fetch = QTimer(self)
+        self._auto_fetch.setSingleShot(True)
+        self._auto_fetch.setInterval(500)
+        self._auto_fetch.timeout.connect(self.fetch_models)
+        self._fetch_poll = QTimer(self)
+        self._fetch_poll.setInterval(80)
+        self._fetch_poll.timeout.connect(self._poll_models)
+        self.key.textChanged.connect(self._credentials_changed)
+        self.url.textChanged.connect(self._credentials_changed)
+        self.finished.connect(self._stop_fetch)
+        # Auto-fetch models on open when the service already has credentials saved
+        if self.service == "custom" and services.ready(self.service):
+            self._auto_fetch.start()
+
+    def _credentials(self):
+        return (self.service, self.url.text().strip(), self.key.text().strip())
+
+    def _credentials_changed(self):
+        self._auto_fetch.stop()
+        self._fetch_again = False
+        self._populate_pickers([])
+        self.result.clear()
+        if self.service == "custom" and self.url.text().strip() and self.key.text().strip():
+            self._auto_fetch.start()
+
+    def _stop_fetch(self, *_):
+        self._auto_fetch.stop()
+        self._fetch_poll.stop()
+        self._fetching = self._fetch_again = False
+        if hasattr(self, "fetch_btn"):
+            self.fetch_btn.setEnabled(True)
 
     def _pick_hear_model(self) -> None:
         m = self.hear_picker.currentData()
@@ -536,80 +633,69 @@ class ServiceDialog(QDialog):
             self.translate_model.setText(m)
 
     def fetch_models(self) -> None:
-        if getattr(self, "_fetching", False):
+        self._auto_fetch.stop()
+        if self._fetching:
+            self._fetch_again = True
             return
         self._fetching = True
-        # Read widgets on the UI thread. The worker may outlive a closed dialog.
-        service, url, key, http = self.service, self.url.text(), self.key.text(), self._http
-        was_visible = self.isVisible()
-        base = tr("Fetching models…").rstrip(".…")
-        self.result.setText(f"{base}…")
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        self._fetch_again = False
+        self._fetch_credentials = self._credentials()
+        service, url, key = self._fetch_credentials
+        http = self._http
+        self.result.setText(tr("Fetching models…"))
         if hasattr(self, "fetch_btn"):
             self.fetch_btn.setText(tr("Fetch models"))
             self.fetch_btn.setEnabled(False)
-        QApplication.processEvents()
-
-        result_holder: dict = {}
-
+        # The daemon only owns a result dict and immutable request inputs.
+        # Closing the dialog stops polling; no worker accesses Qt widgets.
+        result_holder = {}
         def worker():
             try:
-                result_holder["models"] = services.fetch_models(
-                    service, url=url, key=key, http=http
-                )
+                result_holder["models"] = services.fetch_models(service, url=url, key=key, http=http)
             except Exception as error:
                 result_holder["error"] = error
+        self._fetch_result = result_holder
+        self._fetch_thread = threading.Thread(target=worker, daemon=True)
+        self._fetch_started = time.monotonic()
+        self._fetch_thread.start()
+        self._fetch_poll.start()
 
-        thread = threading.Thread(target=worker, daemon=True)
-        thread.start()
-
-        start_time = time.monotonic()
-        while thread.is_alive():
-            if was_visible and not self.isVisible():
-                break
-            now = time.monotonic()
-            if now - start_time >= 30:
-                result_holder["error"] = TimeoutError("connection timed out")
-                break
-            dot_count = (int((now - start_time) * 3) % 3) + 1
-            dots = "." * dot_count
-            self.result.setText(f"{base}{dots}")
-            QApplication.processEvents()
-            thread.join(timeout=0.08)
-
-        QApplication.restoreOverrideCursor()
+    def _poll_models(self):
+        elapsed = time.monotonic() - self._fetch_started
+        if self._fetch_thread.is_alive() and elapsed < 30:
+            return
+        self._fetch_poll.stop()
         self._fetching = False
-        if was_visible and not self.isVisible():
-            if hasattr(self, "fetch_btn"):
-                self.fetch_btn.setEnabled(True)
-            return
-
-        if "error" in result_holder:
-            err = result_holder["error"]
-            elapsed = int(time.monotonic() - start_time)
-            if "timed out" in str(err).lower() or elapsed >= 30:
-                self.result.setText(f"✗ {tr('Timed out after 30s. Click Fetch models to try again.')}")
-            else:
-                self.result.setText(f"✗ {err} — {tr('Click Fetch models to try again')}")
-            if hasattr(self, "fetch_btn"):
-                self.fetch_btn.setText(tr("Try again"))
-                self.fetch_btn.setEnabled(True)
-            return
-
-        models = result_holder.get("models", [])
-        if not models:
-            self.result.setText(f"{tr('No models found')} — {tr('Click Fetch models to try again')}")
-            if hasattr(self, "fetch_btn"):
-                self.fetch_btn.setText(tr("Try again"))
-                self.fetch_btn.setEnabled(True)
-            return
-
         if hasattr(self, "fetch_btn"):
-            self.fetch_btn.setText(tr("Fetch models"))
             self.fetch_btn.setEnabled(True)
-
-        self._populate_pickers(models)
-        self.result.setText(f"✓ {tr('Found {count} models').format(count=len(models))}")
+        changed = self._fetch_credentials != self._credentials()
+        retry = self._fetch_again or (changed and self.service == "custom" and bool(self.key.text().strip()))
+        self._fetch_again = False
+        if changed:
+            # A response for the old key must not populate the new key's list.
+            if retry:
+                self._auto_fetch.start()
+            return
+        error = self._fetch_result.get("error")
+        if self._fetch_thread.is_alive() or (error and "timed out" in str(error).lower()):
+            self.result.setText(f"✗ {tr('Timed out. Click Fetch models to try again.')}")
+        elif error:
+            message = str(error)
+            key = self._fetch_credentials[2] or services.setting(self.service, "key")
+            if key:
+                message = message.replace(key, "***")
+            self.result.setText(f"✗ {message} — {tr('Click Fetch models to try again')}")
+        else:
+            models = self._fetch_result.get("models", [])
+            self._populate_pickers(models)
+            if models:
+                self.result.setText(f"✓ {tr('Found {count} models').format(count=len(models))}")
+            else:
+                self.result.setText(f"{tr('No models found')} — {tr('Click Fetch models to try again')}")
+        if hasattr(self, "fetch_btn"):
+            self.fetch_btn.setText(tr("Try again" if error or not self._fetch_result.get("models") else "Fetch models"))
+        if retry:
+            self._auto_fetch.start()
 
     def _populate_pickers(self, models: list[str]) -> None:
         if hasattr(self, "hear_picker"):
@@ -670,8 +756,7 @@ class ServiceDialog(QDialog):
 
     def save(self) -> None:
         values = {"hear_model": self.hear_model.text(), "translate_model": self.translate_model.text()}
-        if self.service != "dev":
-            values["url"] = self.url.text()
+        values["url"] = self.url.text()
         if self.key.text().strip():
             values["key"] = self.key.text()
         try:
@@ -680,3 +765,76 @@ class ServiceDialog(QDialog):
             self.result.setText(f"✗ {tr('Could not save')}: {error}")
             return
         self.accept()
+
+
+class LocalModelDialog(QDialog):
+    """What the Local Model needs, and its one-time download. Closing the window does not stop
+    the download; when everything has arrived, the main window switches hearing to it."""
+
+    def __init__(self, parent=None, download: local_download.LocalDownload | None = None):
+        super().__init__(parent)
+        self._download = download or local_download.shared()
+        self.setAttribute(Qt.WA_DeleteOnClose)      # a closed one must not keep listening to the download
+        self.setObjectName("settings")
+        self.setWindowTitle(tr(LOCAL_MODEL))
+        self.setMinimumWidth(460)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(10)
+        self.download_note = QLabel(tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size())))
+        for note in (QLabel(tr(LOCAL_NOTE)), self.download_note):
+            note.setObjectName("dim")
+            note.setWordWrap(True)
+            layout.addWidget(note)
+        self.bar = QProgressBar()
+        self.bar.setRange(0, 1000)
+        self.bar.setTextVisible(False)
+        layout.addWidget(self.bar)
+        self.result = QLabel()
+        self.result.setObjectName("dim")
+        self.result.setWordWrap(True)
+        layout.addWidget(self.result)
+        buttons = QHBoxLayout()
+        close = QPushButton(tr("Close"))
+        close.setObjectName("plain")
+        close.clicked.connect(self.accept)
+        self.action = QPushButton()
+        self.action.clicked.connect(self.start_or_stop)
+        buttons.addStretch(1)
+        buttons.addWidget(close)
+        buttons.addWidget(self.action)
+        layout.addLayout(buttons)
+        self._download.progress.connect(self.show_progress)
+        self._download.finished.connect(self.show_state)
+        self.show_state()
+
+    def show_state(self, problem: str = "") -> None:
+        """`problem`: how a download just ended ("" when none did, or when it went well)."""
+        missing = local_model.missing()
+        can_download = bool(missing) and local_model.installed() and local_model.nvidia_card()
+        for part in (self.download_note, self.bar, self.action):
+            part.setVisible(can_download)
+        self.action.setEnabled(True)
+        self.action.setText(tr("Stop") if self._download.active else tr("Download"))
+        if not missing:
+            self.result.setText("✓ " + tr("Ready"))
+        elif not can_download:
+            self.result.setText("✗ " + missing)
+        elif problem and problem != local_download.STOPPED:
+            self.show_progress(local_model.arrived(), local_model.size())
+            self.result.setText("✗ " + problem)
+        else:
+            self.show_progress(local_model.arrived(), local_model.size())
+
+    def show_progress(self, done: float, total: float) -> None:
+        self.bar.setValue(round(1000 * done / total) if total else 0)
+        self.result.setText(tr("{done} of {size}").format(done=local_model.gb(done),
+                                                          size=local_model.gb(total)) if done else "")
+
+    def start_or_stop(self) -> None:
+        if self._download.active:
+            self._download.stop()
+            self.action.setEnabled(False)       # until the download has answered that it stopped
+        else:
+            self._download.start()
+            self.show_state()

@@ -1,0 +1,4 @@
+EXPORTS
+    VrctApoBuildKind
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE

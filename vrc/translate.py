@@ -6,6 +6,7 @@ Settings → Models, plus any add-on found on this PC).
 from __future__ import annotations
 
 TARGET_NAMES = {"en": "English", "zh": "Simplified Chinese", "vi": "Vietnamese",
+                "ja": "Japanese", "ko": "Korean",
                 "yue": "Hong Kong Cantonese (written the way Hong Kong people chat, in Traditional "
                        "Chinese characters)"}
 

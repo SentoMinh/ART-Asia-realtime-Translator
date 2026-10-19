@@ -19,3 +19,6 @@ bench/data/
 # keys never belong here; they live in %APPDATA%
 *key*.txt
 .env
+
+# Retired update-service dependencies kept locally
+updates/

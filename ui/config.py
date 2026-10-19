@@ -26,6 +26,7 @@ def default_path() -> Path:
 class Settings:
     my_lang: str = "vi"            # my spoken language and the target for other players' subtitles
     their_lang: str = AUTO          # their spoken language and my mic's target; AUTO = detect theirs
+    their_lang2: str = ""           # optional second microphone translation target
     send_lang: str = AUTO           # typed text is translated into this; AUTO = the language heard last
     ui_lang: str = "en"             # language of the window itself: en | zh | vi
     mic_on: bool = True             # my mic → chatbox
@@ -36,7 +37,7 @@ class Settings:
     vad_sensitivity: float = 0.7    # how sure the detector must be that it hears a voice (other players)
     mic_vad_sensitivity: float = 0.5   # the same for my own microphone
     # speech → text: an online service, or "local" (Whisper on this PC); text → text: an online
-    # service (this PC's add-ons go first). Friends start with the Dev key, others with Gemini.
+    # service. New profiles start with Gemini; add-ons are fallback translators.
     hearing: str = field(default_factory=services.default_service)
     translating: str = field(default_factory=services.default_service)
     show_original: bool = True      # show the heard text above its translation
@@ -53,10 +54,18 @@ class Settings:
     h: int = 460
 
     def clean(self) -> "Settings":
+        if self.hearing == "dev" or self.translating == "dev":
+            services.migrate_legacy_settings()
+            if self.hearing == "dev":
+                self.hearing = "custom"
+            if self.translating == "dev":
+                self.translating = "custom"
         if self.my_lang not in LANGS:
             self.my_lang = "vi"
         if self.their_lang != AUTO and self.their_lang not in LANGS:
             self.their_lang = AUTO
+        if self.their_lang2 not in LANGS or self.their_lang2 == self.their_lang:
+            self.their_lang2 = ""
         if self.send_lang != AUTO and self.send_lang not in LANGS:
             self.send_lang = AUTO
         if self.ui_lang not in UI_LANGS:

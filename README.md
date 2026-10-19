@@ -1,80 +1,107 @@
-# VRChat Translator
+# ART – Asia realtime Translator
 
 A small always-on-top window for VRChat (desktop mode) that:
 
-- **hears VRChat or a selected audio output device** and shows what was said with a translation, as a scrolling chat log;
+- **hears other players** from VRChat or a selected audio output and shows their speech and translation in a scrolling chat log;
 - **hears your microphone**, translates what you say and puts it in your VRChat chatbox;
-- **translates text you type** and sends it to the chatbox.
+- **translates text you type** and sends it to the chatbox;
+- **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Languages: English, Chinese (Mandarin), Cantonese, Vietnamese. The window itself can be shown in English, 中文 or Tiếng Việt.
+Current source version: **0.11.6**. Everyone uses the same app; enter their API URL and key under **Custom domain**. This source update does not publish a new EXE release.
 
-**It stays on your languages.** On Auto-detect, the program only believes someone speaks another language when the speech model is at least 80% sure. Then it does not translate; it writes one line such as 【Speaking Korean】. Half-heard words and noise are taken as the language of yours that fits best, instead of turning into Spanish or Japanese lines.
+Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
-**How well it works:** a translated line appears 1.2–2.2 s after a player stops talking; 94–96% of words heard right on a clean microphone, 88–93% over loud music. All measurements are in [BENCHMARK.md](BENCHMARK.md).
+**It stays on your languages.** Auto-detect recognizes all six supported languages for translation. Other languages are checked for confidence before being announced with a line such as 【Speaking Spanish】. Uncertain speech is checked against the supported languages.
 
-## Download and run (Windows 10 1809+ or Windows 11, x64)
+Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md](BENCHMARK.md). They are not accuracy or latency guarantees for the current model selection, Japanese or Korean.
 
-1. Download `VRChat-Translator-Public-<version>-win64.zip` when available on the [Releases](https://github.com/SentoMinh/vrchat-translator-public/releases) page and extract it. Source code archives are not the Windows app.
-2. Run `install_windows.bat` to install the Microsoft Visual C++ runtime, then open the Public EXE. Python and app libraries are bundled. The EXE is not code-signed; only run downloads you trust.
-3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The dot in the window turns green ("Connected").
-4. Open **Settings (gear) → Models** and set up a service with **your own key** (below). The program starts with **Google Gemini** for both hearing and translating: its key is free, with a small daily allowance. **Set up… → Get a key**, paste it, **Save**.
-5. Use the arrow to the left of the microphone icon to pick your microphone. Use the arrow to the left of the speaker icon to select **VRChat** or an output device. Choosing an output device captures all apps playing through it.
+## Get the app and run it
+
+1. Use a published ZIP or EXE, when available, downloaded from [Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
+3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
+4. Open **Settings (gear) → Models** and set up your provider key, or enter your API URL and key under **Custom domain**. New profiles default to Google Gemini; available models and account limits depend on your provider. Select separate hearing and translation models, then **Save**.
+5. Open **Settings → Sound → Microphone** and pick the microphone you use in VRChat.
 
 VRChat has to run in windowed or borderless mode for the window to stay on top of it.
 
-This repository contains the **Public edition**, which uses your own API keys. Download future EXE updates manually from Releases. Each published version is tagged so its source can be restored later.
+Builds use `VRChat-Translator-<version>.exe` or `VRChat-Translator-<version>-win64.zip`, with one package for everyone. Settings and provider keys stay in your Windows profile.
 
-Component checks ran on Windows 11; a real Windows 10 run has not been verified. On Windows 10, the VRChat capture library can fall back to capturing the default output device, including other apps. Installing dependencies does not add process-specific capture support.
+The packaged app checks GitHub for newer releases, downloads updates in the background, and applies them on the next start. No provider key is sent to GitHub. A source commit does not publish an application update. Downloads come from [GitHub Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases).
+
+The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run `install_windows.bat` if the Microsoft Visual C++ runtime is needed, or `install_windows.bat --check` for a read-only platform precheck. The script's microphone-permission reminder is general guidance, not detection of blocked access. Live Windows 10 testing remains outstanding. On Windows 10, speaker capture may include other apps sharing the audio output; selected-app music injection currently requires Windows 11.
 
 ### Models: who hears and who translates
 
 | Service | Hears speech | Translates | Good to know |
 |---|---|---|---|
-| OpenAI | ✓ Whisper | ✓ GPT | paid per use |
-| Google Gemini | ✓ | ✓ | the benchmark's best translator; a small free daily allowance |
-| Qwen (Alibaba Cloud) | ✓ Qwen3-ASR | ✓ | tells Cantonese from Mandarin by itself |
-| Xiaomi MiMo | – | ✓ | low prices |
-| OpenRouter | ✓ | ✓ | one key for many models, Qwen and MiMo among them |
+| OpenAI | ✓ Whisper-style transcription | ✓ | uses the configured models |
+| Google Gemini | ✓ audio chat | ✓ | uses the configured models |
+| Qwen (Alibaba Cloud) | ✓ ASR | ✓ | hearing and translation models are separate |
+| Xiaomi MiMo | – | ✓ | translation only in this app |
+| OpenRouter | ✓ with a suitable audio model | ✓ | capabilities depend on the chosen model |
 | Custom | ✓ | ✓ | any OpenAI-compatible address, e.g. a Whisper server on your own PC |
 
-Each service's **Set up…** window has the key, the models (empty = the default shown), a **Get a key** link and a **Test** button. Several translating models can be listed with commas: when one reaches its limit, the next one answers.
+Each service's **Set up…** window has key/model fields and **Test**; **Get a key** appears where a provider link is configured. Empty model fields use the shown defaults. Several translating models can be listed with commas for fallback.
 
-**Custom domain** also has **Fetch models** and hearing/translation model pickers. The Models page displays the selected hearing model and the latest successful translation model, or the configured default before the first request.
+Custom servers offering `nllb-200-ct2` use their `/translate` endpoint with explicit language codes; other translation models use `/chat/completions`.
 
-### What the downloaded program does not include
+**Custom domain** has **Fetch models** and separate model pickers for hearing and translation. With an address entered, pasting a key automatically fetches the list after a short pause; saving stores the chosen models. Settings also shows the model currently in use for hearing and translation.
 
-The **Local Model** (Whisper on your own graphics card) needs faster-whisper and NVIDIA's GPU libraries (2 GB), which are not in the download; to use it, run from source (below) on a PC with an NVIDIA card, and pick it in Settings → Models → Hearing.
+Every normal startup checks configured APIs silently in the background. In **Settings → Models**, status moves from **Checking connection…** to **Online** or **Connection issue**, with a maximum 30-second wait per check. Hover for details. Saving a provider triggers another check. Unconfigured services are skipped. These are connection/authentication checks, not speech or translation requests; an online result does not guarantee that every model works. A missing model-list endpoint is reported as a connection issue; check the API base URL and server configuration.
+
+### The Local Model: hearing on your own graphics card
+
+**Local Model (this PC)** is Whisper large-v3-turbo running on your own NVIDIA graphics card: no key and no limits, and what is said never leaves your PC to be heard (the text still goes to the translating service). It uses about 2.4 GB of the card's memory.
+
+Pick it in **Settings → Models → Hearing**. The first time, its window offers a one-time download of 2.0 GB (NVIDIA's cuBLAS library from PyPI and the model from Hugging Face). You can close the window and keep using the program; hearing switches to the Local Model when everything has arrived. A download that broke off continues where it stopped.
 
 ## The window
 
 | Part | What it does |
 |---|---|
-| Dot + text | Green "Connected", orange "OSC is off" / "No game sound", red "VRChat not found". Hover for details. |
+| VRChat + light | Compact status indicator; hover to see connection, OSC and capture details. |
 | Mic / speaker buttons | Turn "my mic → chatbox" and "other players → subtitles" on or off. The bars show the sound level. |
-| Arrows beside mic / speaker | Choose a microphone input or the subtitle audio source. VRChat is first in the speaker menu, followed by output devices. Choices are saved. |
+| Arrows beside mic / speaker | Pick a microphone or subtitle audio source. The subtitle source list starts with VRChat, followed by available output devices. |
+| Music icon | Select a running app, reload the source list, adjust volume, and use one Play/Stop button. Missing mixer setup asks for consent and administrator permission. See [Music setup](MUSIC_SETUP.md). |
 | Wave button | Voice detector on/off. Off cuts the sound every 4 seconds instead of at the end of a sentence. |
 | Globe | Language of the window. |
 | Pin | Always on top. |
-| I speak / They speak | Voice translation: your microphone goes from "I speak" into "They speak"; other players' speech becomes subtitles in "I speak". Auto-detect follows the last player's language; pick Cantonese for Cantonese speakers. |
+| I speak / They speak | Voice translation: pick one target and an optional second target beside **+**. Choose **None** to remove the second language. Other players' speech becomes subtitles in "I speak"; with two languages selected, their speech is detected automatically. |
 | Text box + Send | Type, press Enter: translated and sent to the chatbox. The arrow picks the language for typed text independently of voice translation. Auto uses the last language heard, or "They speak" before anyone is heard (English if both are Auto). |
 
 For example, set **I speak: English**, **They speak: Vietnamese**, and **Send: Chinese**. Your English microphone speech is translated into Vietnamese, Vietnamese players get English subtitles, and typed messages are translated into Chinese. Changing the Send language only changes typed messages.
+
+In the current source, you can also select **Japanese** as the second "They speak" language. Each microphone message is sent once through OSC, with the original first, followed by the translations in selection order, each on its own line:
+
+```text
+Hello, how are you?
+Xin chào, bạn khỏe không?
+こんにちは、お元気ですか？
+```
+
+The second target is also available in **Settings → Translation → Second language**. Auto-detect remains available for the first target; if it resolves to the second target, only one translation is requested. Empty or identical text is omitted. If one translation fails, the original and successful translation still send, with an error in the app. Long messages share the [144-character OSC budget](https://docs.vrchat.com/docs/osc-as-input-controller#chatbox) across the lines. **Add my own words** controls original text for typed messages; microphone messages always include it. This change is not yet included in the 0.11.5 exports.
 
 In **Settings → Translation**, turn on **Add Speaker words** to also send other players' speech to your own VRChat OSC chatbox as `translation (original)`. It uses the translation into **I speak**, independently of **Add my own words** and the Send language. The switch is off by default. Long messages shorten both parts as needed; turning it off also stops speaker messages waiting to be sent.
 
 Click a line in the chat log to copy what was said (the original text, not the translation).
 
+Drag the header, level meters or header labels to move the window. Header buttons distinguish clicks from dragging; native window movement has a manual fallback. This has automated coverage, but has not been tested live on Windows 10.
+
+Existing saved API settings are retained where recoverable. If an older installation kept its URL only inside its EXE, enter that URL in Custom domain once; the new app cannot recover settings that were never saved outside the old program.
+
 ## Files it keeps
 
-- `%APPDATA%\VRChat-Translator\ui.json` — settings; `models.json` — your keys and chosen models (plain text, readable only by your Windows account).
+- `%APPDATA%\VRChat-Translator\ui.json` — settings; `models.json` — keys and chosen models in plain text under your Windows profile. The app does not encrypt them or apply a separate file ACL.
 - `%APPDATA%\VRChat-Translator\addons\` — empty unless you add your own translator (below).
 - `%LOCALAPPDATA%\VRChat-Translator\engine.log` — every sentence heard, its language, the translation and the delay. Look here first when nothing appears.
+- `%LOCALAPPDATA%\VRChat-Translator\local-model\` — the Local Model's files (2.2 GB), only after you downloaded them. Deleting the folder frees the space; the program offers the download again.
 
 What you type or say, and what other players say, is sent to the service picked in Settings → Models to be heard and translated.
 
 ### Your own translator (optional)
 
-Any `.py` file in `%APPDATA%\VRChat-Translator\addons\` that defines `translators()` returning `(name, translator)` pairs is loaded at start, and its translators are tried before the chosen service's. A translator has `prepare()` and `translate(text, target, likely_source="", heard=False) -> str`, and raises `vrc.translate.TranslateError` when it can't answer (the next one then takes over). Only put files there that you wrote or trust: they run as part of the program.
+Any `.py` file in `%APPDATA%\VRChat-Translator\addons\` that defines `translators()` returning `(name, translator)` pairs is loaded at start. The chosen service's models are tried first, in their configured order; add-ons are fallback only if those models cannot answer. A translator has `prepare()` and `translate(text, target, likely_source="", heard=False) -> str`, and raises `vrc.translate.TranslateError` when it can't answer (the next one then takes over). Only put files there that you wrote or trust: they run as part of the program.
 
 ## Run from source
 
@@ -88,13 +115,19 @@ run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
 
 - **Updates:** `run_ui.bat` first looks for a newer version on GitHub's `main` branch and installs it (`tools\update.py`), then opens the window. It skips the check when offline, when the folder is on a work branch, or while files in it are being edited, so nothing is ever overwritten. `set VRCT_NO_UPDATE=1` turns it off; every start writes one line to `%LOCALAPPDATA%\VRChat-Translator\update.log`.
 - Tests: `.venv-app\Scripts\python -m pytest tests`
-- Build the one-file program: `pwsh -File tools\build.ps1` (output in `dist\`; `-Folder` builds a folder and a zip instead, which starts a little faster)
+- Build the one-file program: `pwsh -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10` (use your validated native build directory; see [APO build instructions](apo/README.md)). `-Folder` builds a folder and ZIP. Without `-MixerBuild`, native mixer DLLs are not explicitly included by the build command.
 - Check a build: `VRChat-Translator.exe --selfcheck` writes `%LOCALAPPDATA%\VRChat-Translator\selfcheck.txt`
+
+Source validation for 0.11.6: **371 tests passed**, and a live custom NLLB translation succeeded. No new EXE was built for this source update.
+
+Historical 0.11.5 checks covered automated tests, packaged self-checks, source/bundled-code privacy scans, and ZIP/checksum verification. A new package must be verified separately. These checks do not establish fresh-PC installation, live Windows 10 behavior or Japanese/Korean recognition accuracy with real services.
 
 ## Layout
 
 - `ui\` — the window (PySide6): main window, settings, chat log, the three window languages.
 - `vrc\` — VRChat itself: finding it, the chatbox (OSC), sound capture, text translation.
 - `engine\` — speech: voice detector → sentences → speech-to-text (an online service or local Whisper) → translation. `engine\services.py` lists the services.
+- `apo\` — native microphone mixer and development validation/removal tools; `driver\` retains the earlier unused virtual-microphone prototype.
+- [MUSIC_SETUP.md](MUSIC_SETUP.md) — music routing and current compatibility limits; [CODEBASE.md](CODEBASE.md) — developer map and verification status.
 - [BENCHMARK.md](BENCHMARK.md) — how the speech and translation models were chosen.
 - `tests\`, `tools\` — tests, the build script, a tool that draws the window to PNG.

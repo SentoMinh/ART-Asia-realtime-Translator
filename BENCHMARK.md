@@ -1,12 +1,14 @@
 # Benchmark
 
-Before the program was built, the candidate speech and translation models were measured on the same recordings, in the three languages the program is for (English, Chinese, Vietnamese) and in the two situations it has to handle: **your own microphone** and **other players heard through VRChat**, with world music behind their voices.
+Before the program was built, the candidate speech and translation models were measured on the same recordings in English, Chinese and Vietnamese, in two situations: **your own microphone** and **other players heard through VRChat**, with world music behind their voices.
+
+This is a historical evaluation, not the current provider configuration. Version 0.11.5 supports six conversation languages, including Japanese and Korean; the measurements below do not benchmark those added languages. Choose current hearing and translation models in Settings → Models.
 
 Everything here was measured on 2 October 2026 on one PC (Ryzen 7 7800X3D, RTX 3080 10 GB, Windows 11, internet from Vietnam). "Cloud" means the same open model run by an online service instead of this PC.
 
-## The setup the program uses, and how it scored
+## The setup evaluated, and how it scored
 
-| Step | What the program uses | Score |
+| Step | Evaluated model or component | Score |
 |---|---|---|
 | Finding sentences | Silero voice detector, strictness 70% | blocked 14 of 14 clips without speech; passed 99% of sentences with music |
 | Hearing | Whisper large-v3-turbo, online | 94.5% / 96.3% / 93.6% heard right (English / Chinese / Vietnamese, clean mic) |
@@ -15,7 +17,7 @@ Everything here was measured on 2 October 2026 on one PC (Ryzen 7 7800X3D, RTX 3
 | Speed, hearing | | 0.30 s per sentence |
 | Speed, live in VRChat | | a translated line 1.2–2.2 s after the speaker stops |
 
-Whisper large-v3-turbo can also run on your own GPU (source version only): the same accuracy, 0.57 s per sentence with VRChat running, 2.4 GB of GPU memory.
+Whisper large-v3-turbo was also evaluated on the local GPU: 0.57 s per sentence with VRChat running and 2.4 GB of GPU memory; accuracy is listed below. Current source and packaged editions include Local Model support, with model data downloaded separately.
 
 ## How it was measured
 

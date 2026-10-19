@@ -3,6 +3,7 @@
     VRChat-Translator.exe              the translator window
     VRChat-Translator.exe --demo       example lines, no connection to VRChat
     VRChat-Translator.exe --selfcheck  loads every part once, writes selfcheck.txt, and exits
+                 (with --get-local-model it first downloads the Local Model's 2 GB if missing)
 """
 from __future__ import annotations
 
@@ -43,9 +44,7 @@ def selfcheck() -> int:
 
     def version():
         import ui
-        from engine.services import dev, update_source
-        return f"{ui.__version__}, " + ("friends' edition (Dev key, updates)" if dev() and update_source()
-                                        else "public edition")
+        return ui.__version__
 
     def icon():
         from ui.main import ICON_FILE, program_icon
@@ -65,6 +64,23 @@ def selfcheck() -> int:
         if audio.ProcessAudioCapture is None:
             raise RuntimeError("proc-tap is missing")
         return "proc-tap present"
+
+    def music_mixer():
+        import ctypes
+        from vrc.apo_install import native_build, setup_command
+        from ui.music_dialog import MusicDialog
+        from ui.config import Settings
+        build = native_build()
+        if build is None:
+            raise RuntimeError("Microphone mixer files are missing")
+        dll = ctypes.CDLL(str(build / "VrctMicApo.dll"))
+        dll.VrctApoBuildKind.restype = ctypes.c_int
+        if dll.VrctApoBuildKind() != 1:
+            raise RuntimeError("Wrong microphone mixer build")
+        dialog = MusicDialog(Settings())
+        dialog.close()
+        setup_command("Microphone")
+        return "production mixer and setup launcher included; no installation performed"
 
     def vrchat():
         from vrc.chatbox import encode_message, find_vrchat
@@ -91,6 +107,22 @@ def selfcheck() -> int:
             return "Local Model"
         return f"{services.title(chosen)}: " + (CloudHearing(chosen).missing() or "ready")
 
+    def local_model():
+        import time
+        from engine import local_model as local
+        from engine import stt
+        if not local.installed():
+            return "not in this copy"
+        stt.whisper_class()                    # the model's own code is all there
+        if local.missing() and "--get-local-model" in sys.argv:
+            local.download()
+        problem = local.missing()
+        if problem:
+            return problem
+        started = time.perf_counter()
+        stt.LocalWhisper().load()
+        return f"loaded on the graphics card in {time.perf_counter() - started:.1f} s"
+
     def translators():
         from engine import services
         from engine.translators import ServiceChain
@@ -106,8 +138,10 @@ def selfcheck() -> int:
     for name, action in (("version", version), ("window", window), ("icon", icon),
                          ("microphones", microphones),
                          ("VRChat sound capture", game_capture), ("VRChat detection", vrchat),
+                         ("music mixer", music_mixer),
                          ("voice detector", detector), ("resampler", resampler),
-                         ("hearing engine", hearing), ("translators", translators),
+                         ("hearing engine", hearing), ("Local Model", local_model),
+                         ("translators", translators),
                          ("secure connection", https)):
         check(name, action)
     lines.append("RESULT: " + ("all parts work" if not failed else f"{failed} part(s) failed"))
@@ -120,6 +154,10 @@ def selfcheck() -> int:
 
 
 def main() -> int:
+    if "--mixer-setup" in sys.argv:
+        sys.argv.remove("--mixer-setup")
+        from vrc.apo_install import main as mixer_setup
+        return mixer_setup()
     from ui.updater import apply_pending, program_file
     program = program_file()
     if program is not None and apply_pending(program):
