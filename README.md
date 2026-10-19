@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **0.11.8**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **0.11.9**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
@@ -42,7 +42,7 @@ The **Services** section lists only your custom domains. **Set up…** has a nam
 
 Custom servers offering `nllb-200-ct2` use their `/translate` endpoint with explicit language codes; other translation models use `/chat/completions`.
 
-**Custom domain → Set up…** fetches the available models. With an address entered, pasting a key automatically fetches the list after a short pause. Saving stores that domain’s list; changing its address or key invalidates the list. The Hearing and Translating model pickers save choices immediately. You can also type a model name when a server does not support discovery. Settings shows the model currently in use for each role.
+**Custom domain → Set up…** fetches the available models. With an address entered, pasting a key automatically fetches the list after a short pause. Saving stores that domain’s list; changing its address or key invalidates the list. Click the down arrow in either Hearing or Translating model box to open its dropdown list. Choosing a model saves immediately. You can also type a model name when a server does not support discovery. Settings shows the model currently in use for each role.
 
 Every normal startup checks configured APIs silently in the background. In **Settings → Models**, status moves from **Checking connection…** to **Online** or **Connection issue**, with a maximum 30-second wait per check. Hover for details. Saving a provider triggers another check. Unconfigured services are skipped. These are connection/authentication checks, not speech or translation requests; an online result does not guarantee that every model works. A missing model-list endpoint is reported as a connection issue; check the API base URL and server configuration.
 
@@ -123,7 +123,7 @@ run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
 - Build the one-file program: `pwsh -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10` (use your validated native build directory; see [APO build instructions](apo/README.md)). `-Folder` builds a folder and ZIP. Without `-MixerBuild`, native mixer DLLs are not explicitly included by the build command.
 - Check a build: `VRChat-Translator.exe --selfcheck` writes `%LOCALAPPDATA%\VRChat-Translator\selfcheck.txt`
 
-Source validation for 0.11.8: **398 tests passed**, plus actual CPU inference with SenseVoice on a sample recording and NLLB translating English to Vietnamese. The EXE includes the local runtimes and microphone mixer. Whisper large-v3 has not been tested with downloaded weights on a GPU.
+Source validation for 0.11.9: **400 tests passed**, plus actual CPU inference with SenseVoice on a sample recording and NLLB translating English to Vietnamese. The EXE includes the local runtimes and microphone mixer. Whisper large-v3 has not been tested with downloaded weights on a GPU.
 
 Historical 0.11.5 checks covered automated tests, packaged self-checks, source/bundled-code privacy scans, and ZIP/checksum verification. A new package must be verified separately. These checks do not establish fresh-PC installation, live Windows 10 behavior or Japanese/Korean recognition accuracy with real services.
 
