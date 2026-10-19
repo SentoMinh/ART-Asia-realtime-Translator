@@ -440,11 +440,17 @@ class MainWindow(QWidget):
         self._dialog.activateWindow()
 
     def _local_model_arrived(self, problem: str) -> None:
-        """The Local Model was asked for in Settings and its download is complete: hear with it
-        from now on (also when the settings window was closed meanwhile)."""
-        if not problem and not local_model.missing():
-            self.settings.hearing = "local"
-            self.settings_changed()
+        """Activate the downloaded model, including when its setup window was closed."""
+        model = local_download.shared().model
+        if not problem and not local_model.missing(model):
+            self._activate_local(model)
+
+    def _activate_local(self, model: str) -> None:
+        role = local_model.MODELS[model][1]
+        if local_model.selected(role) != model:
+            local_model.select(model)
+        setattr(self.settings, role, "local")
+        self.settings_changed()
 
     def _on_setting_switched(self, setting: str, value: str) -> None:
         if hasattr(self.settings, setting):
@@ -497,7 +503,9 @@ class MainWindow(QWidget):
 
     def _open_local_model_download(self) -> None:
         from .settings_window import LocalModelDialog
-        LocalModelDialog(self).show()
+        dialog = LocalModelDialog(self)
+        dialog.selected.connect(self._activate_local)
+        dialog.show()
 
     def _open_settings_models(self, page_name: str = "Models") -> None:
         self.open_settings()

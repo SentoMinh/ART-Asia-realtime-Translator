@@ -174,8 +174,13 @@ class ServiceChain:
         models = tuple(services.translate_models(service))
         key = (service, models, services.setting(service, "url"), services.setting(service, "key"))
         if key not in self._chains:
+            if service == "local":
+                from .local_inference import translator
+                choices = [("local:nllb-200-ct2", translator)]
+            else:
+                choices = [(f"{service}:{model}", ServiceTranslator(service, model)) for model in models]
             self._chains[key] = Chain(
-                [(f"{service}:{model}", ServiceTranslator(service, model)) for model in models] + self._addons,
+                choices + self._addons,
                 self._clock,
                 on_switch=self._on_model_switch)
         return self._chains[key]

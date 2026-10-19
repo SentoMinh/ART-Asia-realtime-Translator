@@ -6,7 +6,7 @@ Updated for source version **0.11.6**. The application has one service registry 
 
 A Python 3.12 / PySide6 desktop companion for VRChat. It captures VRChat audio or a selected playback device for translated subtitles, translates your microphone into the OSC chatbox, and translates typed messages into that same chatbox. Conversation languages are English, Mandarin, Cantonese, Vietnamese, Japanese and Korean; interface languages remain English, Chinese and Vietnamese.
 
-It is an always-on-top desktop window. Live audio is a mix of the other players: the production engine does not identify individual speakers, although the demo and `Utterance` structure support speaker numbers. Speech recognition and text translation are separate steps. Local Whisper handles recognition on an NVIDIA GPU; translation still uses the selected service or an installed add-on.
+It is an always-on-top desktop window. Live audio is a mix of the other players: the production engine does not identify individual speakers, although the demo and `Utterance` structure support speaker numbers. Speech recognition and text translation are separate steps. Local hearing offers Whisper on an NVIDIA GPU or SenseVoice on CPU. Translation uses the selected online service, local NLLB with CTranslate2 on CPU, or an installed add-on.
 
 ## Working tree and exports
 
@@ -32,7 +32,7 @@ flowchart LR
     A[VRChat process audio] --> C[Segmenter: resampling and voice detection]
     B[Microphone] --> C
     C --> D[SpeechEngine: prioritized sentence queue]
-    D --> E[CloudHearing or LocalWhisper]
+    D --> E[CloudHearing or LocalHearing]
     E --> F[ServiceChain: selected models, then add-ons]
     F --> G[Utterance signals and subtitle log]
     F --> H[LiveBackend chatbox queue]
@@ -51,7 +51,8 @@ Audio callbacks only enqueue samples. A cutting thread segments them, a hearing 
 |---|---|---|
 | Capture, microphone selection, meters | `vrc/audio.py`, `ui/live_backend.py` | `test_chatbox.py`, `test_ui.py` |
 | Sentence boundaries and noise rejection | `engine/vad.py`: `Segmenter`, `SileroVad` | `test_engine.py`, `test_typing.py` |
-| Recognition or language handling | `engine/stt.py`: `CloudHearing`, `LocalWhisper`, `tidy` | `test_engine.py` |
+| Recognition or language handling | `engine/stt.py`: `CloudHearing`, `LocalWhisper`, `tidy`; `engine/local_inference.py`: `LocalHearing`, `LocalSenseVoice` | `test_engine.py`, `test_local_choices.py` |
+| Local translation | `engine/local_inference.py`: shared CPU `LocalTranslator`, NLLB language tokens | `test_local_choices.py` |
 | Provider definitions, keys, models, HTTP errors | `engine/services.py` | `test_engine.py`, `test_ui.py` |
 | Startup/provider connection checks | `ui/service_health.py`, `ui/main.py`, `SettingsWindow` | `test_service_health.py` |
 | Model discovery and current-model labels | `ServiceDialog`, `SettingsWindow`, `engine/services.py` | `test_model_controls.py`, `test_ui.py` |
@@ -70,7 +71,7 @@ Current timing rules include 0.8 seconds of end-of-speech silence, microphone/ga
 
 ## Remaining review items
 
-The earlier `local_model.NAME` Settings crash is resolved: the current label uses `Whisper`. Model discovery no longer reads widgets in the worker or manually pumps the event loop. These older findings should not be treated as open defects.
+The earlier `local_model.NAME` Settings crash is resolved: the current label uses the selected local model's name. Model discovery no longer reads widgets in the worker or manually pumps the event loop. These older findings should not be treated as open defects.
 
 The following paths still warrant focused tests before changing behavior:
 
@@ -83,7 +84,7 @@ These are code-review observations, not newly reproduced live failures. This doc
 
 ## Validation and commands
 
-Source version 0.11.6 passed **371 tests** and a live custom NLLB translation check. A new packaged EXE has not been built or tested.
+Source version 0.11.7 passed **385 tests**, plus actual SenseVoice and NLLB CPU inference checks. A new packaged EXE has not been built or tested, and the new Whisper large-v3 choice has not been run with downloaded weights on a GPU.
 
 Historical 0.11.5 package validation covered tests, packaged self-checks, Japanese/Korean language tables, native DLL hashes, privacy scans and ZIP checksums. Run tests and packaged checks again for each new release.
 

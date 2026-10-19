@@ -156,9 +156,9 @@ def test_too_little_room_on_the_disk_is_said_before_anything_is_downloaded(serve
 
 
 def test_what_the_local_model_lacks_is_said_in_plain_words(monkeypatch):
-    monkeypatch.setattr(local_model, "installed", lambda: False)
+    monkeypatch.setattr(local_model, "installed", lambda model=None: False)
     assert "choose an online service" in local_model.missing()
-    monkeypatch.setattr(local_model, "installed", lambda: True)
+    monkeypatch.setattr(local_model, "installed", lambda model=None: True)
     monkeypatch.setattr(local_model, "nvidia_card", lambda: False)
     assert "NVIDIA graphics card" in local_model.missing()
     monkeypatch.setattr(local_model, "nvidia_card", lambda: True)

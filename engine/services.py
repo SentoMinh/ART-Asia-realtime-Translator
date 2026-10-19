@@ -59,7 +59,7 @@ SERVICES = {s.id: s for s in (
     Service("custom", "Custom domain", "", "", "whisper", ""),
 )}
 HEARING = ("local", "openai", "gemini", "qwen", "openrouter", "custom")   # "local": this PC
-TRANSLATING = ("openai", "gemini", "qwen", "mimo", "openrouter", "custom")
+TRANSLATING = ("local", "openai", "gemini", "qwen", "mimo", "openrouter", "custom")
 FIELDS = ("url", "key", "hear_model", "translate_model")
 
 
@@ -103,6 +103,8 @@ def setting(service: str, field: str) -> str:
     value = str(entry.get(field) or "").strip() if isinstance(entry, dict) else ""
     if value:
         return value
+    if service == "local":
+        return {"hear_model": "large-v3-turbo", "translate_model": "nllb-200-ct2"}.get(field, "")
     known = SERVICES.get(service)
     return getattr(known, field, "") if known and field != "key" else ""
 
@@ -168,7 +170,7 @@ def translate_models(service: str) -> list[str]:
 
 
 def title(service: str) -> str:
-    return SERVICES[service].name if service in SERVICES else service
+    return "Local Model (this PC)" if service == "local" else SERVICES[service].name if service in SERVICES else service
 
 
 def auth(service: str) -> dict:

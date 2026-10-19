@@ -24,12 +24,14 @@ class LocalDownload(QObject):
         super().__init__()
         self._fetch = fetch
         self._stop = threading.Event()
+        self.model = local_model.selected()
         self.active = False              # from start() until `finished` has reached the window
         self.finished.connect(self._ended)     # connected first: the window's own slots see it ended
 
-    def start(self) -> None:
+    def start(self, model: str | None = None) -> None:
         if self.active:
             return
+        self.model = model or local_model.selected()
         self.active = True
         self._stop.clear()
         threading.Thread(target=self._run, name="local-model", daemon=True).start()
@@ -50,7 +52,7 @@ class LocalDownload(QObject):
                 told = now
                 self.progress.emit(float(done), float(total))
         try:
-            self._fetch(progress=progress, stop=self._stop.is_set)
+            self._fetch(progress=progress, stop=self._stop.is_set, model=self.model)
             problem = ""
         except local_model.Stopped:
             problem = STOPPED

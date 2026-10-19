@@ -16,7 +16,13 @@ def get_ready_models(category: str, exclude: str = "") -> list[tuple[str, str, s
     results = []
     choices = services.offered(services.HEARING if category == "hearing" else services.TRANSLATING)
     for svc in choices:
-        if svc == exclude or svc == "local":
+        if svc == exclude:
+            continue
+        if svc == "local":
+            if category == "translating":
+                model = local_model.selected(category)
+                if not local_model.missing(model):
+                    results.append((svc, model, local_model.MODELS[model][0]))
             continue
         if services.ready(svc):
             if category == "hearing":
@@ -116,7 +122,7 @@ class SwitchModelDialog(QDialog):
             if category == "hearing" and not local_model.missing():
                 local_btn = QPushButton(tr("Or switch to Local Model"))
                 local_btn.setObjectName("plain")
-                local_btn.clicked.connect(lambda: self._on_switch("local", getattr(local_model, "NAME", "Whisper")))
+                local_btn.clicked.connect(lambda: self._on_switch("local", local_model.MODELS[local_model.selected()][0]))
                 buttons.insertWidget(0, local_btn)
 
         else:
@@ -127,17 +133,17 @@ class SwitchModelDialog(QDialog):
                 layout.addWidget(no_model_label)
 
                 if not local_model.missing():
-                    rec_label = QLabel(tr("We recommend switching to the Local Model (Whisper on your graphics card)."))
+                    rec_label = QLabel(tr("You can switch to your downloaded local hearing model."))
                     rec_label.setWordWrap(True)
                     layout.addWidget(rec_label)
 
                     switch_btn = QPushButton(tr("Switch to Local Model"))
-                    switch_btn.clicked.connect(lambda: self._on_switch("local", getattr(local_model, "NAME", "Whisper")))
+                    switch_btn.clicked.connect(lambda: self._on_switch("local", local_model.MODELS[local_model.selected()][0]))
                     buttons.addStretch(1)
                     buttons.addWidget(cancel)
                     buttons.addWidget(switch_btn)
                 else:
-                    rec_label = QLabel(tr("We recommend downloading the Local Model (Whisper on your graphics card) for free, private speech recognition."))
+                    rec_label = QLabel(tr("Choose a local hearing model to download and run on this PC."))
                     rec_label.setWordWrap(True)
                     layout.addWidget(rec_label)
 

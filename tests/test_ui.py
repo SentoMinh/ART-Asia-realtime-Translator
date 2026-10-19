@@ -395,7 +395,7 @@ def test_hearing_engine_and_detector_strictness(window, tmp_path):
     assert window.settings.hearing == "qwen" and window.saved[-1].hearing == "qwen"
     dialog.translating.setCurrentIndex(dialog.translating.findData("mimo"))
     assert window.settings.translating == "mimo" and window.saved[-1].translating == "mimo"
-    assert dialog.translating.findData("local") == -1          # this PC can only hear
+    assert dialog.translating.findData("local") >= 0          # local translation is available too
     dialog._sliders["font_px"][0].setValue(20)
     assert window.settings.font_px == 20 and isinstance(window.settings.font_px, int)
     path = tmp_path / "ui.json"
@@ -622,8 +622,8 @@ def test_the_local_model_is_downloaded_before_hearing_switches_to_it(window, mon
     from engine import local_model
     from ui import local_download, settings_window
     state = {"missing": NOT_DOWNLOADED}
-    monkeypatch.setattr(local_model, "installed", lambda: True)
-    monkeypatch.setattr(local_model, "missing", lambda: state["missing"])
+    monkeypatch.setattr(local_model, "installed", lambda model=None: True)
+    monkeypatch.setattr(local_model, "missing", lambda model=None: state["missing"])
     opened = []
     monkeypatch.setattr(settings_window.LocalModelDialog, "exec", lambda self: opened.append(self))
     dialog = SettingsWindow(window.settings, window)
@@ -654,17 +654,19 @@ def test_the_local_model_s_window_downloads_stops_and_says_how_it_ended(window, 
             super().__init__()
             self.active, self.calls = False, []
 
-        def start(self):
+        def start(self, model=None):
+            self.model = model
             self.active = True
             self.calls.append("start")
 
         def stop(self):
             self.calls.append("stop")
     state = {"missing": NOT_DOWNLOADED}
-    monkeypatch.setattr(local_model, "installed", lambda: True)
+    monkeypatch.setattr(local_model, "installed", lambda model=None: True)
     monkeypatch.setattr(local_model, "nvidia_card", lambda: True)
-    monkeypatch.setattr(local_model, "missing", lambda: state["missing"])
-    monkeypatch.setattr(local_model, "arrived", lambda root=None: 0)
+    monkeypatch.setattr(local_model, "missing", lambda model=None: state["missing"])
+    monkeypatch.setattr(local_model, "arrived", lambda root=None, model=None: 0)
+    monkeypatch.setattr(local_model, "ready", lambda root=None, model=None: not state["missing"])
     download = Download()
     dialog = LocalModelDialog(window, download=download)
     assert dialog.action.text() == "Download" and not dialog.action.isHidden() and dialog.result.text() == ""
@@ -684,10 +686,63 @@ def test_the_local_model_s_window_downloads_stops_and_says_how_it_ended(window, 
     assert dialog.result.text() == "✓ Ready" and dialog.action.isHidden() and dialog.bar.isHidden()
 
 
+def test_local_model_picker_keeps_hearing_and_translation_separate(window, monkeypatch):
+    from engine import local_model
+    from ui.settings_window import LocalModelDialog
+    monkeypatch.setattr(local_model, "missing", lambda model=None: "")
+    monkeypatch.setattr(local_model, "ready", lambda root=None, model=None: True)
+    dialog = LocalModelDialog(window, role="translating")
+    assert {dialog.models.itemData(i) for i in range(dialog.models.count())} == set(local_model.MODELS)
+    assert dialog.models.currentData() == "nllb-200-ct2"
+    local_model.select("sensevoice")
+    window.settings.hearing = "custom"
+    dialog.selected.connect(window._activate_local)
+    dialog.use.click()
+    assert window.settings.translating == "local"
+    assert window.settings.hearing == "custom"
+    assert local_model.selected() == "sensevoice"
+
+
+def test_cpu_choices_can_download_without_nvidia(window, monkeypatch):
+    from engine import local_model
+    from ui.settings_window import LocalModelDialog
+    monkeypatch.setattr(local_model, "installed", lambda model=None: True)
+    monkeypatch.setattr(local_model, "nvidia_card", lambda: False)
+    dialog = LocalModelDialog(window)
+    for model in ("sensevoice", "nllb-200-ct2"):
+        dialog.models.setCurrentIndex(dialog.models.findData(model))
+        assert not dialog.action.isHidden()
+        assert not dialog.use.isEnabled()
+        assert "CPU" in dialog.model_note.text()
+
+
+def test_translation_download_completion_activates_only_translation(window, monkeypatch):
+    from engine import local_model
+    from ui import local_download
+    monkeypatch.setattr(local_download.shared(), "model", "nllb-200-ct2")
+    monkeypatch.setattr(local_model, "missing", lambda model=None: "")
+    window.settings.hearing = "custom"
+    window.settings.translating = "custom"
+    window._local_model_arrived("connection failed")
+    assert window.settings.translating == "custom"
+    window._local_model_arrived("")
+    assert window.settings.translating == "local"
+    assert window.settings.hearing == "custom"
+
+
+def test_local_download_captures_model_before_worker_runs(app):
+    from ui.local_download import LocalDownload
+    calls = []
+    download = LocalDownload(fetch=lambda **kwargs: calls.append(kwargs["model"]))
+    download.model = "sensevoice"
+    download._run()
+    assert calls == ["sensevoice"]
+
+
 def test_a_pc_without_an_nvidia_card_is_told_so_and_offered_no_download(window, monkeypatch):
     from engine import local_model
     from ui.settings_window import LocalModelDialog
-    monkeypatch.setattr(local_model, "installed", lambda: True)
+    monkeypatch.setattr(local_model, "installed", lambda model=None: True)
     monkeypatch.setattr(local_model, "nvidia_card", lambda: False)
     dialog = LocalModelDialog(window)
     assert "NVIDIA graphics card" in dialog.result.text() and dialog.action.isHidden()
@@ -705,12 +760,12 @@ def test_the_download_tells_the_window_how_it_ended(app):
         assert download.active is False
         return ended
 
-    def no_room(progress, stop):
+    def no_room(progress, stop, model=None):
         raise local_model.DownloadError("no room")
 
-    def stopped(progress, stop):
+    def stopped(progress, stop, model=None):
         raise local_model.Stopped("stopped")
-    assert run(lambda progress, stop: progress(5, 5)) == [""]
+    assert run(lambda progress, stop, model=None: progress(5, 5)) == [""]
     assert run(no_room) == ["no room"] and run(stopped) == [STOPPED]
 
 
@@ -924,7 +979,7 @@ def test_switch_model_dialog_can_switch_to_local_when_ready_models_exist(window,
     from ui.switch_dialog import SwitchModelDialog
 
     monkeypatch.setattr(services, "ready", lambda s: s == "gemini")
-    monkeypatch.setattr(local_model, "missing", lambda: "")  # local is ready!
+    monkeypatch.setattr(local_model, "missing", lambda model=None: "")  # local is ready!
     dlg = SwitchModelDialog("hearing", "custom", window.settings, reason="timeout", parent=window)
 
     switched = []
@@ -932,7 +987,7 @@ def test_switch_model_dialog_can_switch_to_local_when_ready_models_exist(window,
     buttons = dlg.findChildren(QPushButton)
     local_btn = [b for b in buttons if "Local Model" in b.text()][0]
     local_btn.click()
-    assert switched == [("hearing", "local", "Whisper")]
+    assert switched == [("hearing", "local", "Whisper large-v3-turbo")]
 
 
 def test_switch_model_dialog_recommends_local_model_when_none_ready(window, app, monkeypatch):
@@ -940,7 +995,7 @@ def test_switch_model_dialog_recommends_local_model_when_none_ready(window, app,
     from ui.switch_dialog import SwitchModelDialog
 
     monkeypatch.setattr(services, "ready", lambda s: False)
-    monkeypatch.setattr(local_model, "missing", lambda: "")  # local is ready!
+    monkeypatch.setattr(local_model, "missing", lambda model=None: "")  # local is ready!
 
     dlg = SwitchModelDialog("hearing", "custom", window.settings, parent=window)
     assert len(dlg.candidates) == 0
@@ -958,7 +1013,7 @@ def test_switch_model_dialog_recommends_download_local_when_none_ready_and_missi
     from ui.switch_dialog import SwitchModelDialog
 
     monkeypatch.setattr(services, "ready", lambda s: False)
-    monkeypatch.setattr(local_model, "missing", lambda: "not downloaded")
+    monkeypatch.setattr(local_model, "missing", lambda model=None: "not downloaded")
 
     dlg = SwitchModelDialog("hearing", "custom", window.settings, parent=window)
     assert len(dlg.candidates) == 0

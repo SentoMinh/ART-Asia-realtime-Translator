@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFormLayout, QF
                                QPushButton, QScrollArea, QSlider, QStackedWidget, QVBoxLayout,
                                QWidget)
 
-from engine import local_model   # Whisper on this PC: can it run, and its one-time download
+from engine import local_model
 from engine import services      # the online services: names, default models, saved keys
 
 from . import __version__, local_download, theme
@@ -29,10 +29,8 @@ except ImportError:      # numpy missing: no microphone list, only the Windows d
 from .widgets import Switch
 
 LOCAL_MODEL = "Local Model (this PC)"
-LOCAL_NOTE = "Whisper on your own NVIDIA graphics card: no key and no limits. Downloaded once."
-LOCAL_DOWNLOAD_NOTE = ("The download is {size}; the model then uses about 2.4 GB of the graphics card's "
-                       "memory. When everything has arrived, hearing switches to the Local Model. You "
-                       "can close this window: the download carries on.")
+LOCAL_NOTE = "Choose a hearing or translation model to download and run on this PC. No API key is needed."
+LOCAL_DOWNLOAD_NOTE = "Download: {size}. The model becomes active when the download finishes. You can close this window while it continues."
 SERVICE_NOTES = {
     "openai": "Whisper hears, GPT translates. Paid per use.",
     "gemini": "Hears and translates. Google gives a small free daily allowance.",
@@ -210,8 +208,7 @@ class SettingsWindow(QDialog):
         self._service_status: dict[str, QLabel] = {}
         set_up = [(services.title(service), SERVICE_NOTES[service], self._service_row(service))
                   for service in services.offered()]
-        if local_model.installed():      # first, as in the Hearing list
-            set_up.insert(0, (LOCAL_MODEL, LOCAL_NOTE, self._local_row()))
+        set_up.insert(0, (LOCAL_MODEL, LOCAL_NOTE, self._local_row()))
         self._page("Models", [
             ("Hearing", self._hearing_desc, self.hearing),
             ("Translating", self._translating_desc, self.translating),
@@ -230,7 +227,7 @@ class SettingsWindow(QDialog):
         svc = self.settings.hearing
         title = tr(LOCAL_MODEL) if svc == "local" else tr(services.title(svc))
         if svc == "local":
-            model = "Whisper"
+            model = local_model.MODELS[local_model.selected()][0]
         else:
             model = services.setting(svc, "hear_model")
         model = model or title
@@ -303,8 +300,7 @@ class SettingsWindow(QDialog):
         combo = QComboBox()
         for service in choices:
             if service == "local":
-                if local_model.installed() or self.settings.hearing == "local":
-                    combo.addItem(tr(LOCAL_MODEL), "local")
+                combo.addItem(tr(LOCAL_MODEL), "local")
             else:
                 combo.addItem(tr(services.title(service)), service)
         combo.currentIndexChanged.connect(lambda: self._pick(setting, combo))
@@ -313,11 +309,11 @@ class SettingsWindow(QDialog):
         return combo
 
     def _pick(self, setting: str, combo: QComboBox) -> None:
-        if combo.currentData() == "local" and local_model.missing():
+        if combo.currentData() == "local" and local_model.missing(local_model.selected(setting)):
             # not on this PC yet: the choice stays as it was, and the Local Model's window offers
             # the download (the main window switches to it when everything has arrived)
             select_data(combo, getattr(self.settings, setting))
-            self.set_up_local()
+            self.set_up_local(role=setting)
             return
         new_svc = combo.currentData()
         self._set(setting, new_svc)
@@ -332,7 +328,7 @@ class SettingsWindow(QDialog):
                     backend.setting_switched.emit("translating", new_svc)
             elif setting == "hearing":
                 backend.current_hearing_service = new_svc
-                backend.current_hearing_model = getattr(local_model, "NAME", "Whisper") if new_svc == "local" else services.setting(new_svc, "hear_model")
+                backend.current_hearing_model = local_model.MODELS[local_model.selected()][0] if new_svc == "local" else services.setting(new_svc, "hear_model")
                 if hasattr(backend, "setting_switched") and hasattr(backend.setting_switched, "emit"):
                     backend.setting_switched.emit("hearing", new_svc)
         self._update_model_labels()
@@ -383,7 +379,7 @@ class SettingsWindow(QDialog):
         """The Local Model is no service, but it is set up in the same place: "Ready", "Not
         downloaded" or how far the download is, and a button that opens its small window."""
         self._local_status = QLabel()
-        box = self._status_row(self._local_status, self.set_up_local)
+        box = self._status_row(self._local_status, lambda: self.set_up_local())
         download = local_download.shared()
         download.progress.connect(self.show_local_status)
         download.finished.connect(self.show_local_status)
@@ -391,16 +387,25 @@ class SettingsWindow(QDialog):
         return box
 
     def show_local_status(self, *_) -> None:
-        if not local_model.missing():
+        download = local_download.shared()
+        if download.active:
+            text = f"{100 * local_model.arrived(model=download.model) // local_model.size(download.model)}%"
+        elif any(not local_model.missing(model) for model in local_model.MODELS):
             text = tr("Ready")
-        elif local_download.shared().active:
-            text = f"{100 * local_model.arrived() // local_model.size()}%"
         else:
             text = tr("Not downloaded")
         self._local_status.setText(text)
 
-    def set_up_local(self) -> None:
-        LocalModelDialog(self).exec()
+    def set_up_local(self, role="hearing") -> None:
+        dialog = LocalModelDialog(self, role=role)
+        dialog.selected.connect(self._activate_local)
+        dialog.exec()
+
+    def _activate_local(self, model: str) -> None:
+        role = local_model.MODELS[model][1]  # The setup dialog has saved the choice.
+        self._set(role, "local")
+        self.show_local_status()
+        self.sync()
 
     def _set(self, name: str, value) -> None:
         setattr(self.settings, name, value)
@@ -768,30 +773,40 @@ class ServiceDialog(QDialog):
 
 
 class LocalModelDialog(QDialog):
-    """What the Local Model needs, and its one-time download. Closing the window does not stop
-    the download; when everything has arrived, the main window switches hearing to it."""
+    """Choose, download and activate one of the local hearing/translation models."""
+    selected = Signal(str)
 
-    def __init__(self, parent=None, download: local_download.LocalDownload | None = None):
+    def __init__(self, parent=None, download: local_download.LocalDownload | None = None, role="hearing"):
         super().__init__(parent)
         self._download = download or local_download.shared()
-        self.setAttribute(Qt.WA_DeleteOnClose)      # a closed one must not keep listening to the download
+        self.setAttribute(Qt.WA_DeleteOnClose)
         self.setObjectName("settings")
         self.setWindowTitle(tr(LOCAL_MODEL))
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(500)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 18, 22, 18)
         layout.setSpacing(10)
-        self.download_note = QLabel(tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size())))
-        for note in (QLabel(tr(LOCAL_NOTE)), self.download_note):
-            note.setObjectName("dim")
-            note.setWordWrap(True)
-            layout.addWidget(note)
+        note = QLabel(tr(LOCAL_NOTE))
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        self.models = QComboBox()
+        self.models.setAccessibleName(tr("Local model"))
+        for model, (title, category, _, _) in local_model.MODELS.items():
+            self.models.addItem(f"{tr('Hearing' if category == 'hearing' else 'Translating')} — {title}", model)
+        initial = self._download.model if self._download.active else local_model.selected(role)
+        select_data(self.models, initial)
+        layout.addWidget(self.models)
+        self.model_note = QLabel()
+        self.model_note.setWordWrap(True)
+        layout.addWidget(self.model_note)
+        self.download_note = QLabel()
+        self.download_note.setWordWrap(True)
+        layout.addWidget(self.download_note)
         self.bar = QProgressBar()
         self.bar.setRange(0, 1000)
         self.bar.setTextVisible(False)
         layout.addWidget(self.bar)
         self.result = QLabel()
-        self.result.setObjectName("dim")
         self.result.setWordWrap(True)
         layout.addWidget(self.result)
         buttons = QHBoxLayout()
@@ -800,33 +815,51 @@ class LocalModelDialog(QDialog):
         close.clicked.connect(self.accept)
         self.action = QPushButton()
         self.action.clicked.connect(self.start_or_stop)
+        self.use = QPushButton(tr("Use model"))
+        self.use.clicked.connect(self.use_model)
         buttons.addStretch(1)
         buttons.addWidget(close)
         buttons.addWidget(self.action)
+        buttons.addWidget(self.use)
         layout.addLayout(buttons)
+        self.models.currentIndexChanged.connect(lambda: self.show_state())
         self._download.progress.connect(self.show_progress)
         self._download.finished.connect(self.show_state)
         self.show_state()
 
     def show_state(self, problem: str = "") -> None:
-        """`problem`: how a download just ended ("" when none did, or when it went well)."""
-        missing = local_model.missing()
-        can_download = bool(missing) and local_model.installed() and local_model.nvidia_card()
+        model = self.models.currentData()
+        self.models.setEnabled(not self._download.active)
+        if self._download.active:
+            select_data(self.models, self._download.model)
+            model = self._download.model
+        note = ("SenseVoice runs on CPU: Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese."
+                if model == "sensevoice" else "NLLB-200 translates locally on CPU using CTranslate2 (INT8)."
+                if model == "nllb-200-ct2" else "Whisper runs on your NVIDIA graphics card. Large-v3 needs more memory than turbo.")
+        self.model_note.setText(tr(note))
+        missing = local_model.missing(model)
+        can_download = (local_model.installed(model)
+                        and (not model.startswith("large-v3") or local_model.nvidia_card()))
+        needs_download = not local_model.ready(model=model)
+        self.download_note.setText(tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size(model))))
+        visible = self._download.active or (needs_download and can_download)
         for part in (self.download_note, self.bar, self.action):
-            part.setVisible(can_download)
+            part.setVisible(visible)
+        self.use.setEnabled(not missing and not self._download.active)
         self.action.setEnabled(True)
         self.action.setText(tr("Stop") if self._download.active else tr("Download"))
-        if not missing:
+        if not missing and not self._download.active and not needs_download:
             self.result.setText("✓ " + tr("Ready"))
         elif not can_download:
             self.result.setText("✗ " + missing)
-        elif problem and problem != local_download.STOPPED:
-            self.show_progress(local_model.arrived(), local_model.size())
-            self.result.setText("✗ " + problem)
         else:
-            self.show_progress(local_model.arrived(), local_model.size())
+            self.show_progress(local_model.arrived(model=model), local_model.size(model))
+            if problem and problem != local_download.STOPPED:
+                self.result.setText("✗ " + problem)
 
     def show_progress(self, done: float, total: float) -> None:
+        if self._download.active and self.models.currentData() != self._download.model:
+            self.show_state()
         self.bar.setValue(round(1000 * done / total) if total else 0)
         self.result.setText(tr("{done} of {size}").format(done=local_model.gb(done),
                                                           size=local_model.gb(total)) if done else "")
@@ -834,7 +867,20 @@ class LocalModelDialog(QDialog):
     def start_or_stop(self) -> None:
         if self._download.active:
             self._download.stop()
-            self.action.setEnabled(False)       # until the download has answered that it stopped
+            self.action.setEnabled(False)
         else:
-            self._download.start()
+            self._download.start(self.models.currentData())
             self.show_state()
+
+    def use_model(self) -> None:
+        model = self.models.currentData()
+        if local_model.missing(model):
+            self.show_state()
+            return
+        try:
+            local_model.select(model)
+        except OSError as error:
+            self.result.setText(f"✗ {tr('Could not save')}: {error}")
+            return
+        self.selected.emit(model)
+        self.accept()

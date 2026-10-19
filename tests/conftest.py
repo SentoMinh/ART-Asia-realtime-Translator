@@ -8,4 +8,5 @@ CUSTOM_URL = "https://custom.test/v1"
 def isolated_models(tmp_path, monkeypatch):
     from engine import services
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "localappdata"))
     monkeypatch.setattr(services, "_cache", (None, {}))

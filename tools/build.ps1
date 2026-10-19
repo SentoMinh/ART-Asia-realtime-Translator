@@ -6,10 +6,9 @@
 #   -DistPath dist\next                    build beside a copy of the program that is running
 #   -Python <path to python.exe>           another environment than .venv-app
 #
-# The program carries the Local Model's code (faster-whisper, CTranslate2) but not its 2 GB of
-# data: NVIDIA's cuBLAS and the Whisper model are downloaded when "Local Model" is first chosen
-# (engine\local_model.py). PyAV (65 MB, only reads sound files), NVIDIA's packages and PyTorch
-# stay out, which keeps the program one file of about 100 MB.
+# The program carries the local runtimes (faster-whisper, sherpa-onnx, CTranslate2).
+# Model weights and Whisper's cuBLAS files are downloaded separately in Settings.
+# PyAV, NVIDIA's Python packages and PyTorch stay out of the program file.
 
 param([switch]$Folder, [string]$DistPath = "dist", [string]$Python = "", [string]$MixerBuild = "")
 
@@ -38,7 +37,8 @@ if ($MixerBuild) {
     --collect-all pyaudiowpatch `
     --collect-binaries soxr --collect-binaries onnxruntime `
     --hidden-import proctap._native --hidden-import engine.speech --hidden-import engine.translators `
-    --hidden-import engine.local_model --hidden-import ui.local_download --hidden-import ui.switch_dialog `
+    --collect-all sherpa_onnx --collect-all tokenizers --collect-all ctranslate2 `
+    --hidden-import engine.local_inference --hidden-import engine.local_model --hidden-import ui.local_download --hidden-import ui.switch_dialog `
     --hidden-import http.client --hidden-import queue `
     --exclude-module av --exclude-module hf_xet `
     --exclude-module scipy --exclude-module nvidia --exclude-module torch `

@@ -687,13 +687,13 @@ def test_the_voice_detector_brings_its_own_model_file():
 
 
 def test_without_the_local_model_this_pc_hearing_says_what_to_do(monkeypatch):
-    monkeypatch.setattr(stt.local_model, "installed", lambda: False)
+    monkeypatch.setattr(stt.local_model, "installed", lambda model=None: False)
     with pytest.raises(SttError, match="choose an online service"):
         stt.LocalWhisper().load()
 
 
 def test_before_its_download_the_local_model_says_where_to_get_it(monkeypatch):
-    monkeypatch.setattr(stt.local_model, "installed", lambda: True)
+    monkeypatch.setattr(stt.local_model, "installed", lambda model=None: True)
     monkeypatch.setattr(stt.local_model, "nvidia_card", lambda: True)
     monkeypatch.setattr(stt.local_model, "gpu_folders", lambda: [])
     with pytest.raises(SttError, match="not downloaded yet"):
@@ -710,8 +710,8 @@ def test_the_local_model_loads_from_the_program_s_own_download(monkeypatch, tmp_
         def transcribe(self, samples, **options):
             return [], None
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    monkeypatch.setattr(stt.local_model, "missing", lambda: "")
-    monkeypatch.setattr(stt.local_model, "ready", lambda root=None: True)
+    monkeypatch.setattr(stt.local_model, "missing", lambda model=None: "")
+    monkeypatch.setattr(stt.local_model, "ready", lambda root=None, model=None: True)
     monkeypatch.setattr(stt.local_model, "gpu_folders", lambda: [])
     monkeypatch.setattr(stt, "whisper_class", lambda: Model)
     stt.LocalWhisper().load()

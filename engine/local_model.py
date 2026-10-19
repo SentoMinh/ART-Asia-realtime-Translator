@@ -1,21 +1,16 @@
-"""The Local Model's big files, and whether it can run on this PC.
+"""Download and check local hearing/translation models in the user's local app-data cache.
 
-The program file (.exe) carries the speech model's code but not its 2 GB of data. When "Local
-Model" is first chosen (Settings → Models), these are downloaded into
-%LOCALAPPDATA%\\VRChat-Translator\\local-model:
-    gpu\\      cuBLAS, the one NVIDIA library the model loads, taken out of NVIDIA's package on PyPI
-    whisper\\  Whisper large-v3-turbo in faster-whisper's format, from Hugging Face
-Each download is checked against its known SHA-256 before it is used. One that broke off
-continues where it stopped.
-
-The source version gets cuBLAS as a Python package (requirements.txt) and lets faster-whisper
-fetch the model, so it needs none of this. When these files are there, it uses them too.
+The app carries runtimes, while Settings downloads each model separately. Pinned files are
+checked against SHA-256 before use and interrupted downloads resume. Whisper models share
+cuBLAS; SenseVoice and NLLB run on CPU. Existing source installs can also use faster-whisper's
+own turbo cache with the NVIDIA packages installed through requirements.txt.
 """
 from __future__ import annotations
 
 import ctypes
 import hashlib
 import importlib.util
+import json
 import os
 import shutil
 import time
@@ -77,6 +72,42 @@ PARTS = (
 )
 
 
+# id: (display name, role, directory, runtime)
+MODELS = {
+    "large-v3-turbo": ("Whisper large-v3-turbo", "hearing", "whisper", "faster_whisper"),
+    "large-v3": ("Whisper large-v3", "hearing", "whisper-v3", "faster_whisper"),
+    "sensevoice": ("SenseVoice Small", "hearing", "sensevoice", "sherpa_onnx"),
+    "nllb-200-ct2": ("NLLB-200 · CTranslate2", "translating", "nllb", "ctranslate2"),
+}
+_MODEL_FILES = json.loads((Path(__file__).parent / "assets" / "local_models.json").read_text(encoding="utf-8"))
+
+
+def selected(role: str = "hearing") -> str:
+    from . import services
+    default = "large-v3-turbo" if role == "hearing" else "nllb-200-ct2"
+    name = services.setting("local", "hear_model" if role == "hearing" else "translate_model")
+    return name if name in MODELS and MODELS[name][1] == role else default
+
+
+def select(model: str) -> str:
+    from . import services
+    role = MODELS[model][1]
+    services.save("local", **{"hear_model" if role == "hearing" else "translate_model": model})
+    return role
+
+
+def parts(model: str | None = None) -> tuple[Part, ...]:
+    model = model or selected()
+    if model == "large-v3-turbo":
+        return PARTS
+    found = tuple(Part(**part) for part in _MODEL_FILES[model])
+    return (PARTS[0], *found) if model == "large-v3" else found
+
+
+def model_folder(model: str | None = None) -> Path:
+    return folder() / MODELS[model or selected()][2]
+
+
 def folder() -> Path:
     base = os.environ.get("LOCALAPPDATA") or str(Path.home())
     return Path(base) / "VRChat-Translator" / "local-model"
@@ -93,27 +124,29 @@ def _has(part: Part, root: Path) -> bool:
         return False
 
 
-def ready(root: Path | None = None) -> bool:
+def ready(root: Path | None = None, *, model: str | None = None) -> bool:
     """Every file is in place (each was checked when it arrived)."""
     root = root or folder()
-    return all(_has(part, root) for part in PARTS)
+    return all(_has(part, root) for part in parts(model))
 
 
-def size() -> int:
+def size(model: str | None = None) -> int:
     """Bytes of the whole download."""
-    return sum(part.size for part in PARTS)
+    return sum(part.size for part in parts(model))
 
 
-def arrived(root: Path | None = None) -> int:
+def arrived(root: Path | None = None, *, model: str | None = None) -> int:
     """Bytes that are here already: whole parts, and the start of one that broke off."""
     root = root or folder()
+    model = model or selected()
+    waiting = root / WAITING if model == "large-v3-turbo" else root / WAITING / model
     count = 0
-    for part in PARTS:
+    for part in parts(model):
         if _has(part, root):
             count += part.size
         else:
             try:
-                count += min((root / WAITING / part.name).stat().st_size, part.size)
+                count += min((waiting / part.name).stat().st_size, part.size)
             except OSError:
                 pass
     return count
@@ -121,15 +154,14 @@ def arrived(root: Path | None = None) -> int:
 
 # ---- can it run here? ----------------------------------------------------------------------
 
-def installed() -> bool:
-    """The model's code is part of this copy: the program file has it; from source, the
-    faster-whisper package."""
-    return importlib.util.find_spec("faster_whisper") is not None
+def installed(model: str | None = None) -> bool:
+    """Whether this copy includes the chosen model's runtime."""
+    return importlib.util.find_spec(MODELS[model or selected()][3]) is not None
 
 
 @lru_cache(maxsize=1)
 def nvidia_card() -> bool:
-    """NVIDIA's driver is installed (it brings nvcuda.dll). The model runs on nothing else."""
+    """NVIDIA's driver is installed (it brings nvcuda.dll), as required for local Whisper."""
     try:
         ctypes.WinDLL("nvcuda.dll")
     except (OSError, AttributeError):      # AttributeError: not Windows
@@ -150,18 +182,22 @@ def gpu_folders() -> list[str]:
             place = Path(location) / sub
             if place.is_dir():
                 folders.append(str(place))
-    if ready():
+    if _has(PARTS[0], folder()):
         folders.append(str(folder() / "gpu"))
     return folders
 
 
-def missing() -> str:
-    """What the Local Model lacks on this PC, in plain words; "" when it can run."""
-    if not installed():
-        return "this copy has no Local Model: choose an online service in Settings → Models"
-    if not nvidia_card():
-        return "the Local Model needs an NVIDIA graphics card, and this PC has none"
-    if not gpu_folders():
+def missing(model: str | None = None) -> str:
+    """What the selected model lacks before it can run."""
+    model = model or selected()
+    if not installed(model):
+        return "this copy has no Local Model runtime: install its dependencies or choose an online service in Settings → Models"
+    if MODELS[model][3] == "faster_whisper":
+        if not nvidia_card():
+            return "the Local Model needs an NVIDIA graphics card, and this PC has none"
+        if model == "large-v3-turbo" and gpu_folders():
+            return ""  # Existing source installs let faster-whisper fetch its cached model.
+    if not ready(model=model):
         return "the Local Model is not downloaded yet (Settings → Models)"
     return ""
 
@@ -169,14 +205,15 @@ def missing() -> str:
 # ---- the download --------------------------------------------------------------------------
 
 def download(progress=lambda done, total: None, stop=lambda: False, http=None,
-             root: Path | None = None, wait=time.sleep) -> None:
+             root: Path | None = None, wait=time.sleep, model: str | None = None) -> None:
     """Fetches the parts that are missing. `progress(done, total)` is told the bytes that are
     here; when `stop()` turns true the download ends with Stopped. Any other reason it can't
     finish is a DownloadError."""
     root = root or folder()
-    waiting = root / WAITING
-    total = size()
-    todo = [part for part in PARTS if not _has(part, root)]
+    model = model or selected()
+    waiting = root / WAITING if model == "large-v3-turbo" else root / WAITING / model
+    total = size(model)
+    todo = [part for part in parts(model) if not _has(part, root)]
     done = total - sum(part.size for part in todo)
     try:
         waiting.mkdir(parents=True, exist_ok=True)
@@ -193,7 +230,10 @@ def download(progress=lambda done, total: None, stop=lambda: False, http=None,
             _put(part, file, root)
             done += part.size
             progress(done, total)
-        shutil.rmtree(waiting, ignore_errors=True)
+        try:
+            waiting.rmdir()
+        except OSError:
+            pass
     except (OSError, zipfile.BadZipFile) as error:
         raise DownloadError(f"the files could not be written: {error}") from error
 

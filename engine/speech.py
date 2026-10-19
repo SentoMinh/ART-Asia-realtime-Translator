@@ -23,7 +23,8 @@ from ui.backend import AUTO, LANGS, Utterance
 from vrc.translate import TranslateError
 
 from . import services
-from .stt import CloudHearing, LocalWhisper, SttError
+from .stt import CloudHearing, SttError
+from .local_inference import LocalHearing
 from .translators import ServiceChain
 from .vad import Segment, Segmenter
 
@@ -44,7 +45,7 @@ class SpeechEngine:
     def __init__(self, backend, engines: dict | None = None, translator=None,
                  clock=time.monotonic, vads: dict | None = None):
         self.backend = backend
-        self._engines = engines or {"local": LocalWhisper()}   # online ones are added when picked
+        self._engines = engines or {"local": LocalHearing()}   # online ones are added when picked
         self._translator = translator or ServiceChain(
             lambda: getattr(backend.settings, "translating", ""))
         if hasattr(self._translator, "on_switch") and getattr(self._translator, "on_switch") is None:
