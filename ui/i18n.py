@@ -4,6 +4,9 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Connect": "连接",
+    "Connected": "已连接",
+    "Fetch models and save, then choose models under Hearing and Translating.": "获取模型并保存，然后在语音识别和翻译下选择模型。",
     "Name": "名称",
     "Add domain": "添加域名",
     "Remove domain": "移除域名",
@@ -269,6 +272,9 @@ _ZH = {
 }
 
 _VI = {
+    "Connect": "Kết nối",
+    "Connected": "Đã kết nối",
+    "Fetch models and save, then choose models under Hearing and Translating.": "Lấy danh sách mô hình và lưu, rồi chọn mô hình bên dưới Nhận dạng và Dịch.",
     "Name": "Tên",
     "Add domain": "Thêm tên miền",
     "Remove domain": "Xóa tên miền",

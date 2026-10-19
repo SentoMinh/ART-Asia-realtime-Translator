@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **0.11.7**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **0.11.8**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
@@ -20,7 +20,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 1. Use a published ZIP or EXE, when available, downloaded from [Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
-4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Select separate hearing and translation models, then **Save**.
+4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Pick a model below each Hearing and Translating domain selector; use **Connect** beside the selector to check the API.
 5. Open **Settings → Sound → Microphone** and pick the microphone you use in VRChat.
 
 VRChat has to run in windowed or borderless mode for the window to stay on top of it.
@@ -38,11 +38,11 @@ The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run
 | Local Model | ✓ SenseVoice or Whisper | ✓ NLLB-200 (CTranslate2) | download the chosen models; no API key |
 | Custom domain | ✓ | ✓ | an OpenAI-compatible API address; add more with **+** |
 
-The **Services** section lists only your custom domains. **Set up…** has a name, API address, key, model fields, **Fetch models** and **Test**. Use **+** beside a row to add another domain, or **−** to remove an added one. The first domain remains available. Removing a selected domain switches that role back to the first domain. Previously selected, configured providers are preserved as custom domains when upgrading. Several translating models can be listed with commas for fallback.
+The **Services** section lists only your custom domains. **Set up…** has a name, API address, key and **Fetch models**. Save the API settings, then select models below the Hearing and Translating domain selectors. **Connect** checks the selected API and shows **Connected** when it responds. Use **+** beside a row to add another domain, or **−** to remove an added one. The first domain remains available. Removing a selected domain switches that role back to the first domain. Previously selected, configured providers are preserved as custom domains when upgrading. Several translating models can be listed with commas for fallback.
 
 Custom servers offering `nllb-200-ct2` use their `/translate` endpoint with explicit language codes; other translation models use `/chat/completions`.
 
-**Custom domain** has **Fetch models** and separate model pickers for hearing and translation. With an address entered, pasting a key automatically fetches the list after a short pause; saving stores the chosen models. Settings also shows the model currently in use for hearing and translation.
+**Custom domain → Set up…** fetches the available models. With an address entered, pasting a key automatically fetches the list after a short pause. Saving stores that domain’s list; changing its address or key invalidates the list. The Hearing and Translating model pickers save choices immediately. You can also type a model name when a server does not support discovery. Settings shows the model currently in use for each role.
 
 Every normal startup checks configured APIs silently in the background. In **Settings → Models**, status moves from **Checking connection…** to **Online** or **Connection issue**, with a maximum 30-second wait per check. Hover for details. Saving a provider triggers another check. Unconfigured services are skipped. These are connection/authentication checks, not speech or translation requests; an online result does not guarantee that every model works. A missing model-list endpoint is reported as a connection issue; check the API base URL and server configuration.
 
@@ -123,7 +123,7 @@ run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
 - Build the one-file program: `pwsh -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10` (use your validated native build directory; see [APO build instructions](apo/README.md)). `-Folder` builds a folder and ZIP. Without `-MixerBuild`, native mixer DLLs are not explicitly included by the build command.
 - Check a build: `VRChat-Translator.exe --selfcheck` writes `%LOCALAPPDATA%\VRChat-Translator\selfcheck.txt`
 
-Source validation for 0.11.7: **394 tests passed**, plus actual CPU inference with SenseVoice on a sample recording and NLLB translating English to Vietnamese. The EXE includes the local runtimes and microphone mixer. Whisper large-v3 has not been tested with downloaded weights on a GPU.
+Source validation for 0.11.8: **398 tests passed**, plus actual CPU inference with SenseVoice on a sample recording and NLLB translating English to Vietnamese. The EXE includes the local runtimes and microphone mixer. Whisper large-v3 has not been tested with downloaded weights on a GPU.
 
 Historical 0.11.5 checks covered automated tests, packaged self-checks, source/bundled-code privacy scans, and ZIP/checksum verification. A new package must be verified separately. These checks do not establish fresh-PC installation, live Windows 10 behavior or Japanese/Korean recognition accuracy with real services.
 
