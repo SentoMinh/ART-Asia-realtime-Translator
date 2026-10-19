@@ -381,31 +381,33 @@ def test_microphone_picker(window, monkeypatch):
 
 
 def test_hearing_engine_and_detector_strictness(window, tmp_path):
+    from engine import services
+    services.save("custom_second", url="https://second.test/v1")
     dialog = SettingsWindow(window.settings, window)
     dialog.changed.connect(window.settings_changed)
     slider, label, _, _ = dialog._sliders["vad_sensitivity"]
-    assert slider.value() == 70 and label.text() == "70%" and dialog.hearing.currentData() == "gemini"
+    assert slider.value() == 70 and label.text() == "70%" and dialog.hearing.currentData() == "custom"
     slider.setValue(55)
     assert window.settings.vad_sensitivity == 0.55 and label.text() == "55%"
     mic_slider, mic_label, _, _ = dialog._sliders["mic_vad_sensitivity"]
     assert mic_slider.value() == 50 and mic_label.text() == "50%"
     mic_slider.setValue(65)
     assert window.settings.mic_vad_sensitivity == 0.65 and window.settings.vad_sensitivity == 0.55
-    dialog.hearing.setCurrentIndex(dialog.hearing.findData("qwen"))
-    assert window.settings.hearing == "qwen" and window.saved[-1].hearing == "qwen"
-    dialog.translating.setCurrentIndex(dialog.translating.findData("mimo"))
-    assert window.settings.translating == "mimo" and window.saved[-1].translating == "mimo"
+    dialog.hearing.setCurrentIndex(dialog.hearing.findData("custom_second"))
+    assert window.settings.hearing == "custom_second" and window.saved[-1].hearing == "custom_second"
+    dialog.translating.setCurrentIndex(dialog.translating.findData("custom_second"))
+    assert window.settings.translating == "custom_second" and window.saved[-1].translating == "custom_second"
     assert dialog.translating.findData("local") >= 0          # local translation is available too
     dialog._sliders["font_px"][0].setValue(20)
     assert window.settings.font_px == 20 and isinstance(window.settings.font_px, int)
     path = tmp_path / "ui.json"
     config.save(window.settings, path)
     loaded = config.load(path)
-    assert loaded.vad_sensitivity == 0.55 and (loaded.hearing, loaded.translating) == ("qwen", "mimo")
+    assert loaded.vad_sensitivity == 0.55 and (loaded.hearing, loaded.translating) == ("custom_second", "custom_second")
     path.write_text('{"vad_sensitivity": 5.0, "mic_vad_sensitivity": 0.01, "hearing": "cloud"}',
                     encoding="utf-8")
     loaded = config.load(path)
-    assert loaded.vad_sensitivity == config.VAD_RANGE[1] and loaded.hearing == "gemini"
+    assert loaded.vad_sensitivity == config.VAD_RANGE[1] and loaded.hearing == "custom"
     assert loaded.mic_vad_sensitivity == config.VAD_RANGE[0]
 
 
@@ -414,7 +416,7 @@ def test_settings_from_version_0_9_7_keep_the_local_model(tmp_path):
     path.write_text('{"stt_engine": "local"}', encoding="utf-8")
     assert config.load(path).hearing == "local"
     path.write_text('{"stt_engine": "cloud"}', encoding="utf-8")    # the old online engine
-    assert config.load(path).hearing == "gemini"
+    assert config.load(path).hearing == "custom"
 
 
 def test_settings_show_the_program_picture_and_version(window):
@@ -431,7 +433,7 @@ def test_models_page_sets_up_each_service(window, tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
     dialog = SettingsWindow(window.settings, window)
     assert dialog.nav.item(dialog.nav.count() - 1).text() == "Models"
-    assert list(dialog._service_status) == ["openai", "gemini", "qwen", "mimo", "openrouter", "custom"]
+    assert list(dialog._service_status) == ["custom"]
     assert dialog._service_status["custom"].text() == "Not set up"
     code = ServiceDialog("custom", dialog)
     assert not code.url.isHidden() and not code.hear_model.isHidden()
@@ -631,9 +633,9 @@ def test_the_local_model_is_downloaded_before_hearing_switches_to_it(window, mon
     assert dialog._local_status.text() == "Not downloaded"
     dialog.hearing.setCurrentIndex(dialog.hearing.findData("local"))
     # its window opens; until everything has arrived, hearing stays as it was
-    assert len(opened) == 1 and window.settings.hearing == "gemini" and dialog.hearing.currentData() == "gemini"
+    assert len(opened) == 1 and window.settings.hearing == "custom" and dialog.hearing.currentData() == "custom"
     local_download.shared().finished.emit("not enough free space on C:")
-    assert window.settings.hearing == "gemini"
+    assert window.settings.hearing == "custom"
     state["missing"] = ""
     local_download.shared().finished.emit("")
     assert window.settings.hearing == "local" and window.saved[-1].hearing == "local"
@@ -691,6 +693,37 @@ def test_the_local_model_s_window_downloads_stops_and_says_how_it_ended(window, 
     download.finished.emit("")
     assert row["result"].text() == "Ready" and not row["action"].isEnabled() and row["bar"].isHidden()
     assert row["use"].isEnabled()
+
+
+def test_domain_buttons_add_cancel_and_remove_without_touching_other_settings(window, monkeypatch):
+    from engine import services
+    from ui.settings_window import ServiceDialog
+    dialog = SettingsWindow(window.settings, window)
+    assert set(dialog._service_status) == {"custom"}
+    monkeypatch.setattr(ServiceDialog, "exec", lambda self: 0)
+    dialog.add_domain()
+    assert services.offered() == ("custom",)
+    def save_new(self):
+        assert self.domain_name.text() == "Custom domain 2"
+        self.domain_name.setText("Second API")
+        self.url.setText("https://second.test/v1")
+        self.key.setText("second-key")
+        self.save()
+        return 1
+    monkeypatch.setattr(ServiceDialog, "exec", save_new)
+    plus = next(b for b in dialog._domains_host.findChildren(QPushButton) if b.text() == "+")
+    plus.click()
+    added = next(s for s in services.offered() if s != "custom")
+    assert services.title(added) == "Second API"
+    assert services.setting(added, "key") == "second-key"
+    assert set(dialog._service_status) == {"custom", added}
+    dialog.hearing.setCurrentIndex(dialog.hearing.findData(added))
+    dialog.translating.setCurrentIndex(dialog.translating.findData(added))
+    assert window.settings.hearing == window.settings.translating == added
+    minus = next(b for b in dialog._domains_host.findChildren(QPushButton) if b.text() == "−" and b.isEnabled())
+    minus.click()
+    assert window.settings.hearing == window.settings.translating == "custom"
+    assert services.offered() == ("custom",)
 
 
 def test_local_model_picker_keeps_hearing_and_translation_separate(window, monkeypatch):
@@ -923,30 +956,33 @@ def test_the_program_icon_loads(app):
 
 
 def test_models_page_shows_currently_in_use_and_updates_on_switch(window, app):
+    from engine import services
+    services.save("custom_a", name="Domain A", url="https://a.test/v1", hear_model="whisper-1", translate_model="gpt-5.4-mini")
+    services.save("custom_b", name="Domain B", url="https://b.test/v1", hear_model="gemini-3.5-flash-lite", translate_model="gemini-3.5-flash-lite")
     dialog = SettingsWindow(window.settings, window)
     window._dialog = dialog
     assert "Currently in use:" in dialog._hearing_desc.text()
     assert "Currently in use:" in dialog._translating_desc.text()
 
-    window.backend.setting_switched.emit("hearing", "openai")
-    assert window.settings.hearing == "openai"
-    assert dialog.hearing.currentData() == "openai"
+    window.backend.setting_switched.emit("hearing", "custom_a")
+    assert window.settings.hearing == "custom_a"
+    assert dialog.hearing.currentData() == "custom_a"
     assert "whisper-1" in dialog._hearing_desc.text()
 
-    window.backend.setting_switched.emit("translating", "openai")
-    assert window.settings.translating == "openai"
-    assert dialog.translating.currentData() == "openai"
+    window.backend.setting_switched.emit("translating", "custom_a")
+    assert window.settings.translating == "custom_a"
+    assert dialog.translating.currentData() == "custom_a"
     assert "gpt-5.4-mini" in dialog._translating_desc.text()
 
     from engine import services
-    services.save("openai", translate_model="gpt-5.4-mini, gpt-4o")
+    services.save("custom_a", translate_model="gpt-5.4-mini, gpt-4o")
     window.backend.current_translating_model = "gpt-4o"
     window.backend.setting_switched.emit("translating_model", "gpt-4o")
     assert "gpt-4o" in dialog._translating_desc.text()
 
     # Both model and service are shown in description
-    assert "OpenAI" in dialog._hearing_desc.text()
-    assert "OpenAI" in dialog._translating_desc.text()
+    assert "Domain A" in dialog._hearing_desc.text()
+    assert "Domain A" in dialog._translating_desc.text()
 
     # When hearing is local and ready, it shows Whisper and Local Model
     from engine import local_model
@@ -957,35 +993,37 @@ def test_models_page_shows_currently_in_use_and_updates_on_switch(window, app):
     assert "Local Model" in dialog._hearing_desc.text()
 
     # When switching to Gemini via _handle_model_switched, both service dropdown and description update
-    window._handle_model_switched("translating", "gemini", "gemini-3.5-flash-lite")
-    assert window.settings.translating == "gemini"
-    assert dialog.translating.currentData() == "gemini"
+    window._handle_model_switched("translating", "custom_b", "gemini-3.5-flash-lite")
+    assert window.settings.translating == "custom_b"
+    assert dialog.translating.currentData() == "custom_b"
     assert "gemini-3.5-flash-lite" in dialog._translating_desc.text()
-    assert "Google Gemini" in dialog._translating_desc.text()
+    assert "Domain B" in dialog._translating_desc.text()
 
 
 def test_switch_model_dialog_asks_to_switch_to_ready_model(window, app, monkeypatch):
     from engine import services
     from ui.switch_dialog import SwitchModelDialog
 
-    monkeypatch.setattr(services, "ready", lambda s: s == "gemini")
+    services.save("custom_b", url="https://b.test/v1", hear_model="gemini-3.5-flash-lite")
+    monkeypatch.setattr(services, "ready", lambda s: s == "custom_b")
     dlg = SwitchModelDialog("hearing", "custom", window.settings, reason="timeout", parent=window)
     assert len(dlg.candidates) == 1
-    assert dlg.candidates[0][0] == "gemini"
+    assert dlg.candidates[0][0] == "custom_b"
 
     switched = []
     dlg.switched.connect(lambda cat, svc, m: switched.append((cat, svc, m)))
     buttons = dlg.findChildren(QPushButton)
     switch_btn = [b for b in buttons if "gemini" in b.text().lower() or b.text() == "Switch"][0]
     switch_btn.click()
-    assert switched == [("hearing", "gemini", "gemini-3.5-flash-lite")]
+    assert switched == [("hearing", "custom_b", "gemini-3.5-flash-lite")]
 
 
 def test_switch_model_dialog_can_switch_to_local_when_ready_models_exist(window, app, monkeypatch):
     from engine import local_model, services
     from ui.switch_dialog import SwitchModelDialog
 
-    monkeypatch.setattr(services, "ready", lambda s: s == "gemini")
+    services.save("custom_b", url="https://b.test/v1", hear_model="gemini-3.5-flash-lite")
+    monkeypatch.setattr(services, "ready", lambda s: s == "custom_b")
     monkeypatch.setattr(local_model, "missing", lambda model=None: "")  # local is ready!
     dlg = SwitchModelDialog("hearing", "custom", window.settings, reason="timeout", parent=window)
 

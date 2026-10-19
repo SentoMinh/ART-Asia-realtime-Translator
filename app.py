@@ -107,21 +107,34 @@ def selfcheck() -> int:
             return "Local Model"
         return f"{services.title(chosen)}: " + (CloudHearing(chosen).missing() or "ready")
 
+    def local_runtimes():
+        import sherpa_onnx
+        import ctranslate2
+        from tokenizers import Tokenizer
+        from engine import local_model
+        from engine.stt import whisper_class
+        from ui.settings_window import LocalModelDialog
+        whisper_class()
+        dialog = LocalModelDialog()
+        if set(dialog.rows) != set(local_model.MODELS):
+            raise RuntimeError("Local model choices are missing")
+        dialog.close()
+        return "Whisper, SenseVoice, CTranslate2, tokenizer and model list included"
+
     def local_model():
         import time
         from engine import local_model as local
-        from engine import stt
+        from engine.local_inference import LocalHearing
         if not local.installed():
             return "not in this copy"
-        stt.whisper_class()                    # the model's own code is all there
         if local.missing() and "--get-local-model" in sys.argv:
             local.download()
         problem = local.missing()
         if problem:
             return problem
         started = time.perf_counter()
-        stt.LocalWhisper().load()
-        return f"loaded on the graphics card in {time.perf_counter() - started:.1f} s"
+        LocalHearing().load()
+        return f"{local.selected()} loaded in {time.perf_counter() - started:.1f} s"
 
     def translators():
         from engine import services
@@ -140,7 +153,7 @@ def selfcheck() -> int:
                          ("VRChat sound capture", game_capture), ("VRChat detection", vrchat),
                          ("music mixer", music_mixer),
                          ("voice detector", detector), ("resampler", resampler),
-                         ("hearing engine", hearing), ("Local Model", local_model),
+                         ("hearing engine", hearing), ("local runtimes", local_runtimes), ("Local Model", local_model),
                          ("translators", translators),
                          ("secure connection", https)):
         check(name, action)

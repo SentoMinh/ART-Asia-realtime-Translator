@@ -89,6 +89,41 @@ def test_a_damaged_download_is_thrown_away(program):
     assert not updater.beside(program, ".new").exists() and not updater.beside(program, ".part").exists()
 
 
+def test_cached_download_is_verified_before_reuse(program):
+    data = b"version 0.9.9"
+    pending = updater.beside(program, ".new")
+    pending.write_bytes(b"version 0.9.0")  # Same size, different version.
+    http = Http(release(data), data)
+    assert updater.Updater(program, "0.9.8", http=http).check() == "0.9.9"
+    assert http.asked == [LATEST, FILE] and pending.read_bytes() == data
+    http.asked.clear()
+    assert updater.Updater(program, "0.9.8", http=http).check() == "0.9.9"
+    assert http.asked == [LATEST]
+
+
+def test_bad_pending_file_is_removed_even_when_replacement_download_fails(program):
+    updater.beside(program, ".new").write_bytes(b"bad")
+    http = Http(release(b"new"), b"damaged download")
+    assert updater.Updater(program, "0.9.8", http=http).check() == ""
+    assert not updater.beside(program, ".new").exists()
+
+
+def test_other_executable_assets_are_not_installed_as_the_app(program):
+    http = Http(release(b"installer", name="mixer-setup.exe"), b"installer")
+    assert updater.Updater(program, "0.9.8", http=http).check() == ""
+    assert http.asked == [LATEST]
+
+
+def test_launch_failure_restores_the_existing_program(program):
+    updater.beside(program, ".new").write_bytes(b"new version")
+    def blocked(*args, **kwargs):
+        raise OSError("launch blocked")
+    assert not updater.apply_pending(program, launch=blocked)
+    assert program.read_bytes() == b"version 0.9.8"
+    assert updater.beside(program, ".new").read_bytes() == b"new version"
+    assert not updater.beside(program, ".old").exists()
+
+
 def test_the_download_takes_the_program_s_place_at_the_next_start(program, monkeypatch):
     monkeypatch.setenv("_PYI_APPLICATION_HOME_DIR", r"C:\Temp\_MEI12345")   # this copy's unpacked files
     updater.beside(program, ".new").write_bytes(b"version 0.9.9")
@@ -121,9 +156,9 @@ def test_updates_never_send_provider_keys(program):
 def test_one_service_list_and_default_for_everyone():
     from engine import services
     assert "dev" not in services.SERVICES
-    assert services.offered() == tuple(services.SERVICES)
+    assert services.offered() == ("custom",)
     assert services.update_source() == "SentoMinh/ART-Asia-realtime-Translator"
-    assert (Settings().hearing, Settings().translating) == ("gemini", "gemini")
+    assert (Settings().hearing, Settings().translating) == ("custom", "custom")
 
 
 def test_legacy_selection_preserves_saved_api_settings():

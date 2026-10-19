@@ -648,8 +648,8 @@ def test_no_key_and_no_local_model_names_both_reasons():
                                     "and the speech model could not be loaded")
 
 
-def test_gemini_hears_and_translates_by_default():
-    assert (Settings().hearing, Settings().translating) == ("gemini", "gemini")
+def test_custom_domain_hears_and_translates_by_default():
+    assert (Settings().hearing, Settings().translating) == ("custom", "custom")
 
 
 def test_the_microphone_has_its_own_strictness_setting():

@@ -39,7 +39,7 @@ class Service:
 
     @property
     def can_hear(self) -> bool:
-        return bool(self.hear_model) or self.id == "custom"
+        return bool(self.hear_model) or is_custom(self.id)
 
 
 SERVICES = {s.id: s for s in (
@@ -58,19 +58,31 @@ SERVICES = {s.id: s for s in (
             "google/gemini-3.5-flash-lite", "https://openrouter.ai/settings/keys"),
     Service("custom", "Custom domain", "", "", "whisper", ""),
 )}
-HEARING = ("local", "openai", "gemini", "qwen", "openrouter", "custom")   # "local": this PC
-TRANSLATING = ("local", "openai", "gemini", "qwen", "mimo", "openrouter", "custom")
-FIELDS = ("url", "key", "hear_model", "translate_model")
+HEARING = TRANSLATING = ("local", "custom")
+FIELDS = ("url", "key", "hear_model", "translate_model", "name", "legacy_provider")
 
 
-def offered(choices: tuple[str, ...] = tuple(SERVICES)) -> tuple[str, ...]:
-    """The services available in the app."""
-    return tuple(choice for choice in choices if choice in SERVICES or choice == "local")
+def is_custom(service: str) -> bool:
+    return service == "custom" or service.startswith("custom_")
+
+
+def offered(choices: tuple[str, ...] = ()) -> tuple[str, ...]:
+    """Custom domains available in the UI; built-in definitions only recover old settings."""
+    domains = ("custom", *(key for key, value in saved().items()
+                            if key != "custom" and is_custom(key) and isinstance(value, dict)))
+    return (("local",) if "local" in choices else ()) + domains
+
+
+def info(service: str) -> Service:
+    if not is_custom(service):
+        return SERVICES[service]
+    legacy = SERVICES.get(setting(service, "legacy_provider"), SERVICES["custom"])
+    return Service(service, title(service), "", "", legacy.hear_style, "", extra=legacy.extra)
 
 
 def default_service() -> str:
-    """New profiles start with Gemini."""
-    return "gemini"
+    """New profiles use the first custom domain."""
+    return "custom"
 
 
 def models_file() -> Path:
@@ -123,12 +135,39 @@ def save(service: str, **values: str) -> None:
         else:
             entry.pop(field, None)
     data[service] = entry
+    _write(data)
+
+
+def _write(data: dict) -> None:
+    global _cache
     path = models_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
     tmp.replace(path)
     _cache = (None, {})  # Rapid same-size writes can share a Windows file timestamp.
+
+
+def remove_domain(service: str) -> None:
+    if not is_custom(service) or service == "custom":
+        raise ValueError("The first custom domain is kept")
+    data = dict(saved())
+    data.pop(service, None)
+    _write(data)
+
+
+def migrate_provider(service: str) -> str:
+    if service not in SERVICES or is_custom(service):
+        return service
+    if not saved().get(service):
+        return "custom"
+    target = "custom_legacy_" + service
+    if target not in saved():
+        from urllib.parse import urlsplit
+        values = {field: setting(service, field) for field in ("url", "key", "hear_model", "translate_model")}
+        save(target, **values, name="Custom domain — " + (urlsplit(values["url"]).hostname or service),
+             legacy_provider=service)
+    return target
 
 
 def migrate_legacy_settings() -> None:
@@ -170,6 +209,8 @@ def translate_models(service: str) -> list[str]:
 
 
 def title(service: str) -> str:
+    if is_custom(service):
+        return setting(service, "name") or "Custom domain"
     return "Local Model (this PC)" if service == "local" else SERVICES[service].name if service in SERVICES else service
 
 
@@ -183,7 +224,7 @@ def post_chat(http, service: str, body: dict, plain: set):
     unless the model refused them once; then the request is sent again without them, and the
     model is remembered in `plain`."""
     url = setting(service, "url").rstrip("/") + "/chat/completions"
-    extra = dict(SERVICES[service].extra) if service in SERVICES else {}
+    extra = dict(info(service).extra) if service in SERVICES or is_custom(service) else {}
     if "gpt-oss" in body.get("model", ""):
         extra.setdefault("reasoning_effort", "low")     # these think first: keep it short
     if extra and body.get("model") not in plain:
@@ -231,11 +272,11 @@ def check(service: str, url: str = "", key: str = "", http=None, *, use_saved: b
     key = key.strip() or (setting(service, "key") if use_saved else "")
     if not url:
         return False, "no address yet"
-    if not key and service != "custom":
+    if not key and not is_custom(service):
         return False, "no key yet"
     if http is None:
         import httpx
-        timeout = 60 if service == "custom" else 8
+        timeout = 60 if is_custom(service) else 8
         http = httpx.Client(timeout=timeout)
     # OpenRouter shows its model list to anyone; its /key page needs a working key
     page = "key" if service == "openrouter" else "models"
@@ -246,7 +287,7 @@ def check(service: str, url: str = "", key: str = "", http=None, *, use_saved: b
         return False, f"can't be reached: {error}"
     if answer.status_code == 200:
         return True, "the key works" if key else "the address works"
-    if answer.status_code == 404 and service == "custom":
+    if answer.status_code == 404 and is_custom(service):
         return False, failure(service, answer) + "; check the API base address and model-list endpoint"
     return False, failure(service, answer).replace(" (Settings → Models)", "")
 
@@ -259,7 +300,7 @@ def fetch_models(service: str = "custom", url: str = "", key: str = "", http=Non
         return []
     if http is None:
         import httpx
-        timeout = 30 if service == "custom" else 8
+        timeout = 30 if is_custom(service) else 8
         with httpx.Client(timeout=timeout, follow_redirects=True) as client:
             return fetch_models(service, url=url, key=key, http=client)
     headers = {"Authorization": f"Bearer {key}"} if key else {}
@@ -302,9 +343,9 @@ def fetch_models(service: str = "custom", url: str = "", key: str = "", http=Non
 
 def missing(service: str) -> str:
     """What to do before this service works, in plain words; "" when it is ready."""
-    name = SERVICES[service].name if service in SERVICES else service
+    name = title(service)
     if not setting(service, "url"):
         return f"{name} has no address yet (Settings → Models)"
-    if service != "custom" and not setting(service, "key"):
+    if not is_custom(service) and not setting(service, "key"):
         return f"no {name} key yet (Settings → Models)"
     return ""

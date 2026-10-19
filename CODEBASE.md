@@ -84,7 +84,7 @@ These are code-review observations, not newly reproduced live failures. This doc
 
 ## Validation and commands
 
-Source version 0.11.7 passed **385 tests**, plus actual SenseVoice and NLLB CPU inference checks. A new packaged EXE has not been built or tested, and the new Whisper large-v3 choice has not been run with downloaded weights on a GPU.
+Source version 0.11.7 passed **394 tests**, plus actual SenseVoice and NLLB CPU inference checks. Packaged self-checks cover the bundled runtimes and microphone mixer. Whisper large-v3 has not been run with downloaded weights on a GPU.
 
 Historical 0.11.5 package validation covered tests, packaged self-checks, Japanese/Korean language tables, native DLL hashes, privacy scans and ZIP checksums. Run tests and packaged checks again for each new release.
 

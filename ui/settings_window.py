@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
+import uuid
 from html import escape
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFormLayout, QFrame,
                                QHBoxLayout, QLabel, QLineEdit, QListWidget, QProgressBar,
-                               QPushButton, QScrollArea, QSlider, QStackedWidget, QVBoxLayout,
+                               QPushButton, QMessageBox, QScrollArea, QSlider, QStackedWidget, QVBoxLayout,
                                QWidget)
 
 from engine import local_model
@@ -206,13 +207,15 @@ class SettingsWindow(QDialog):
         self._hearing_desc = QLabel()
         self._translating_desc = QLabel()
         self._service_status: dict[str, QLabel] = {}
-        set_up = [(services.title(service), SERVICE_NOTES[service], self._service_row(service))
-                  for service in services.offered()]
-        set_up.insert(0, (LOCAL_MODEL, LOCAL_NOTE, self._local_row()))
+        self._domains_host = QWidget()
+        self._domains_layout = QVBoxLayout(self._domains_host)
+        self._domains_layout.setContentsMargins(0, 0, 0, 0)
+        self._refresh_domains()
         self._page("Models", [
             ("Hearing", self._hearing_desc, self.hearing),
             ("Translating", self._translating_desc, self.translating),
-        ], more=[("Services", set_up)])
+        ], more=[(LOCAL_MODEL, [(LOCAL_MODEL, LOCAL_NOTE, self._local_row())]),
+                 ("Services", self._domains_host)])
         self.nav.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.nav.setCurrentRow(0)
         self.sync()
@@ -354,8 +357,59 @@ class SettingsWindow(QDialog):
         The engines read the saved values on every request, so a change works at once."""
         self._service_status[service] = QLabel()
         box = self._status_row(self._service_status[service], lambda: self.set_up(service))
+        for symbol, label, action in (("+", "Add domain", self.add_domain),
+                                       ("−", "Remove domain", lambda: self.remove_domain(service))):
+            button = QPushButton(symbol)
+            button.setObjectName("plain")
+            button.setFixedWidth(32)
+            button.setAccessibleName(tr(label))
+            button.setToolTip(tr(label))
+            button.setEnabled(symbol != "−" or service != "custom")
+            button.clicked.connect(action)
+            box.layout().addWidget(button)
         self.show_service_status(service)
         return box
+
+    def _refresh_domains(self) -> None:
+        while self._domains_layout.count():
+            old = self._domains_layout.takeAt(0).widget()
+            old.hide()
+            old.deleteLater()
+        self._service_status.clear()
+        rows = [(services.title(service), services.setting(service, "url") or SERVICE_NOTES["custom"],
+                 self._service_row(service)) for service in services.offered()]
+        self._domains_layout.addWidget(self._card(rows))
+        for role, combo in (("hearing", self.hearing), ("translating", self.translating)):
+            combo.blockSignals(True)
+            combo.clear()
+            for service in services.offered(services.HEARING):
+                combo.addItem(tr(services.title(service)), service)
+            select_data(combo, getattr(self.settings, role))
+            combo.blockSignals(False)
+            fit_combo(combo)
+
+    def add_domain(self) -> None:
+        service = "custom_" + uuid.uuid4().hex
+        if ServiceDialog(service, self).exec():
+            self._refresh_domains()
+            if self._service_health:
+                self._service_health.check(service)
+            self.changed.emit()
+
+    def remove_domain(self, service: str) -> None:
+        if service == "custom":
+            return
+        try:
+            services.remove_domain(service)
+        except OSError as error:
+            QMessageBox.warning(self, tr("Could not save"), str(error))
+            return
+        for role in ("hearing", "translating"):
+            if getattr(self.settings, role) == service:
+                setattr(self.settings, role, "custom")
+        self._refresh_domains()
+        self._update_model_labels()
+        self.changed.emit()
 
     def show_service_status(self, service: str) -> None:
         if service not in self._service_status:
@@ -369,6 +423,7 @@ class SettingsWindow(QDialog):
 
     def set_up(self, service: str) -> None:
         if ServiceDialog(service, self).exec():
+            self._refresh_domains()
             if self._service_health:
                 self._service_health.check(service)
             self.show_service_status(service)
@@ -456,7 +511,7 @@ class SettingsWindow(QDialog):
             label.setObjectName("title")
             outer.addSpacing(6)
             outer.addWidget(label)
-            outer.addWidget(self._card(card_rows))
+            outer.addWidget(card_rows if isinstance(card_rows, QWidget) else self._card(card_rows))
         outer.addStretch(1)
         scroll = QScrollArea()
         scroll.setObjectName("page")
@@ -506,7 +561,7 @@ class ServiceDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self._http = http
-        info = services.SERVICES[service]
+        info = services.info(service)
         self.setObjectName("settings")
         self.setWindowTitle(tr(info.name))
         self.setMinimumWidth(460)
@@ -529,22 +584,31 @@ class ServiceDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 18, 22, 18)
         layout.setSpacing(10)
-        note = QLabel(tr(SERVICE_NOTES[service]))
+        note = QLabel(tr(SERVICE_NOTES.get(service, SERVICE_NOTES["custom"])))
         note.setObjectName("dim")
         note.setWordWrap(True)
         layout.addWidget(note)
         form = QFormLayout()
         form.setSpacing(8)
+        self.domain_name = field("name", tr("Custom domain"))
+        if services.is_custom(service):
+            if service != "custom" and service not in services.saved():
+                names = {services.title(item) for item in services.offered()}
+                number = 2
+                while f"{tr('Custom domain')} {number}" in names:
+                    number += 1
+                self.domain_name.setText(f"{tr('Custom domain')} {number}")
+            form.addRow(tr("Name"), self.domain_name)
         form.addRow(tr("Address"), self.url)
         form.addRow(tr("Key"), self.key)
-        if self.service == "custom":
+        if services.is_custom(self.service):
             self.fetch_btn = QPushButton(tr("Fetch models"))
             self.fetch_btn.setObjectName("plain")
             self.fetch_btn.setCursor(Qt.PointingHandCursor)
             self.fetch_btn.clicked.connect(self.fetch_models)
             form.addRow("", self.fetch_btn)
         if info.can_hear:
-            if self.service == "custom":
+            if services.is_custom(self.service):
                 self.hear_picker = QComboBox()
                 self.hear_picker.addItem(tr("Pick a model…"), "")
                 self.hear_picker.currentIndexChanged.connect(self._pick_hear_model)
@@ -554,7 +618,7 @@ class ServiceDialog(QDialog):
                 form.addRow(tr("Hearing model"), hear_row)
             else:
                 form.addRow(tr("Hearing model"), self.hear_model)
-        if self.service == "custom":
+        if services.is_custom(self.service):
             self.translate_picker = QComboBox()
             self.translate_picker.addItem(tr("Pick a model…"), "")
             self.translate_picker.currentIndexChanged.connect(self._pick_translate_model)
@@ -606,7 +670,7 @@ class ServiceDialog(QDialog):
         self.url.textChanged.connect(self._credentials_changed)
         self.finished.connect(self._stop_fetch)
         # Auto-fetch models on open when the service already has credentials saved
-        if self.service == "custom" and services.ready(self.service):
+        if services.is_custom(self.service) and services.ready(self.service):
             self._auto_fetch.start()
 
     def _credentials(self):
@@ -617,7 +681,7 @@ class ServiceDialog(QDialog):
         self._fetch_again = False
         self._populate_pickers([])
         self.result.clear()
-        if self.service == "custom" and self.url.text().strip() and self.key.text().strip():
+        if services.is_custom(self.service) and self.url.text().strip() and self.key.text().strip():
             self._auto_fetch.start()
 
     def _stop_fetch(self, *_):
@@ -674,7 +738,7 @@ class ServiceDialog(QDialog):
         if hasattr(self, "fetch_btn"):
             self.fetch_btn.setEnabled(True)
         changed = self._fetch_credentials != self._credentials()
-        retry = self._fetch_again or (changed and self.service == "custom" and bool(self.key.text().strip()))
+        retry = self._fetch_again or (changed and services.is_custom(self.service) and bool(self.key.text().strip()))
         self._fetch_again = False
         if changed:
             # A response for the old key must not populate the new key's list.
@@ -756,11 +820,13 @@ class ServiceDialog(QDialog):
         QApplication.restoreOverrideCursor()
         ok, text = result_holder.get("res", (False, "error"))
         self.result.setText(("✓ " if ok else "✗ ") + text)
-        if ok and self.service == "custom":
+        if ok and services.is_custom(self.service):
             self.fetch_models()
 
     def save(self) -> None:
         values = {"hear_model": self.hear_model.text(), "translate_model": self.translate_model.text()}
+        if services.is_custom(self.service):
+            values["name"] = self.domain_name.text()
         values["url"] = self.url.text()
         if self.key.text().strip():
             values["key"] = self.key.text()
