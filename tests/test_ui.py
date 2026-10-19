@@ -436,8 +436,8 @@ def test_models_page_sets_up_each_service(window, tmp_path, monkeypatch):
     assert list(dialog._service_status) == ["custom"]
     assert dialog._service_status["custom"].text() == "Not set up"
     code = ServiceDialog("custom", dialog)
-    assert not code.url.isHidden() and not code.hear_model.isHidden()
-    assert hasattr(code, "hear_picker") and hasattr(code, "translate_picker")
+    assert not code.url.isHidden() and code.hear_model.isHidden() and code.translate_model.isHidden()
+    assert not code.findChildren(QComboBox)
     code.url.setText("https://custom.test/v1")
     code.key.setText("  custom-key-1  ")
     code._auto_fetch.stop()
@@ -470,19 +470,19 @@ def test_custom_domain_dialog_fetch_and_pick_models(window, tmp_path, monkeypatc
     monkeypatch.setattr(services, "fetch_models", lambda service="custom", url="", key="", http=None: ["whisper-custom", "gpt-4o-custom"])
     custom_dlg = ServiceDialog("custom", dialog)
     assert hasattr(custom_dlg, "fetch_btn")
-    assert hasattr(custom_dlg, "hear_picker")
-    assert hasattr(custom_dlg, "translate_picker")
+    assert not custom_dlg.findChildren(QComboBox)
     custom_dlg.url.setText("http://127.0.0.1:8000/v1")
     custom_dlg.key.setText("my-secret-key")
     custom_dlg.fetch_models()
     wait_for_models(custom_dlg)
     assert "Found 2 models" in custom_dlg.result.text()
-    assert custom_dlg.hear_picker.count() == 3  # [Pick a model…, whisper-custom, gpt-4o-custom]
-    custom_dlg.hear_picker.setCurrentIndex(1)
-    assert custom_dlg.hear_model.text() == "whisper-custom"
-    custom_dlg.translate_picker.setCurrentIndex(2)
-    assert custom_dlg.translate_model.text() == "gpt-4o-custom"
+    assert custom_dlg._fetched_models == ["whisper-custom", "gpt-4o-custom"]
     custom_dlg.save()
+    dialog.sync()
+    hear = dialog.model_pickers["hearing"]
+    translate = dialog.model_pickers["translating"]
+    hear.setCurrentIndex(hear.findData("whisper-custom"))
+    translate.setCurrentIndex(translate.findData("gpt-4o-custom"))
 
     saved = json.loads(services.models_file().read_text(encoding="utf-8"))
     assert saved["custom"]["url"] == "http://127.0.0.1:8000/v1"
@@ -529,11 +529,16 @@ def test_custom_key_auto_fetches_and_saves_separate_model_choices(window, tmp_pa
     wait_for_models(dialog)
     assert calls == [("https://custom.test/v1/models", {"Authorization": "Bearer pasted-custom-key"})]
     assert not services.models_file().exists()  # fetching does not save the key
-    dialog.hear_picker.setCurrentIndex(dialog.hear_picker.findData("whisper-new"))
-    dialog.translate_picker.setCurrentIndex(dialog.translate_picker.findData("chat-new"))
     dialog.save()
-    assert services.saved()["custom"] == {
-        "url": "https://custom.test/v1", "key": "pasted-custom-key", "hear_model": "whisper-new", "translate_model": "chat-new"}
+    assert services.setting("custom", "key") == "pasted-custom-key"
+    assert services.catalog("custom") == ["chat-new", "whisper-new"]
+    models = SettingsWindow(window.settings, window)
+    hear = models.model_pickers["hearing"]
+    translate = models.model_pickers["translating"]
+    hear.setCurrentIndex(hear.findData("whisper-new"))
+    translate.setCurrentIndex(translate.findData("chat-new"))
+    assert services.setting("custom", "hear_model") == "whisper-new"
+    assert services.setting("custom", "translate_model") == "chat-new"
 
 
 def test_custom_fetch_error_hides_key_and_can_retry(window, tmp_path, monkeypatch):
@@ -553,8 +558,35 @@ def test_custom_fetch_error_hides_key_and_can_retry(window, tmp_path, monkeypatc
     monkeypatch.setattr(services, "fetch_models", lambda *a, **kw: ["whisper-new"])
     dialog.fetch_btn.click()
     wait_for_models(dialog)
-    assert dialog.hear_picker.findData("whisper-new") > 0
+    assert dialog._fetched_models == ["whisper-new"]
     dialog.reject()
+
+
+def test_model_pickers_follow_domain_and_preserve_each_roles_selection(window):
+    from engine import services
+    services.save("custom", url="https://a.test", models=["hear-a", "chat-a"], hear_model="hear-a")
+    services.save("custom_second", url="https://b.test", models=["hear-b", "chat-b"], translate_model="chat-b")
+    dialog = SettingsWindow(window.settings, window)
+    hear, translate = dialog.model_pickers["hearing"], dialog.model_pickers["translating"]
+    assert hear.currentText() == "hear-a"
+    dialog.translating.setCurrentIndex(dialog.translating.findData("custom_second"))
+    assert translate.currentText() == "chat-b" and translate.findData("chat-a") == -1
+    assert hear.currentText() == "hear-a"
+    translate.setEditText("manual-model")
+    translate.lineEdit().editingFinished.emit()
+    assert services.setting("custom_second", "translate_model") == "manual-model"
+    assert services.setting("custom", "hear_model") == "hear-a"
+
+
+def test_api_setup_preserves_model_choices_when_saving(window):
+    from engine import services
+    from ui.settings_window import ServiceDialog
+    services.save("custom", url="https://a.test", hear_model="hear", translate_model="chat")
+    dialog = ServiceDialog("custom", window)
+    dialog.domain_name.setText("My API")
+    dialog.save()
+    assert services.setting("custom", "hear_model") == "hear"
+    assert services.setting("custom", "translate_model") == "chat"
 
 
 @pytest.mark.parametrize("new_key", ["new-key", ""])
@@ -580,11 +612,11 @@ def test_custom_key_change_discards_inflight_results(window, tmp_path, monkeypat
         release.set()
         wait_for_models(dialog)
         assert calls == (["old-key", "new-key"] if new_key else ["old-key"])
-        assert dialog.hear_picker.findData("old-key-model") == -1
+        assert "old-key-model" not in (dialog._fetched_models or [])
         if new_key:
-            assert dialog.hear_picker.findData("new-key-model") > 0
+            assert dialog._fetched_models == ["new-key-model"]
         else:
-            assert dialog.hear_picker.count() == 1
+            assert dialog._fetched_models is None
     finally:
         release.set()
         dialog.reject()
@@ -613,7 +645,7 @@ def test_closing_custom_dialog_cancels_pending_auto_fetch(window, tmp_path, monk
     release.set()
     QTest.qWait(550)
     assert calls == ([True] if started else [])
-    assert dialog.hear_picker.count() == 1
+    assert dialog._fetched_models is None
     assert not services.models_file().exists()
 
 

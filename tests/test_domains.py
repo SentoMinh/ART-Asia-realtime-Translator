@@ -21,6 +21,18 @@ def test_only_custom_domains_and_local_models_are_offered():
     assert Settings().hearing == Settings().translating == "custom"
 
 
+def test_model_catalog_is_bound_to_each_domains_credentials():
+    services.save("custom", url="https://a.test", key="a", models=["hear-a", "chat-a"])
+    services.save("custom_second", url="https://b.test", key="b", models=["hear-b"])
+    assert services.catalog("custom") == ["hear-a", "chat-a"]
+    assert services.catalog("custom_second") == ["hear-b"]
+    services.save("custom", key="different-key")
+    assert services.catalog("custom") == []
+    assert services.catalog("custom_second") == ["hear-b"]
+    services.save("custom_second", url="https://another.test")
+    assert services.catalog("custom_second") == []
+
+
 def test_additional_domain_routes_both_hearing_and_ct2_translation():
     services.save("custom", url="https://first.test/v1", key="first-key")
     services.save("custom_second", url="https://second.test/v1", key="second-key", hear_model="whisper-1")

@@ -251,3 +251,21 @@ def test_no_requests_without_saved_providers(health_ui):
     health.start()
     assert not health._pending
     health.stop()
+
+
+def test_connect_button_checks_selected_domain_and_shows_result(health_ui):
+    services.save("custom", url="https://custom.test")
+    calls = []
+    health = ServiceHealth(probe=lambda *args: (calls.append(args) or True, "reachable"))
+    parent = QWidget()
+    parent.backend = SimpleNamespace(service_health=health)
+    dialog = SettingsWindow(Settings(), parent)
+    try:
+        assert dialog.connect_buttons["hearing"].text() == "Connect"
+        dialog.connect_buttons["hearing"].click()
+        until(lambda: dialog.connect_buttons["hearing"].text() == "Connected")
+        assert dialog.connect_buttons["translating"].text() == "Connected"
+        assert calls == [("custom", "https://custom.test", "")]
+    finally:
+        health.stop()
+        parent.deleteLater()

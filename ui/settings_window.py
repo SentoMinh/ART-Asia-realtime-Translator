@@ -206,14 +206,19 @@ class SettingsWindow(QDialog):
         self.translating = self._service_combo("translating", services.offered(services.TRANSLATING))
         self._hearing_desc = QLabel()
         self._translating_desc = QLabel()
+        self.model_pickers = {}
+        self.connect_buttons = {}
+        self._model_choices = {}
+        hearing_control = self._model_control("hearing", self.hearing)
+        translating_control = self._model_control("translating", self.translating)
         self._service_status: dict[str, QLabel] = {}
         self._domains_host = QWidget()
         self._domains_layout = QVBoxLayout(self._domains_host)
         self._domains_layout.setContentsMargins(0, 0, 0, 0)
         self._refresh_domains()
         self._page("Models", [
-            ("Hearing", self._hearing_desc, self.hearing),
-            ("Translating", self._translating_desc, self.translating),
+            ("Hearing", self._hearing_desc, hearing_control),
+            ("Translating", self._translating_desc, translating_control),
         ], more=[(LOCAL_MODEL, [(LOCAL_MODEL, LOCAL_NOTE, self._local_row())]),
                  ("Services", self._domains_host)])
         self.nav.currentRowChanged.connect(self.pages.setCurrentIndex)
@@ -263,6 +268,7 @@ class SettingsWindow(QDialog):
         return f"{model} ({title})" if model != title else title
 
     def _update_model_labels(self) -> None:
+        self._sync_model_controls()
         hear_model = escape(self._active_hearing_model())
         trans_model = escape(self._active_translating_model())
         hear_base = tr("Turns speech into text.")
@@ -274,6 +280,96 @@ class SettingsWindow(QDialog):
         self._translating_desc.setText(
             f"{trans_base}<br><span style='color: #5ab8ff;'>{in_use}</span> <b>{trans_model}</b>"
         )
+
+    def _model_control(self, role: str, domains: QComboBox) -> QWidget:
+        box = QWidget()
+        layout = QVBoxLayout(box)
+        layout.setContentsMargins(0, 0, 0, 0)
+        row = QHBoxLayout()
+        row.addWidget(domains, 1)
+        connect = QPushButton(tr("Connect"))
+        connect.setObjectName("plain")
+        connect.setAccessibleName(f"{tr('Connect')} — {tr('Hearing' if role == 'hearing' else 'Translating')}")
+        connect.clicked.connect(lambda: self._connect_domain(role))
+        row.addWidget(connect)
+        layout.addLayout(row)
+        picker = QComboBox()
+        picker.setMinimumWidth(190)
+        picker.setMaximumWidth(300)
+        picker.setAccessibleName(tr("Hearing model" if role == "hearing" else "Translating models"))
+        picker.setEditable(True)
+        picker.lineEdit().setPlaceholderText(tr("Pick a model…"))
+        picker.currentIndexChanged.connect(lambda: self._choose_model(role))
+        picker.lineEdit().editingFinished.connect(lambda: self._choose_model(role))
+        layout.addWidget(picker)
+        self.model_pickers[role] = picker
+        self.connect_buttons[role] = connect
+        return box
+
+    def _sync_model_controls(self) -> None:
+        for role, picker in self.model_pickers.items():
+            service = getattr(self.settings, role)
+            field = "hear_model" if role == "hearing" else "translate_model"
+            selected = services.setting(service, field)
+            models = (tuple(m for m, info in local_model.MODELS.items() if info[1] == role)
+                      if service == "local" else tuple(services.catalog(service)))
+            signature = (service, selected, models)
+            if self._model_choices.get(role) != signature:
+                self._model_choices[role] = signature
+                picker.blockSignals(True)
+                picker.clear()
+                for model in dict.fromkeys((selected, *models)):
+                    if model:
+                        picker.addItem(model, model)
+                picker.setCurrentIndex(picker.findData(selected))
+                picker.setEditText(selected)
+                picker.blockSignals(False)
+            button = self.connect_buttons[role]
+            health = self._service_health.status(service) if self._service_health and service != "local" else None
+            status = health[0] if health else ""
+            label = ("Set up…" if service == "local" else "Connected" if status == "Online" else
+                     "…" if status == "Checking connection…" else "Connect")
+            button.setText(tr(label))
+            button.setEnabled(status != "Checking connection…")
+            button.setToolTip(tr(health[1] or health[0]) if health else tr("Connect"))
+            button.setStyleSheet(f"color: {theme.OK};" if status == "Online" else "")
+
+    def _connect_domain(self, role: str) -> None:
+        service = getattr(self.settings, role)
+        if service == "local":
+            self.set_up_local(role)
+        elif services.missing(service):
+            self.set_up(service)
+        else:
+            if self._service_health is None:
+                from .service_health import ServiceHealth
+                self._service_health = ServiceHealth(self)
+                self._service_health.changed.connect(self.show_service_status)
+            self._service_health.check(service)
+        self._sync_model_controls()
+
+    def _choose_model(self, role: str) -> None:
+        picker = self.model_pickers[role]
+        model = picker.currentText().strip()
+        if not model:
+            return
+        service = getattr(self.settings, role)
+        field = "hear_model" if role == "hearing" else "translate_model"
+        if model == services.setting(service, field):
+            return
+        if service == "local" and (model not in local_model.MODELS or local_model.MODELS[model][1] != role
+                                   or local_model.missing(model)):
+            self._model_choices.pop(role, None)
+            self._sync_model_controls()
+            self.set_up_local(role)
+            return
+        try:
+            services.save(service, **{field: model})
+        except OSError as error:
+            QMessageBox.warning(self, tr("Could not save"), str(error))
+            return
+        self.changed.emit()
+        self._update_model_labels()
 
     def sync(self) -> None:
         """Show the current values (also after a change made in the main window)."""
@@ -420,6 +516,8 @@ class SettingsWindow(QDialog):
         label.setToolTip(tr(health[1]) if health else "")
         color = theme.OK if health and health[0] == "Online" else theme.WARN if health else theme.DIM
         label.setStyleSheet(f"color: {color};")
+        if hasattr(self, "model_pickers"):
+            self._sync_model_controls()
 
     def set_up(self, service: str) -> None:
         if ServiceDialog(service, self).exec():
@@ -554,8 +652,7 @@ class SettingsWindow(QDialog):
 
 
 class ServiceDialog(QDialog):
-    """One service's address, key and models. Empty model fields mean the service's defaults;
-    an empty key field keeps the saved key."""
+    """API setup and model discovery. An empty key field keeps the saved key."""
 
     def __init__(self, service: str, parent=None, http=None):
         super().__init__(parent)
@@ -607,29 +704,14 @@ class ServiceDialog(QDialog):
             self.fetch_btn.setCursor(Qt.PointingHandCursor)
             self.fetch_btn.clicked.connect(self.fetch_models)
             form.addRow("", self.fetch_btn)
-        if info.can_hear:
-            if services.is_custom(self.service):
-                self.hear_picker = QComboBox()
-                self.hear_picker.addItem(tr("Pick a model…"), "")
-                self.hear_picker.currentIndexChanged.connect(self._pick_hear_model)
-                hear_row = QHBoxLayout()
-                hear_row.addWidget(self.hear_model, 1)
-                hear_row.addWidget(self.hear_picker, 0)
-                form.addRow(tr("Hearing model"), hear_row)
-            else:
+        if not services.is_custom(self.service):
+            if info.can_hear:
                 form.addRow(tr("Hearing model"), self.hear_model)
-        if services.is_custom(self.service):
-            self.translate_picker = QComboBox()
-            self.translate_picker.addItem(tr("Pick a model…"), "")
-            self.translate_picker.currentIndexChanged.connect(self._pick_translate_model)
-            trans_row = QHBoxLayout()
-            trans_row.addWidget(self.translate_model, 1)
-            trans_row.addWidget(self.translate_picker, 0)
-            form.addRow(tr("Translating models"), trans_row)
-        else:
             form.addRow(tr("Translating models"), self.translate_model)
         layout.addLayout(form)
-        hint = QLabel(tr("Empty fields use the defaults shown. Several translating models can be "
+        hint = QLabel(tr("Fetch models and save, then choose models under Hearing and Translating.")
+                      if services.is_custom(self.service) else
+                      tr("Empty fields use the defaults shown. Several translating models can be "
                          "listed with commas: when one is at its limit, the next answers."))
         hint.setObjectName("dim")
         hint.setWordWrap(True)
@@ -652,13 +734,16 @@ class ServiceDialog(QDialog):
         save = QPushButton(tr("Save"))
         save.setDefault(True)
         save.clicked.connect(self.save)
-        buttons.addWidget(test)
+        if not services.is_custom(self.service):
+            buttons.addWidget(test)
         buttons.addStretch(1)
         buttons.addWidget(cancel)
         buttons.addWidget(save)
         layout.addLayout(buttons)
         self._fetching = False
         self._fetch_again = False
+        self._fetched_models = None
+        self._fetched_credentials = None
         self._auto_fetch = QTimer(self)
         self._auto_fetch.setSingleShot(True)
         self._auto_fetch.setInterval(500)
@@ -674,12 +759,13 @@ class ServiceDialog(QDialog):
             self._auto_fetch.start()
 
     def _credentials(self):
-        return (self.service, self.url.text().strip(), self.key.text().strip())
+        return (self.service, self.url.text().strip(), self.key.text().strip() or services.setting(self.service, "key"))
 
     def _credentials_changed(self):
         self._auto_fetch.stop()
         self._fetch_again = False
-        self._populate_pickers([])
+        self._fetched_models = None
+        self._fetched_credentials = None
         self.result.clear()
         if services.is_custom(self.service) and self.url.text().strip() and self.key.text().strip():
             self._auto_fetch.start()
@@ -690,16 +776,6 @@ class ServiceDialog(QDialog):
         self._fetching = self._fetch_again = False
         if hasattr(self, "fetch_btn"):
             self.fetch_btn.setEnabled(True)
-
-    def _pick_hear_model(self) -> None:
-        m = self.hear_picker.currentData()
-        if m:
-            self.hear_model.setText(m)
-
-    def _pick_translate_model(self) -> None:
-        m = self.translate_picker.currentData()
-        if m:
-            self.translate_model.setText(m)
 
     def fetch_models(self) -> None:
         self._auto_fetch.stop()
@@ -756,7 +832,8 @@ class ServiceDialog(QDialog):
             self.result.setText(f"✗ {message} — {tr('Click Fetch models to try again')}")
         else:
             models = self._fetch_result.get("models", [])
-            self._populate_pickers(models)
+            self._fetched_models = models
+            self._fetched_credentials = self._fetch_credentials
             if models:
                 self.result.setText(f"✓ {tr('Found {count} models').format(count=len(models))}")
             else:
@@ -765,24 +842,6 @@ class ServiceDialog(QDialog):
             self.fetch_btn.setText(tr("Try again" if error or not self._fetch_result.get("models") else "Fetch models"))
         if retry:
             self._auto_fetch.start()
-
-    def _populate_pickers(self, models: list[str]) -> None:
-        if hasattr(self, "hear_picker"):
-            self.hear_picker.blockSignals(True)
-            self.hear_picker.clear()
-            self.hear_picker.addItem(tr("Pick a model…"), "")
-            for m in models:
-                self.hear_picker.addItem(m, m)
-            self.hear_picker.blockSignals(False)
-            fit_combo(self.hear_picker)
-        if hasattr(self, "translate_picker"):
-            self.translate_picker.blockSignals(True)
-            self.translate_picker.clear()
-            self.translate_picker.addItem(tr("Pick a model…"), "")
-            for m in models:
-                self.translate_picker.addItem(m, m)
-            self.translate_picker.blockSignals(False)
-            fit_combo(self.translate_picker)
 
     def test(self) -> None:
         """Asks the service with what is typed (or saved), without saving."""
@@ -824,14 +883,14 @@ class ServiceDialog(QDialog):
             self.fetch_models()
 
     def save(self) -> None:
-        values = {"hear_model": self.hear_model.text(), "translate_model": self.translate_model.text()}
-        if services.is_custom(self.service):
-            values["name"] = self.domain_name.text()
+        values = ({"name": self.domain_name.text()} if services.is_custom(self.service) else
+                  {"hear_model": self.hear_model.text(), "translate_model": self.translate_model.text()})
         values["url"] = self.url.text()
         if self.key.text().strip():
             values["key"] = self.key.text()
         try:
-            services.save(self.service, **values)
+            models = self._fetched_models if self._fetched_credentials == self._credentials() else None
+            services.save(self.service, models=models, **values)
         except OSError as error:
             self.result.setText(f"✗ {tr('Could not save')}: {error}")
             return

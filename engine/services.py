@@ -17,6 +17,7 @@ All users share the same app. Custom domain accepts a user-supplied API URL and 
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -121,7 +122,17 @@ def setting(service: str, field: str) -> str:
     return getattr(known, field, "") if known and field != "key" else ""
 
 
-def save(service: str, **values: str) -> None:
+def catalog(service: str) -> list[str]:
+    entry = saved().get(service) or {}
+    if not isinstance(entry, dict):
+        return []
+    stamp = hashlib.sha256((setting(service, "url") + "\0" + setting(service, "key")).encode()).hexdigest()
+    models = entry.get("models", [])
+    return [m for m in models if isinstance(m, str) and m] if (
+        isinstance(models, list) and entry.get("models_credentials") == stamp) else []
+
+
+def save(service: str, *, models: list[str] | None = None, **values: str) -> None:
     """Stores the given fields of one service ("" removes a field: back to the default)."""
     global _cache
     data = dict(saved())
@@ -134,6 +145,10 @@ def save(service: str, **values: str) -> None:
             entry[field] = value
         else:
             entry.pop(field, None)
+    if models is not None:
+        entry["models"] = list(dict.fromkeys(m for m in models if isinstance(m, str) and m))
+        entry["models_credentials"] = hashlib.sha256(
+            (entry.get("url", "") + "\0" + entry.get("key", "")).encode()).hexdigest()
     data[service] = entry
     _write(data)
 

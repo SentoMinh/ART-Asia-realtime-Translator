@@ -49,13 +49,17 @@ def test_discover_pick_and_save_custom_models(model_ui, monkeypatch):
         assert "Found 2 models" in dialog.result.text()
         assert [r.url.path for r in requests] == ["/models", "/v1/models"]
         assert all("authorization" not in r.headers for r in requests)
-        dialog.hear_picker.setCurrentIndex(dialog.hear_picker.findData("whisper-custom"))
-        dialog.translate_picker.setCurrentIndex(dialog.translate_picker.findData("chat-custom"))
         dialog.save()
+        window = SettingsWindow(Settings(hearing="custom", translating="custom"))
+        hearing = window.model_pickers["hearing"]
+        translating = window.model_pickers["translating"]
+        hearing.setCurrentIndex(hearing.findData("whisper-custom"))
+        translating.setCurrentIndex(translating.findData("chat-custom"))
         assert services.setting("custom", "hear_model") == "whisper-custom"
         assert services.translate_models("custom") == ["chat-custom"]
         assert not services.missing("custom")
         dialog.deleteLater()
+        window.deleteLater()
 
 
 def test_fetch_error_can_be_retried(model_ui, monkeypatch):
@@ -70,7 +74,7 @@ def test_fetch_error_can_be_retried(model_ui, monkeypatch):
     monkeypatch.setattr(services, "fetch_models", lambda *a, **kw: ["recovered"])
     dialog.fetch_models()
     wait_for_fetch(dialog)
-    assert dialog.hear_picker.findData("recovered") > 0
+    assert dialog._fetched_models == ["recovered"]
     dialog.deleteLater()
 
 
