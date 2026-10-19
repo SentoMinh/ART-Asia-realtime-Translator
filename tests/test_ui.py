@@ -578,6 +578,30 @@ def test_model_pickers_follow_domain_and_preserve_each_roles_selection(window):
     assert services.setting("custom", "hear_model") == "hear-a"
 
 
+@pytest.mark.parametrize("role, field", [("hearing", "hear_model"), ("translating", "translate_model")])
+def test_model_dropdown_arrow_opens_list_and_mouse_selection_saves(window, role, field):
+    from engine import services
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QToolButton
+    services.save("custom", url="https://models.test", models=["first", "second"], **{field: "first"})
+    dialog = SettingsWindow(window.settings, window)
+    dialog.setStyleSheet(theme.style_sheet())
+    dialog.nav.setCurrentRow(dialog.nav.count() - 1)
+    dialog.show()
+    QTest.qWait(20)
+    picker = dialog.model_pickers[role]
+    arrow = picker.lineEdit().findChild(QToolButton)
+    assert arrow.isVisible() and arrow.width() > 0
+    QTest.mouseClick(arrow, Qt.LeftButton)
+    assert picker.view().isVisible()
+    index = picker.model().index(picker.findData("second"), 0)
+    QTest.mouseClick(picker.view().viewport(), Qt.LeftButton, pos=picker.view().visualRect(index).center())
+    assert services.setting("custom", field) == "second"
+    assert not picker.view().isVisible()
+    dialog.close()
+
+
 def test_api_setup_preserves_model_choices_when_saving(window):
     from engine import services
     from ui.settings_window import ServiceDialog

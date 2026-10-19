@@ -1,6 +1,6 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.11.8**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.11.9**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 ## What the app does
 
@@ -12,7 +12,7 @@ It is an always-on-top desktop window. Live audio is a mix of the other players:
 
 Source commits, local builds and published releases are separate steps. Keep previous build artifacts when preparing a new release.
 
-Source version 0.11.8 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
+Source version 0.11.9 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
 
 Existing 0.11.5 exports and reports are historical artifacts. This source update does not rebuild or publish them. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL.
 
@@ -84,7 +84,7 @@ These are code-review observations, not newly reproduced live failures. This doc
 
 ## Validation and commands
 
-Source version 0.11.8 passed **398 tests**, plus actual SenseVoice and NLLB CPU inference checks. Packaged self-checks cover the bundled runtimes and microphone mixer. Whisper large-v3 has not been run with downloaded weights on a GPU.
+Source version 0.11.9 passed **400 tests**, plus actual SenseVoice and NLLB CPU inference checks. Packaged self-checks cover the bundled runtimes and microphone mixer. Whisper large-v3 has not been run with downloaded weights on a GPU.
 
 Historical 0.11.5 package validation covered tests, packaged self-checks, Japanese/Korean language tables, native DLL hashes, privacy scans and ZIP checksums. Run tests and packaged checks again for each new release.
 
