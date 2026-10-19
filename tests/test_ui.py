@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QComboBox, QPushButton
 
 from ui import config, i18n, theme
 from ui.backend import AUTO, Backend, Utterance
@@ -669,21 +669,28 @@ def test_the_local_model_s_window_downloads_stops_and_says_how_it_ended(window, 
     monkeypatch.setattr(local_model, "ready", lambda root=None, model=None: not state["missing"])
     download = Download()
     dialog = LocalModelDialog(window, download=download)
-    assert dialog.action.text() == "Download" and not dialog.action.isHidden() and dialog.result.text() == ""
-    dialog.action.click()
-    assert download.calls == ["start"] and dialog.action.text() == "Stop"
+    row = dialog.rows["sensevoice"]
+    other = dialog.rows["nllb-200-ct2"]
+    assert row["action"].text() == "Download" and not row["action"].isHidden()
+    assert not dialog.findChildren(QComboBox)
+    row["action"].click()
+    assert download.calls == ["start"] and row["action"].text() == "Stop"
+    assert download.model == "sensevoice" and not other["action"].isEnabled()
+    other_before = other["result"].text()
     download.progress.emit(float(2**30), float(2 * 2**30))
-    assert dialog.bar.value() == 500 and dialog.result.text() == "1.0 GB of 2.0 GB"
-    dialog.action.click()
-    assert download.calls == ["start", "stop"] and not dialog.action.isEnabled()
+    assert row["bar"].value() == 500 and row["result"].text() == "1.0 GB of 2.0 GB"
+    assert other["result"].text() == other_before
+    row["action"].click()
+    assert download.calls == ["start", "stop"] and not row["action"].isEnabled()
     download.active = False
     download.finished.emit("stopped")
-    assert dialog.action.text() == "Download" and dialog.action.isEnabled() and dialog.result.text() == ""
+    assert row["action"].text() == "Download" and row["action"].isEnabled()
     download.finished.emit("not enough free space on C:")
-    assert dialog.result.text() == "✗ not enough free space on C:"
+    assert row["result"].text() == "✗ not enough free space on C:"
     state["missing"] = ""
     download.finished.emit("")
-    assert dialog.result.text() == "✓ Ready" and dialog.action.isHidden() and dialog.bar.isHidden()
+    assert row["result"].text() == "Ready" and not row["action"].isEnabled() and row["bar"].isHidden()
+    assert row["use"].isEnabled()
 
 
 def test_local_model_picker_keeps_hearing_and_translation_separate(window, monkeypatch):
@@ -692,12 +699,11 @@ def test_local_model_picker_keeps_hearing_and_translation_separate(window, monke
     monkeypatch.setattr(local_model, "missing", lambda model=None: "")
     monkeypatch.setattr(local_model, "ready", lambda root=None, model=None: True)
     dialog = LocalModelDialog(window, role="translating")
-    assert {dialog.models.itemData(i) for i in range(dialog.models.count())} == set(local_model.MODELS)
-    assert dialog.models.currentData() == "nllb-200-ct2"
+    assert set(dialog.rows) == set(local_model.MODELS)
     local_model.select("sensevoice")
     window.settings.hearing = "custom"
     dialog.selected.connect(window._activate_local)
-    dialog.use.click()
+    dialog.rows["nllb-200-ct2"]["use"].click()
     assert window.settings.translating == "local"
     assert window.settings.hearing == "custom"
     assert local_model.selected() == "sensevoice"
@@ -710,10 +716,9 @@ def test_cpu_choices_can_download_without_nvidia(window, monkeypatch):
     monkeypatch.setattr(local_model, "nvidia_card", lambda: False)
     dialog = LocalModelDialog(window)
     for model in ("sensevoice", "nllb-200-ct2"):
-        dialog.models.setCurrentIndex(dialog.models.findData(model))
-        assert not dialog.action.isHidden()
-        assert not dialog.use.isEnabled()
-        assert "CPU" in dialog.model_note.text()
+        row = dialog.rows[model]
+        assert not row["action"].isHidden() and row["action"].isEnabled()
+        assert not row["use"].isEnabled()
 
 
 def test_translation_download_completion_activates_only_translation(window, monkeypatch):
@@ -745,7 +750,9 @@ def test_a_pc_without_an_nvidia_card_is_told_so_and_offered_no_download(window, 
     monkeypatch.setattr(local_model, "installed", lambda model=None: True)
     monkeypatch.setattr(local_model, "nvidia_card", lambda: False)
     dialog = LocalModelDialog(window)
-    assert "NVIDIA graphics card" in dialog.result.text() and dialog.action.isHidden()
+    for model in ("large-v3-turbo", "large-v3"):
+        row = dialog.rows[model]
+        assert "NVIDIA graphics card" in row["result"].text() and not row["action"].isEnabled()
 
 
 def test_the_download_tells_the_window_how_it_ended(app):

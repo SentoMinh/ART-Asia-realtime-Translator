@@ -773,114 +773,130 @@ class ServiceDialog(QDialog):
 
 
 class LocalModelDialog(QDialog):
-    """Choose, download and activate one of the local hearing/translation models."""
+    """Every local model has its own download, progress and activation controls."""
     selected = Signal(str)
 
     def __init__(self, parent=None, download: local_download.LocalDownload | None = None, role="hearing"):
         super().__init__(parent)
         self._download = download or local_download.shared()
+        self._stopping = False
+        self.rows = {}
         self.setAttribute(Qt.WA_DeleteOnClose)
         self.setObjectName("settings")
         self.setWindowTitle(tr(LOCAL_MODEL))
-        self.setMinimumWidth(500)
+        self.setMinimumSize(620, 480)
+        self.resize(720, 560)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 18, 22, 18)
         layout.setSpacing(10)
         note = QLabel(tr(LOCAL_NOTE))
         note.setWordWrap(True)
         layout.addWidget(note)
-        self.models = QComboBox()
-        self.models.setAccessibleName(tr("Local model"))
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        content = QWidget()
+        listing = QVBoxLayout(content)
+        listing.setContentsMargins(0, 0, 8, 0)
+        listing.setSpacing(14)
         for model, (title, category, _, _) in local_model.MODELS.items():
-            self.models.addItem(f"{tr('Hearing' if category == 'hearing' else 'Translating')} — {title}", model)
-        initial = self._download.model if self._download.active else local_model.selected(role)
-        select_data(self.models, initial)
-        layout.addWidget(self.models)
-        self.model_note = QLabel()
-        self.model_note.setWordWrap(True)
-        layout.addWidget(self.model_note)
-        self.download_note = QLabel()
-        self.download_note.setWordWrap(True)
-        layout.addWidget(self.download_note)
-        self.bar = QProgressBar()
-        self.bar.setRange(0, 1000)
-        self.bar.setTextVisible(False)
-        layout.addWidget(self.bar)
-        self.result = QLabel()
-        self.result.setWordWrap(True)
-        layout.addWidget(self.result)
-        buttons = QHBoxLayout()
+            panel = QFrame()
+            panel.setObjectName("card")
+            row = QHBoxLayout(panel)
+            details = QVBoxLayout()
+            heading = QLabel(f"{tr('Hearing' if category == 'hearing' else 'Translating')} — {title}")
+            heading.setWordWrap(True)
+            details.addWidget(heading)
+            description = ("SenseVoice runs on CPU: Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese."
+                           if model == "sensevoice" else "NLLB-200 translates locally on CPU using CTranslate2 (INT8)."
+                           if model == "nllb-200-ct2" else "Whisper runs on your NVIDIA graphics card. Large-v3 needs more memory than turbo.")
+            model_note = QLabel(tr(description))
+            model_note.setObjectName("dim")
+            model_note.setWordWrap(True)
+            details.addWidget(model_note)
+            result = QLabel()
+            result.setWordWrap(True)
+            details.addWidget(result)
+            bar = QProgressBar()
+            bar.setRange(0, 1000)
+            bar.setTextVisible(False)
+            details.addWidget(bar)
+            row.addLayout(details, 1)
+            buttons = QVBoxLayout()
+            action = QPushButton(tr("Download"))
+            action.setAccessibleName(f"{tr('Download')} {title}")
+            action.setToolTip(tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size(model))))
+            action.clicked.connect(lambda checked=False, model=model: self.start_or_stop(model))
+            use = QPushButton(tr("Use model"))
+            use.setAccessibleName(f"{tr('Use model')} {title}")
+            use.clicked.connect(lambda checked=False, model=model: self.use_model(model))
+            buttons.addWidget(action)
+            buttons.addWidget(use)
+            buttons.addStretch(1)
+            row.addLayout(buttons)
+            listing.addWidget(panel)
+            self.rows[model] = dict(action=action, use=use, result=result, bar=bar)
+        listing.addStretch(1)
+        scroll.setWidget(content)
+        layout.addWidget(scroll, 1)
         close = QPushButton(tr("Close"))
         close.setObjectName("plain")
         close.clicked.connect(self.accept)
-        self.action = QPushButton()
-        self.action.clicked.connect(self.start_or_stop)
-        self.use = QPushButton(tr("Use model"))
-        self.use.clicked.connect(self.use_model)
-        buttons.addStretch(1)
-        buttons.addWidget(close)
-        buttons.addWidget(self.action)
-        buttons.addWidget(self.use)
-        layout.addLayout(buttons)
-        self.models.currentIndexChanged.connect(lambda: self.show_state())
+        layout.addWidget(close, alignment=Qt.AlignRight)
         self._download.progress.connect(self.show_progress)
         self._download.finished.connect(self.show_state)
         self.show_state()
+        initial = self.rows[local_model.selected(role)]
+        (initial["use"] if initial["use"].isEnabled() else initial["action"]).setFocus()
 
     def show_state(self, problem: str = "") -> None:
-        model = self.models.currentData()
-        self.models.setEnabled(not self._download.active)
-        if self._download.active:
-            select_data(self.models, self._download.model)
-            model = self._download.model
-        note = ("SenseVoice runs on CPU: Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese."
-                if model == "sensevoice" else "NLLB-200 translates locally on CPU using CTranslate2 (INT8)."
-                if model == "nllb-200-ct2" else "Whisper runs on your NVIDIA graphics card. Large-v3 needs more memory than turbo.")
-        self.model_note.setText(tr(note))
-        missing = local_model.missing(model)
-        can_download = (local_model.installed(model)
-                        and (not model.startswith("large-v3") or local_model.nvidia_card()))
-        needs_download = not local_model.ready(model=model)
-        self.download_note.setText(tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size(model))))
-        visible = self._download.active or (needs_download and can_download)
-        for part in (self.download_note, self.bar, self.action):
-            part.setVisible(visible)
-        self.use.setEnabled(not missing and not self._download.active)
-        self.action.setEnabled(True)
-        self.action.setText(tr("Stop") if self._download.active else tr("Download"))
-        if not missing and not self._download.active and not needs_download:
-            self.result.setText("✓ " + tr("Ready"))
-        elif not can_download:
-            self.result.setText("✗ " + missing)
-        else:
-            self.show_progress(local_model.arrived(model=model), local_model.size(model))
-            if problem and problem != local_download.STOPPED:
-                self.result.setText("✗ " + problem)
+        if not self._download.active:
+            self._stopping = False
+        for model, row in self.rows.items():
+            active = self._download.active and self._download.model == model
+            missing = local_model.missing(model)
+            can_download = (local_model.installed(model)
+                            and (not model.startswith("large-v3") or local_model.nvidia_card()))
+            needs_download = not local_model.ready(model=model)
+            row["action"].setText(tr("Stop") if active else tr("Download"))
+            row["action"].setEnabled(not self._stopping if active else
+                                     not self._download.active and can_download and needs_download)
+            row["use"].setVisible(not missing)
+            row["use"].setEnabled(not missing and not self._download.active)
+            done, total = local_model.arrived(model=model), local_model.size(model)
+            row["bar"].setVisible(active or (needs_download and done > 0))
+            row["bar"].setValue(round(1000 * done / total) if total else 0)
+            status = (tr("Ready") if not missing and not needs_download else
+                      missing if not can_download else
+                      tr("{done} of {size}").format(done=local_model.gb(done), size=local_model.gb(total)))
+            row["result"].setText(status)
+            if problem and problem != local_download.STOPPED and model == self._download.model:
+                row["result"].setText("✗ " + problem)
 
     def show_progress(self, done: float, total: float) -> None:
-        if self._download.active and self.models.currentData() != self._download.model:
-            self.show_state()
-        self.bar.setValue(round(1000 * done / total) if total else 0)
-        self.result.setText(tr("{done} of {size}").format(done=local_model.gb(done),
-                                                          size=local_model.gb(total)) if done else "")
+        self.show_state()
+        row = self.rows[self._download.model]
+        row["bar"].setValue(round(1000 * done / total) if total else 0)
+        row["result"].setText(tr("{done} of {size}").format(done=local_model.gb(done),
+                                                          size=local_model.gb(total)))
 
-    def start_or_stop(self) -> None:
+    def start_or_stop(self, model: str) -> None:
         if self._download.active:
-            self._download.stop()
-            self.action.setEnabled(False)
+            if self._download.model == model:
+                self._stopping = True
+                self._download.stop()
         else:
-            self._download.start(self.models.currentData())
-            self.show_state()
+            self._download.start(model)
+        self.show_state()
 
-    def use_model(self) -> None:
-        model = self.models.currentData()
-        if local_model.missing(model):
+    def use_model(self, model: str) -> None:
+        if self._download.active or local_model.missing(model):
             self.show_state()
             return
         try:
             local_model.select(model)
         except OSError as error:
-            self.result.setText(f"✗ {tr('Could not save')}: {error}")
+            self.rows[model]["result"].setText(f"✗ {tr('Could not save')}: {error}")
             return
         self.selected.emit(model)
         self.accept()
