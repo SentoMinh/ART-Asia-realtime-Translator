@@ -260,9 +260,14 @@ _ZH = {
     "Send other players' translation and original words to your VRChat chatbox.":
         "将其他玩家话语的译文和原文发送到你的 VRChat 聊天框。",
     "Message text size": "消息文字大小", "Size of the text in the chat log.": "聊天记录中文字的大小。",
+    "What's new in {version}": "{version} 更新内容",
+    "Below 30% background darkness, empty overlay space lets clicks through. Text and the typing box stay clickable.": "背景深度低于 30% 时可点击穿透空白区域，文字和输入框仍可点击。",
+    "Drag from the top controls. Resize from the top edge or top corners.": "从顶部控件拖动窗口，从顶部边缘或顶角调整大小。",
+    "Domain setup and model downloads now open inside Settings and move with it.": "域名设置和模型下载现在在设置窗口内打开，并随窗口一起移动。",
+    "This update notice appears once per version.": "每个版本只显示一次更新提示。",
     "Background darkness": "背景深度",
-    "100% is a solid panel. 0% leaves only the text over the game.":
-        "100% 是不透明的面板。0% 只留下文字浮在游戏上。",
+    "Below 30%, empty space lets clicks through. Text and top controls stay clickable.":
+        "低于 30% 时可点击穿透空白区域，文字和顶部控件仍可点击。",
     "Always on top": "窗口置顶",
     "Keeps the window above the game. Needs VRChat in windowed or borderless mode.":
         "让窗口保持在游戏上方。VRChat 需要使用窗口或无边框模式。",
@@ -541,9 +546,14 @@ _VI = {
     "Send other players' translation and original words to your VRChat chatbox.":
         "Gửi bản dịch và lời gốc của người chơi khác vào chatbox VRChat của bạn.",
     "Message text size": "Cỡ chữ tin nhắn", "Size of the text in the chat log.": "Cỡ chữ trong nhật ký trò chuyện.",
+    "What's new in {version}": "Có gì mới trong {version}",
+    "Below 30% background darkness, empty overlay space lets clicks through. Text and the typing box stay clickable.": "Khi độ tối nền dưới 30%, có thể nhấp xuyên vùng trống. Chữ và ô nhập vẫn bấm được.",
+    "Drag from the top controls. Resize from the top edge or top corners.": "Kéo cửa sổ từ các nút phía trên. Đổi kích thước từ cạnh trên hoặc hai góc trên.",
+    "Domain setup and model downloads now open inside Settings and move with it.": "Thiết lập tên miền và tải mô hình mở bên trong Cài đặt và di chuyển cùng cửa sổ.",
+    "This update notice appears once per version.": "Thông báo cập nhật này chỉ xuất hiện một lần mỗi phiên bản.",
     "Background darkness": "Độ tối của nền",
-    "100% is a solid panel. 0% leaves only the text over the game.":
-        "100% là nền đặc. 0% chỉ còn chữ nổi trên game.",
+    "Below 30%, empty space lets clicks through. Text and top controls stay clickable.":
+        "Dưới 30%, có thể nhấp xuyên vùng trống. Chữ và nút phía trên vẫn bấm được.",
     "Always on top": "Luôn ở trên cùng",
     "Keeps the window above the game. Needs VRChat in windowed or borderless mode.":
         "Giữ cửa sổ nằm trên game. VRChat cần chạy ở chế độ cửa sổ hoặc không viền.",

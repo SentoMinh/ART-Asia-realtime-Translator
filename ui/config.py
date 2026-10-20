@@ -45,6 +45,7 @@ class Settings:
     backdrop: int = 85              # percent; 0 = only the text floats over the game
     always_on_top: bool = True
     auto_hide_bars: bool = False    # only the chat log stays while the mouse is away
+    last_update_notice: str = ""    # app version whose What's new panel has been shown
     chatbox_typing: bool = True     # show the "typing" dots in VRChat while I talk
     chatbox_original: bool = False  # chatbox gets "translation (original)"
     chatbox_speaker: bool = False   # also send other players' translation and original to my chatbox

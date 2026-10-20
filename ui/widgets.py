@@ -3,9 +3,39 @@ from __future__ import annotations
 
 from PySide6.QtCore import QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QPainter
-from PySide6.QtWidgets import QAbstractButton, QWidget
+from PySide6.QtWidgets import (QAbstractButton, QFrame, QHBoxLayout, QLabel,
+                               QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from . import theme
+from .i18n import tr
+
+
+class DialogPanel(QFrame):
+    """Present existing dialog contents inside the owning window."""
+
+    def __init__(self, dialog, parent=None):
+        super().__init__(parent)
+        self.dialog = dialog
+        self.setObjectName("card")
+        layout = QVBoxLayout(self)
+        heading = QHBoxLayout()
+        title = QLabel(dialog.windowTitle())
+        title.setObjectName("title")
+        title.setWordWrap(True)
+        heading.addWidget(title, 1)
+        close = QPushButton(tr("Close"))
+        close.setObjectName("plain")
+        close.clicked.connect(dialog.reject)
+        heading.addWidget(close)
+        layout.addLayout(heading)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        dialog.setParent(scroll, Qt.Widget)
+        dialog.setAttribute(Qt.WA_DeleteOnClose, False)
+        dialog.setMinimumSize(0, 0)
+        scroll.setWidget(dialog)
+        layout.addWidget(scroll, 1)
 
 
 class LevelBar(QWidget):

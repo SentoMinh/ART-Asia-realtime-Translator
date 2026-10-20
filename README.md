@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Published version **[0.11.9](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.9)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Published version **[0.11.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.10)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
@@ -17,7 +17,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.11.9](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.9). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.11.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.10). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -27,7 +27,7 @@ VRChat has to run in windowed or borderless mode for the window to stay on top o
 
 Builds use `VRChat-Translator-<version>.exe` or `VRChat-Translator-<version>-win64.zip`, with one package for everyone. Settings and provider keys stay in your Windows profile.
 
-The packaged app checks GitHub for newer releases, downloads updates in the background, and applies them on the next start. No provider key is sent to GitHub. A source commit does not publish an application update. The old 0.9.15 EXE did not have an update source configured: download this release manually once to enable future automatic updates. Downloads come from [GitHub Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases).
+The packaged app checks GitHub for newer releases, downloads updates in the background, and applies them on the next start. A “What’s new” panel appears inside the overlay once per version, including the first start of this release. The app saves the shown version in `ui.json`, so restarting does not repeat it. No provider key is sent to GitHub. A source commit does not publish an application update. The old 0.9.15 EXE did not have an update source configured: download this release manually once to enable future automatic updates. Downloads come from [GitHub Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases).
 
 The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run `install_windows.bat` if the Microsoft Visual C++ runtime is needed, or `install_windows.bat --check` for a read-only platform precheck. The script's microphone-permission reminder is general guidance, not detection of blocked access. Live Windows 10 testing remains outstanding. On Windows 10, speaker capture may include other apps sharing the audio output; selected-app music injection currently requires Windows 11.
 
@@ -38,7 +38,7 @@ The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run
 | Local Model | ✓ SenseVoice or Whisper | ✓ NLLB-200 (CTranslate2) | download the chosen models; no API key |
 | Custom domain | ✓ | ✓ | an OpenAI-compatible API address; add more with **+** |
 
-The **Services** section lists only your custom domains. **Set up…** has a name, API address, key and **Fetch models**. Save the API settings, then select models below the Hearing and Translating domain selectors. **Connect** checks the selected API and shows **Connected** when it responds. Use **+** beside a row to add another domain, or **−** to remove an added one. The first domain remains available. Removing a selected domain switches that role back to the first domain. Previously selected, configured providers are preserved as custom domains when upgrading. Several translating models can be listed with commas for fallback.
+The **Services** section lists only your custom domains. **Set up…** opens inside Settings with a name, API address, key and **Fetch models**. It moves with Settings; Close or Cancel returns to the Models page. Navigation is disabled while a setup panel is open. Save the API settings, then select models below the Hearing and Translating domain selectors. **Connect** checks the selected API and shows **Connected** when it responds. Use **+** beside a row to add another domain, or **−** to remove an added one. The first domain remains available. Removing a selected domain switches that role back to the first domain. Previously selected, configured providers are preserved as custom domains when upgrading. Several translating models can be listed with commas for fallback.
 
 Custom servers offering `nllb-200-ct2` use their `/translate` endpoint with explicit language codes; other translation models use `/chat/completions`.
 
@@ -57,7 +57,7 @@ Open **Settings → Models → Local Model → Set up…** and choose a model:
 | SenseVoice Small | Hearing | CPU; Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese. |
 | NLLB-200 · CTranslate2 | Translation | CPU, INT8; English, Vietnamese, Chinese, Cantonese, Japanese and Korean. |
 
-All models are listed directly, each with a **Download** button, download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. Whisper shares the downloaded NVIDIA cuBLAS library between its two choices.
+The download panel opens inside Settings and moves with it. All models are listed directly, each with a **Download** button, download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. Whisper shares the downloaded NVIDIA cuBLAS library between its two choices.
 
 Local inference needs no API key. Select Local Model for both Hearing and Translating to run both steps on your PC. The first download needs internet access. Optional translation add-ons retain their existing fallback behavior.
 
@@ -91,7 +91,9 @@ In **Settings → Translation**, turn on **Add Speaker words** to also send othe
 
 Click a line in the chat log to copy what was said (the original text, not the translation).
 
-Drag the header, level meters or header labels to move the window. Header buttons distinguish clicks from dragging; native window movement has a manual fallback. This has automated coverage, but has not been tested live on Windows 10.
+Drag the top controls, level meters or header labels to move the window. Resize from the top edge or top corners; side and bottom edges do not resize it. Header buttons distinguish clicks from dragging; native window movement has a manual fallback.
+
+In **Settings → Appearance → Background darkness**, values below **30%** make empty overlay space fully transparent and click-through. Subtitle letters remain clickable for copying, and the typing box and top controls stay usable. At **30%** or above, the full panel accepts clicks again. This was checked against a separate Windows application; live VRChat and Windows 10 behavior still need testing.
 
 Existing saved API settings are retained where recoverable. If an older installation kept its URL only inside its EXE, enter that URL in Custom domain once; the new app cannot recover settings that were never saved outside the old program.
 
@@ -123,9 +125,9 @@ run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
 - Build the one-file program: `pwsh -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10` (use your validated native build directory; see [APO build instructions](apo/README.md)). `-Folder` builds a folder and ZIP. Without `-MixerBuild`, native mixer DLLs are not explicitly included by the build command.
 - Check a build: `VRChat-Translator.exe --selfcheck` writes `%LOCALAPPDATA%\VRChat-Translator\selfcheck.txt`
 
-Release validation for 0.11.9: **400 tests passed**, including clicking both model dropdown arrows and choosing models. The EXE passed its packaged self-check, bundled-runtime and native-DLL checks, source/artifact scans, ZIP checks and SHA-256 verification. The GitHub download, replacement and restart from 0.11.8 to 0.11.9 were verified, followed by a no-update check on the current version.
+Release validation for 0.11.10: **411 tests passed**, including the 30% click-through threshold, top-only resize edges, embedded setup panels and once-per-version update notices. Windows checks also verified cross-process click-through, retained text/input interaction and subtitle copying. The EXE passed its packaged self-check, bundled-runtime and native-DLL checks, source/artifact scans, ZIP checks and SHA-256 verification. The GitHub download, replacement and restart from 0.11.9 to 0.11.10 were verified, followed by a no-update check on the current version.
 
-Earlier source checks ran SenseVoice on a sample recording and NLLB translating English to Vietnamese. Fresh-PC installation, live Windows 10 behavior, Whisper large-v3 GPU inference and Japanese/Korean recognition accuracy with real services remain unverified. These checks were not repeated for the dropdown change.
+Earlier source checks ran SenseVoice on a sample recording and NLLB translating English to Vietnamese. Fresh-PC installation, live Windows 10 behavior, Whisper large-v3 GPU inference and Japanese/Korean recognition accuracy with real services remain unverified. These inference checks were not repeated for this UI update.
 
 ## Layout
 

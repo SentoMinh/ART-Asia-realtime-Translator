@@ -682,14 +682,13 @@ def test_the_local_model_is_downloaded_before_hearing_switches_to_it(window, mon
     state = {"missing": NOT_DOWNLOADED}
     monkeypatch.setattr(local_model, "installed", lambda model=None: True)
     monkeypatch.setattr(local_model, "missing", lambda model=None: state["missing"])
-    opened = []
-    monkeypatch.setattr(settings_window.LocalModelDialog, "exec", lambda self: opened.append(self))
     dialog = SettingsWindow(window.settings, window)
     dialog.changed.connect(window.settings_changed)
     assert dialog._local_status.text() == "Not downloaded"
     dialog.hearing.setCurrentIndex(dialog.hearing.findData("local"))
     # its window opens; until everything has arrived, hearing stays as it was
-    assert len(opened) == 1 and window.settings.hearing == "custom" and dialog.hearing.currentData() == "custom"
+    assert isinstance(dialog._panel.dialog, settings_window.LocalModelDialog)
+    assert window.settings.hearing == "custom" and dialog.hearing.currentData() == "custom"
     local_download.shared().finished.emit("not enough free space on C:")
     assert window.settings.hearing == "custom"
     state["missing"] = ""
@@ -756,19 +755,17 @@ def test_domain_buttons_add_cancel_and_remove_without_touching_other_settings(wi
     from ui.settings_window import ServiceDialog
     dialog = SettingsWindow(window.settings, window)
     assert set(dialog._service_status) == {"custom"}
-    monkeypatch.setattr(ServiceDialog, "exec", lambda self: 0)
     dialog.add_domain()
+    dialog._panel.dialog.reject()
     assert services.offered() == ("custom",)
-    def save_new(self):
-        assert self.domain_name.text() == "Custom domain 2"
-        self.domain_name.setText("Second API")
-        self.url.setText("https://second.test/v1")
-        self.key.setText("second-key")
-        self.save()
-        return 1
-    monkeypatch.setattr(ServiceDialog, "exec", save_new)
     plus = next(b for b in dialog._domains_host.findChildren(QPushButton) if b.text() == "+")
     plus.click()
+    setup = dialog._panel.dialog
+    assert setup.domain_name.text() == "Custom domain 2"
+    setup.domain_name.setText("Second API")
+    setup.url.setText("https://second.test/v1")
+    setup.key.setText("second-key")
+    setup.save()
     added = next(s for s in services.offered() if s != "custom")
     assert services.title(added) == "Second API"
     assert services.setting(added, "key") == "second-key"
@@ -1004,6 +1001,53 @@ def test_a_see_through_window_shows_only_the_letters(window):
     assert theme.DIM not in row.original.text()          # the small grey text is lighter here
 
 
+@pytest.mark.parametrize("opacity", [0, 29, 30, 85])
+def test_click_through_background_threshold_preserves_header_and_input(window, opacity):
+    from PySide6.QtCore import QPoint
+    window.setStyleSheet(theme.style_sheet())
+    window.settings.backdrop = opacity
+    window.settings_changed()
+    window.show()
+    QApplication.processEvents()
+    image = window.grab().toImage()
+    def alpha(point):
+        return image.pixelColor(point * image.devicePixelRatio()).alpha()
+    blank = window.log.mapTo(window, QPoint(window.log.width() // 2, 20))
+    assert (alpha(blank) == 0) == (opacity < 30)
+    assert alpha(QPoint(window.width() // 2, 2)) > 0
+    assert alpha(window.input.mapTo(window, window.input.rect().center())) > 0
+    if opacity < 30:
+        assert alpha(QPoint(1, window.height() // 2)) == 0
+        assert alpha(QPoint(window.width() // 2, window.height() - 2)) == 0
+        window._show_bars(False)
+        QApplication.processEvents()
+        image = window.grab().toImage()
+        assert alpha(QPoint(window.width() // 2, 2)) > 0
+        assert alpha(QPoint(window.width() // 2, window.height() - 20)) == 0
+    window.hide()
+
+
+@pytest.mark.parametrize("dpi", [96, 144, 192])
+def test_only_top_edge_and_top_corners_resize(window, monkeypatch, dpi):
+    import ctypes
+    from ctypes import wintypes
+    from types import SimpleNamespace
+    def get_rect(hwnd, out):
+        rect = ctypes.cast(out, ctypes.POINTER(wintypes.RECT)).contents
+        rect.left, rect.top, rect.right, rect.bottom = -800, -600, -200, -100
+        return 1
+    monkeypatch.setattr(ctypes, "windll", SimpleNamespace(user32=SimpleNamespace(
+        GetWindowRect=get_rect, GetDpiForWindow=lambda hwnd: dpi)))
+    def hit(x, y):
+        return window._edge_code(SimpleNamespace(hWnd=1, lParam=(x & 0xffff) | ((y & 0xffff) << 16)))
+    assert hit(-799, -599) == 13
+    assert hit(-500, -599) == 12
+    assert hit(-201, -599) == 14
+    assert hit(-799, -400) == hit(-201, -400) == 0
+    assert hit(-799, -101) == hit(-500, -101) == hit(-201, -101) == 0
+    assert hit(-500, -600 + 6 * dpi // 96) == 0
+
+
 def test_the_program_icon_loads(app):
     from ui.main import ICON_FILE, program_icon
     assert ICON_FILE.exists() and ICON_FILE.with_suffix(".ico").exists()
@@ -1161,3 +1205,65 @@ def test_log_displays_both_translations(app):
     assert not row.translation.isHidden() and not row.translation2.isHidden()
     row.set_utterance(Utterance(id=99, source="mic", original="Hello", final=True))
     assert row.translation2.isHidden()
+
+
+@pytest.mark.parametrize("kind", ["domain", "local"])
+def test_setup_panels_are_inside_settings_and_move_with_it(window, kind):
+    from PySide6.QtCore import QPoint
+    dialog = SettingsWindow(window.settings, window)
+    dialog.show()
+    dialog.nav.setCurrentRow(dialog.nav.count() - 1)
+    previous = dialog.pages.currentWidget()
+    if kind == "domain":
+        dialog.set_up("custom")
+    else:
+        dialog.set_up_local()
+    QApplication.processEvents()
+    panel = dialog._panel
+    assert panel.window() is dialog and not panel.dialog.isWindow()
+    assert dialog.pages.currentWidget() is panel and not dialog.nav.isEnabled()
+    before = panel.mapToGlobal(QPoint(0, 0))
+    delta = QPoint(20, 15)
+    dialog.move(dialog.pos() + delta)
+    QApplication.processEvents()
+    assert panel.mapToGlobal(QPoint(0, 0)) == before + delta
+    dialog.resize(760, 550)
+    QApplication.processEvents()
+    assert dialog.rect().contains(panel.geometry().translated(dialog.pages.pos()))
+    panel.dialog.reject()
+    assert dialog._panel is None and dialog.nav.isEnabled()
+    assert dialog.pages.currentWidget() is previous
+    dialog.close()
+
+
+def test_closing_settings_closes_embedded_fetch_panel(window):
+    dialog = SettingsWindow(window.settings, window)
+    dialog.show()
+    dialog.set_up("custom")
+    setup = dialog._panel.dialog
+    setup._auto_fetch.start()
+    dialog.reject()
+    assert dialog._panel is None and not setup._auto_fetch.isActive()
+
+
+def test_update_notice_shows_once_per_version_and_stays_inside_window(window, tmp_path, monkeypatch):
+    from ui import __version__
+    import ui.main_window as module
+    path = tmp_path / "ui.json"
+    window._save = lambda settings: config.save(settings, path)
+    window.show()
+    window.show_update_notice()
+    panel = window._notice
+    assert panel is not None and panel.window() is window and not panel.dialog.isWindow()
+    assert __version__ in panel.dialog.windowTitle()
+    assert window.log.isHidden() and window.input_bar.isHidden() and window.bars_shown()
+    assert config.load(path).last_update_notice == __version__
+    panel.dialog.reject()
+    assert window._notice is None and not window.log.isHidden() and not window.input_bar.isHidden()
+    window.settings = config.load(path)
+    window.show_update_notice()
+    assert window._notice is None
+    monkeypatch.setattr(module, "__version__", "99.0.0")
+    window.show_update_notice()
+    assert window._notice is not None and config.load(path).last_update_notice == "99.0.0"
+    window._notice.dialog.reject()

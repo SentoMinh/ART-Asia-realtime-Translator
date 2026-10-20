@@ -8,26 +8,26 @@ from ctypes import wintypes
 
 from PySide6.QtCore import QEvent, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QColor, QCursor, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGraphicsDropShadowEffect,
+from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGraphicsDropShadowEffect,
                                QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton,
                                QToolButton, QVBoxLayout, QWidget)
 
 from engine import local_model
 
-from . import config, i18n, local_download, theme
+from . import __version__, config, i18n, local_download, theme
 from .backend import AUTO, LANGS, PICK_LANGS, Backend, Status, Utterance
 from .config import Settings
 from .i18n import tr
 from .log_view import SHORT, LogView
 from .settings_window import SettingsWindow, fill_lang_combo, retranslate_lang_combo, select_data
-from .widgets import LevelBar
+from .widgets import DialogPanel, LevelBar
 from vrc.audio import input_devices, output_devices
 
-GRIP = 6          # px at the window edge that resize it
+GRIP = 6          # px along the top edge and corners that resize the window
 SHADOW_BELOW = 50  # backdrop % under which the letters get a dark shadow instead of a background
+CLICK_THROUGH_BELOW = 30
 WM_NCHITTEST = 0x0084
-HT = {(-1, -1): 13, (0, -1): 12, (1, -1): 14, (-1, 0): 10, (1, 0): 11,
-      (-1, 1): 16, (0, 1): 15, (1, 1): 17}   # HTTOPLEFT, HTTOP, … HTBOTTOMRIGHT
+HT = {(-1, -1): 13, (0, -1): 12, (1, -1): 14}  # HTTOPLEFT, HTTOP, HTTOPRIGHT
 
 
 class TitleBar(QWidget):
@@ -117,6 +117,7 @@ class MainWindow(QWidget):
         self.settings = settings
         self._save = save
         self._dialog: SettingsWindow | None = None
+        self._notice = None
         self._music_dialog = None
         self._music_active = False
         self._music_level = 0.0
@@ -646,16 +647,48 @@ class MainWindow(QWidget):
     def bars_shown(self) -> bool:
         return not self.bars.isHidden()
 
+    def show_update_notice(self) -> None:
+        if self._notice or self.settings.last_update_notice == __version__:
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
+        layout = QVBoxLayout(dialog)
+        for text in (
+            "Below 30% background darkness, empty overlay space lets clicks through. Text and the typing box stay clickable.",
+            "Drag from the top controls. Resize from the top edge or top corners.",
+            "Domain setup and model downloads now open inside Settings and move with it.",
+            "This update notice appears once per version.",
+        ):
+            label = QLabel("• " + tr(text))
+            label.setWordWrap(True)
+            layout.addWidget(label)
+        layout.addStretch(1)
+        panel = self._notice = DialogPanel(dialog, self)
+        self.log.hide()
+        self.input_bar.hide()
+        self.layout().insertWidget(1, panel, 1)
+        self._show_bars(True)
+        def finished(_):
+            self.layout().removeWidget(panel)
+            panel.deleteLater()
+            self._notice = None
+            self.log.show()
+            self.input_bar.setVisible(self.bars_shown())
+        dialog.finished.connect(finished)
+        dialog.show()
+        self.settings.last_update_notice = __version__
+        self._save_settings()
+
     def _show_bars(self, visible: bool) -> None:
         if self.bars_shown() != visible:
             self.bars.setVisible(visible)
-            self.input_bar.setVisible(visible)
+            self.input_bar.setVisible(visible and self._notice is None)
             self.update()
 
     def _check_hover(self) -> None:
         if not self.settings.auto_hide_bars:
             return
-        busy = (QApplication.activePopupWidget() is not None or self.input.hasFocus()
+        busy = (self._notice is not None or QApplication.activePopupWidget() is not None or self.input.hasFocus()
                 or bool(QGuiApplication.mouseButtons()))
         self._show_bars(busy or self.frameGeometry().contains(QCursor.pos()))
 
@@ -664,6 +697,15 @@ class MainWindow(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         bars = self.bars_shown()
         alpha = round(255 * self.settings.backdrop / 100)
+        if self.settings.backdrop < CLICK_THROUGH_BELOW:
+            # Windows passes clicks through alpha-zero pixels, including to other processes.
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(11, 11, 13, max(alpha, 1)))
+            height = self.bars.geometry().bottom() + 1 if bars else GRIP
+            painter.drawRect(QRectF(0, 0, self.width(), height))
+            if self.input_bar.isVisible():
+                painter.drawRoundedRect(QRectF(self.input_bar.geometry()), 9, 9)
+            return
         if bars:
             alpha = max(alpha, 1)   # alpha 0 lets clicks fall through to the game
         painter.setBrush(QColor(11, 11, 13, alpha))
@@ -714,5 +756,4 @@ class MainWindow(QWidget):
         ctypes.windll.user32.GetWindowRect(msg.hWnd, ctypes.byref(rect))
         grip = max(GRIP * ctypes.windll.user32.GetDpiForWindow(msg.hWnd) // 96, GRIP)
         side = -1 if x < rect.left + grip else (1 if x >= rect.right - grip else 0)
-        level = -1 if y < rect.top + grip else (1 if y >= rect.bottom - grip else 0)
-        return HT.get((side, level), 0)
+        return HT.get((side, -1), 0) if y < rect.top + grip else 0

@@ -136,9 +136,8 @@ def test_settings_shows_cached_status_and_rechecks_saved_changes(health_ui, monk
         assert dialog._service_status["custom"].text() == "Online"
         assert "custom_b" not in dialog._service_status
         result[:] = [False, "timed out"]
-        monkeypatch.setattr("ui.settings_window.ServiceDialog",
-                            lambda *args: SimpleNamespace(exec=lambda: 1))
         dialog.set_up("custom")
+        dialog._panel.dialog.save()
         assert dialog._service_status["custom"].text() == "Checking connection…"
         until(lambda: dialog._service_status["custom"].text() == "Connection issue")
         assert dialog._service_status["custom"].toolTip() == "timed out"
