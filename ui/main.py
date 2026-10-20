@@ -111,6 +111,7 @@ def run(backend: Backend | None = None) -> int:
         app.aboutToQuit.connect(backend.service_health.stop)
     window = MainWindow(backend, config.load())
     window.show()
+    QTimer.singleShot(0, window.show_update_notice)
     if isinstance(backend, LiveBackend):
         QTimer.singleShot(0, backend.service_health.start)
     backend.start()

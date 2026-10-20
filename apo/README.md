@@ -2,7 +2,7 @@
 
 This is the alternative to creating a new virtual microphone: a user-mode Windows Audio Processing Object mixes app music into the existing microphone capture stream. The earlier kernel driver remains in `driver/` for reference; the APO does not use its SYS file or endpoints.
 
-**Working development installation on this PC.** The production DLL is now attached to Virtual Desktop Audio using its legacy capture-effect slot. HyperX QuadCast was previously validated, but VRChat used the headset instead. Live tests measured WAV playback and selected-app audio in headset microphone capture, then verified the tone stopped. The current source and 0.11.9 EXE support both effect slots. Fresh-machine setup, remote VRChat reception, signed public deployment and live Windows 10 validation remain outstanding; never attach the test DLL to Windows.
+**Working development installation on this PC.** The production DLL is now attached to Virtual Desktop Audio using its legacy capture-effect slot. HyperX QuadCast was previously validated, but VRChat used the headset instead. Live tests measured WAV playback and selected-app audio in headset microphone capture, then verified the tone stopped. The current source and 0.11.10 EXE support both effect slots. Fresh-machine setup, remote VRChat reception, signed public deployment and live Windows 10 validation remain outstanding; never attach the test DLL to Windows.
 
 ## Build and inspect
 
@@ -40,7 +40,7 @@ Do not invent a token to make the command connect: only a configured, running AP
 
 ## Application packaging
 
-`tools/build.ps1 -MixerBuild <validated-build-directory>` bundles only the production APO and producer DLL. The 0.11.9 release used `.tools/apo-prototype-10`; archive inspection confirmed matching production DLL hashes and no test DLL. The EXE also passed its component self-check. These checks do not perform a fresh attachment or prove remote VRChat playback.
+`tools/build.ps1 -MixerBuild <validated-build-directory>` bundles only the production APO and producer DLL. The 0.11.10 release used `.tools/apo-prototype-10`; archive inspection confirmed matching production DLL hashes and no test DLL. The EXE also passed its component self-check. These checks do not perform a fresh attachment or prove remote VRChat playback.
 
 `vrc/apo_install.py` finds the selected physical microphone, detects an already validated installation, and launches setup only after the UI's Install consent. Frozen apps dispatch `--mixer-setup` through their own EXE and exchange a report file with the setup helper. Setup requests administrator permission when needed; no separate driver download is used. The native attachment/rollback implementation is `vrc/apo_setup.py` below.
 
@@ -80,6 +80,6 @@ With audio restart enabled, setup first validates the stream-effect attachment. 
 2. Validate signed distribution and protected-content policy. The local unsigned development build loaded without weakening Windows policies; this is not a guarantee of universal unsigned deployment.
 3. Test hot unplug, default-device changes, long playback, physical mute and bypass modes. Stop/crash fallbacks and registry rollback have automated tests; field behavior still needs broader coverage.
 4. Decide how the translator's recognition should handle injected music, which can reach multiple microphone clients.
-5. Validate fresh-PC installation and mixer upgrades through the bundled helper; provide a packaged removal flow. Current removal is the source `apo/remove_mixer.bat` helper. The [0.11.9 EXE/ZIP](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.9) are published on GitHub; the EXE is not code-signed.
+5. Validate fresh-PC installation and mixer upgrades through the bundled helper; provide a packaged removal flow. Current removal is the source `apo/remove_mixer.bat` helper. The [0.11.10 EXE/ZIP](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.10) are published on GitHub; the EXE is not code-signed.
 
 Microsoft references: [implementing APOs](https://learn.microsoft.com/en-us/windows-hardware/drivers/audio/implementing-audio-processing-objects), [APO architecture](https://learn.microsoft.com/en-us/windows-hardware/drivers/audio/audio-processing-object-architecture), [Windows 10/11 deployment](https://learn.microsoft.com/en-us/windows-hardware/drivers/dashboard/deploying-audio-processing-objects). This is our implementation; no Soundpad binaries or proprietary code are used.

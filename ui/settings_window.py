@@ -27,7 +27,7 @@ try:
 except ImportError:      # numpy missing: no microphone list, only the Windows default
     def input_devices() -> list[str]:
         return []
-from .widgets import Switch
+from .widgets import DialogPanel, Switch
 
 LOCAL_MODEL = "Local Model (this PC)"
 LOCAL_NOTE = "Choose a hearing or translation model to download and run on this PC. No API key is needed."
@@ -99,6 +99,7 @@ class SettingsWindow(QDialog):
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
         self.settings = settings
+        self._panel = None
         self._service_health = getattr(getattr(parent, "backend", None), "service_health", None)
         if self._service_health:
             self._service_health.changed.connect(self.show_service_status)
@@ -172,7 +173,7 @@ class SettingsWindow(QDialog):
         self._page("Appearance", [
             ("Message text size", "Size of the text in the chat log.",
              self._slider("font_px", FONT_RANGE, "")),
-            ("Background darkness", "100% is a solid panel. 0% leaves only the text over the game.",
+            ("Background darkness", "Below 30%, empty space lets clicks through. Text and top controls stay clickable.",
              self._slider("backdrop", BACKDROP_RANGE, "%")),
             ("Always on top", "Keeps the window above the game. Needs VRChat in windowed or "
                               "borderless mode.", self._switch("always_on_top")),
@@ -489,11 +490,37 @@ class SettingsWindow(QDialog):
 
     def add_domain(self) -> None:
         service = "custom_" + uuid.uuid4().hex
-        if ServiceDialog(service, self).exec():
+        def saved():
             self._refresh_domains()
             if self._service_health:
                 self._service_health.check(service)
             self.changed.emit()
+        self._open_panel(ServiceDialog(service, self), saved)
+
+    def _open_panel(self, dialog, accepted=None) -> None:
+        if self._panel:
+            self._panel.dialog.reject()
+        previous = self.pages.currentWidget()
+        panel = self._panel = DialogPanel(dialog, self.pages)
+        self.pages.addWidget(panel)
+        self.pages.setCurrentWidget(panel)
+        self.nav.setEnabled(False)
+        def finished(result):
+            self.pages.setCurrentWidget(previous)
+            self.pages.removeWidget(panel)
+            self._panel = None
+            self.nav.setEnabled(True)
+            panel.deleteLater()
+            if result == QDialog.Accepted and accepted:
+                accepted()
+        dialog.finished.connect(finished)
+        dialog.show()
+        dialog.setFocus()
+
+    def done(self, result):
+        if self._panel:
+            self._panel.dialog.reject()
+        super().done(result)
 
     def remove_domain(self, service: str) -> None:
         if service == "custom":
@@ -523,13 +550,14 @@ class SettingsWindow(QDialog):
             self._sync_model_controls()
 
     def set_up(self, service: str) -> None:
-        if ServiceDialog(service, self).exec():
+        def saved():
             self._refresh_domains()
             if self._service_health:
                 self._service_health.check(service)
             self.show_service_status(service)
             self._update_model_labels()
             self.changed.emit()      # the status line may now have something else to say
+        self._open_panel(ServiceDialog(service, self), saved)
 
     def _local_row(self) -> QWidget:
         """The Local Model is no service, but it is set up in the same place: "Ready", "Not
@@ -555,7 +583,7 @@ class SettingsWindow(QDialog):
     def set_up_local(self, role="hearing") -> None:
         dialog = LocalModelDialog(self, role=role)
         dialog.selected.connect(self._activate_local)
-        dialog.exec()
+        self._open_panel(dialog)
 
     def _activate_local(self, model: str) -> None:
         role = local_model.MODELS[model][1]  # The setup dialog has saved the choice.
