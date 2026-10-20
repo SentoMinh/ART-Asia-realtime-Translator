@@ -1048,6 +1048,25 @@ def test_only_top_edge_and_top_corners_resize(window, monkeypatch, dpi):
     assert hit(-500, -600 + 6 * dpi // 96) == 0
 
 
+@pytest.mark.parametrize("opacity", [0, 29, 30, 85])
+def test_top_resize_grip_changes_both_dimensions(window, opacity):
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+    window.settings.backdrop = opacity
+    window.settings_changed()
+    window.show()
+    QApplication.processEvents()
+    grip = window.resize_grip
+    assert grip.isVisible() and window.bars.isAncestorOf(grip)
+    before = window.size()
+    start = grip.rect().center()
+    QTest.mousePress(grip, Qt.LeftButton, pos=start)
+    QTest.mouseMove(grip, start + QPoint(50, -40))
+    QTest.mouseRelease(grip, Qt.LeftButton, pos=start + QPoint(50, -40))
+    assert window.width() > before.width() and window.height() > before.height()
+    window.hide()
+
+
 def test_the_program_icon_loads(app):
     from ui.main import ICON_FILE, program_icon
     assert ICON_FILE.exists() and ICON_FILE.with_suffix(".ico").exists()
@@ -1267,3 +1286,63 @@ def test_update_notice_shows_once_per_version_and_stays_inside_window(window, tm
     window.show_update_notice()
     assert window._notice is not None and config.load(path).last_update_notice == "99.0.0"
     window._notice.dialog.reject()
+
+
+@pytest.mark.parametrize("origin", [None, (100, 200)])
+def test_move_to_vrchat_failure_keeps_position_and_reports_problem(window, monkeypatch, origin):
+    import ctypes
+    from types import SimpleNamespace
+    from tests.test_vrchat_window import Call
+    import ui.main_window as module
+    monkeypatch.setattr(module, "vrchat_window_origin", lambda: origin)
+    calls = []
+    monkeypatch.setattr(module.QToolTip, "showText", lambda *args: calls.append(args[1]))
+    monkeypatch.setattr(ctypes, "windll", SimpleNamespace(user32=SimpleNamespace(SetWindowPos=Call(lambda *args: 0))))
+    before = window.pos()
+    window.dock_button.click()
+    assert window.pos() == before and len(calls) == 1
+    assert ("not found" if origin is None else "Could not move") in calls[0]
+
+
+def test_move_to_vrchat_uses_native_screen_coordinates_and_saves_position(window, monkeypatch):
+    import ctypes
+    from types import SimpleNamespace
+    from tests.test_vrchat_window import Call
+    import ui.main_window as module
+    monkeypatch.setattr(module, "vrchat_window_origin", lambda: (-1400, 120))
+    calls = []
+    def place(hwnd, after, x, y, width, height, flags):
+        calls.append((x, y, width, height, flags))
+        window.move(x, y)
+        return 1
+    monkeypatch.setattr(ctypes, "windll", SimpleNamespace(user32=SimpleNamespace(SetWindowPos=Call(place))))
+    before = window.size()
+    window.dock_button.click()
+    assert calls == [(-1400, 120, 0, 0, 0x0015)]
+    assert window.size() == before
+    assert (window.saved[-1].x, window.saved[-1].y) == (-1400, 120)
+
+
+@pytest.mark.parametrize("entry", ["settings", "download_prompt"])
+def test_local_download_panel_has_one_scroll_area_and_one_close_button(window, entry):
+    from PySide6.QtWidgets import QScrollArea
+    if entry == "download_prompt":
+        window._open_local_model_download()
+        settings = window._dialog
+    else:
+        settings = SettingsWindow(window.settings, window)
+        settings.show()
+        settings.set_up_local()
+    settings.resize(680, 470)
+    QApplication.processEvents()
+    panel = settings._panel
+    assert len(panel.findChildren(QScrollArea)) == 1
+    closes = [button for button in panel.findChildren(QPushButton)
+              if button.text() == "Close" and button.isVisible()]
+    assert len(closes) == 1
+    scroll = panel.findChild(QScrollArea)
+    scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
+    QApplication.processEvents()
+    assert closes[0].isVisible() and panel.rect().contains(closes[0].geometry())
+    assert not panel.dialog.isWindow()
+    settings.close()

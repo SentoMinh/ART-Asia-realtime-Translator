@@ -18,12 +18,12 @@ Read `CODEBASE.md` for the architecture, export status, test baseline and remain
 - `app.py`: packaged entry point and self-check; `ui/main.py`: GUI startup.
 - `ui/backend.py`: `Backend`, `Status`, `Utterance` contracts. Re-emit the same utterance ID to update an existing row.
 - `ui/live_backend.py`: capture lifecycle, typed translation, chatbox queue and typing dots.
-- `vrc/audio.py`, `vrc/chatbox.py`: Windows capture and OSC integration.
+- `vrc/audio.py`, `vrc/chatbox.py`: Windows capture, OSC integration and visible VRChat-window discovery for the header positioning button.
 - `engine/vad.py`, `engine/speech.py`: segmentation, recognition scheduling, translation and routing.
 - `engine/stt.py`: cloud/local recognition through `load()` and `transcribe()` returning `Heard`.
 - `engine/services.py`: service registry, configuration, request helpers and per-domain model catalogs bound to URL/key fingerprints.
-- `ui/widgets.py`: `DialogPanel` embeds setup/download forms; preserve cancellation, navigation restoration and shared downloads.
-- `ui/main_window.py`: below 30%, alpha-zero blank space passes clicks through; text/input/top controls stay interactive. Only the top edge/corners resize. The embedded update notice uses `Settings.last_update_notice` and must have current release text.
+- `ui/widgets.py`: `DialogPanel` embeds setup/download forms; preserve cancellation, navigation restoration and shared downloads. Keep the model list to one scroll area and one Close button.
+- `ui/main_window.py`: below 30%, alpha-zero blank space passes clicks through; text/input/top controls stay interactive. Use the visible top `QSizeGrip` to resize; only the top edge/corners also accept native edge resizing. The embedded update notice uses `Settings.last_update_notice` and must have current release text.
 - `ui/settings_window.py`: API setup with Fetch models; Connect beside each domain; visible model dropdown arrows below Hearing/Translating. Selections save immediately; manual model entry remains available.
 - `ui/service_health.py`: silent startup/API checks, 30-second deadline, Settings status and stale-result handling. Do not reintroduce the startup popup.
 - `engine/translators.py`, `vrc/translate.py`: provider adapters, add-ons, fallback chain and shared prompts.
@@ -50,6 +50,6 @@ Read `CODEBASE.md` for the architecture, export status, test baseline and remain
 - UI snapshots: `.venv-app\Scripts\python.exe tools\snapshot_ui.py <output-folder>`.
 - Packaged check: `VRChat-Translator.exe --selfcheck`; it can probe devices/network. `--get-local-model` additionally permits a large model download.
 - Unit-test success is separate from live VRChat, GPU, service and packaged-build validation.
-- Version 0.11.10 passed 411 tests, packaged self-checks, runtime/native-DLL checks, source/artifact scans and ZIP/checksum checks. The GitHub download and packaged upgrade from 0.11.9 to 0.11.10 were verified. Live Windows 10 and fresh-machine mixer installation remain outstanding; selected-app music currently requires Windows 11.
+- Version 0.11.10 passed 422 tests, packaged self-checks, runtime/native-DLL checks, source/artifact scans and ZIP/checksum checks. The GitHub download and packaged upgrade from 0.11.9 to 0.11.10 were verified. Live Windows 10 and fresh-machine mixer installation remain outstanding; selected-app music currently requires Windows 11.
 - Provider credentials belong in the existing AppData configuration, not source files or test fixtures.
 - Source updates and packaged updates live in `tools/update.py` and `ui/updater.py`. Releases belong in `SentoMinh/ART-Asia-realtime-Translator`.

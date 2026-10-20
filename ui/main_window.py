@@ -10,7 +10,7 @@ from PySide6.QtCore import QEvent, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QColor, QCursor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGraphicsDropShadowEffect,
                                QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton,
-                               QToolButton, QVBoxLayout, QWidget)
+                               QToolButton, QToolTip, QVBoxLayout, QWidget)
 
 from engine import local_model
 
@@ -20,8 +20,9 @@ from .config import Settings
 from .i18n import tr
 from .log_view import SHORT, LogView
 from .settings_window import SettingsWindow, fill_lang_combo, retranslate_lang_combo, select_data
-from .widgets import DialogPanel, LevelBar
+from .widgets import DialogPanel, LevelBar, ResizeGrip
 from vrc.audio import input_devices, output_devices
+from vrc.chatbox import vrchat_window_origin
 
 GRIP = 6          # px along the top edge and corners that resize the window
 SHADOW_BELOW = 50  # backdrop % under which the letters get a dark shadow instead of a background
@@ -224,6 +225,8 @@ class MainWindow(QWidget):
         self.pin_button = self._button("pin", "", lambda: self._flip("always_on_top"))
         row.addWidget(self.dot)
         row.addWidget(self.status)
+        self.dock_button = self._button("dock", "Move to VRChat's top-left corner", self.move_to_vrchat)
+        row.addWidget(self.dock_button)
         row.addWidget(self.music_button)
         row.addSpacing(8)
         row.addWidget(self.mic_device_button)
@@ -241,6 +244,11 @@ class MainWindow(QWidget):
         row.addWidget(self.ui_lang_button)
         row.addWidget(self.pin_button)
         row.addWidget(self._button("gear", "Settings", self.open_settings))
+        self.resize_grip = ResizeGrip(bar)
+        self.resize_grip.setFixedSize(24, 24)
+        self.resize_grip.setAccessibleName(tr("Resize window"))
+        self._tips.append((self.resize_grip, "Drag to resize the window"))
+        row.addWidget(self.resize_grip)
         row.addWidget(self._button("min", "Minimise", self.showMinimized))
         row.addWidget(self._button("max", "Maximise", self.toggle_maximized))
         row.addWidget(self._button("close", "Close", self.close, "close"))
@@ -503,10 +511,8 @@ class MainWindow(QWidget):
             self._dialog.sync()
 
     def _open_local_model_download(self) -> None:
-        from .settings_window import LocalModelDialog
-        dialog = LocalModelDialog(self)
-        dialog.selected.connect(self._activate_local)
-        dialog.show()
+        self._open_settings_models()
+        self._dialog.set_up_local()
 
     def _open_settings_models(self, page_name: str = "Models") -> None:
         self.open_settings()
@@ -655,8 +661,9 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(dialog)
         for text in (
             "Below 30% background darkness, empty overlay space lets clicks through. Text and the typing box stay clickable.",
-            "Drag from the top controls. Resize from the top edge or top corners.",
+            "Drag from the top controls. Use the resize grip beside Settings to resize the window.",
             "Domain setup and model downloads now open inside Settings and move with it.",
+            "Use the button beside VRChat to move the translator to the game's top-left corner.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))
@@ -713,6 +720,25 @@ class MainWindow(QWidget):
         painter.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 10, 10)
 
     # ---- window ---------------------------------------------------------
+
+    def move_to_vrchat(self) -> None:
+        origin = vrchat_window_origin()
+        if origin is None:
+            QToolTip.showText(self.dock_button.mapToGlobal(self.dock_button.rect().bottomLeft()),
+                             tr("VRChat window not found. Open or restore VRChat first."), self.dock_button)
+            return
+        if self.isMaximized():
+            self.showNormal()
+        user = ctypes.windll.user32
+        user.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                      ctypes.c_int, ctypes.c_int, wintypes.UINT]
+        # Native coordinates keep placement correct across monitors with different DPI.
+        if not user.SetWindowPos(int(self.winId()), None, *origin, 0, 0, 0x0015):
+            QToolTip.showText(self.dock_button.mapToGlobal(self.dock_button.rect().bottomLeft()),
+                             tr("Could not move the translator window."), self.dock_button)
+            return
+        self.settings.x, self.settings.y = self.x(), self.y()
+        self._save_settings()
 
     def _place(self) -> None:
         s = self.settings
