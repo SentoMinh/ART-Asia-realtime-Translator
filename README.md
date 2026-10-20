@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **0.11.9**. Enter your API URL and key under **Custom domain**, or choose local models.
+Published version **[0.11.9](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.9)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
@@ -17,10 +17,10 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Use a published ZIP or EXE, when available, downloaded from [Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.11.9](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.9). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
-4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Pick a model below each Hearing and Translating domain selector; use **Connect** beside the selector to check the API.
+4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
 5. Open **Settings → Sound → Microphone** and pick the microphone you use in VRChat.
 
 VRChat has to run in windowed or borderless mode for the window to stay on top of it.
@@ -85,7 +85,7 @@ Xin chào, bạn khỏe không?
 こんにちは、お元気ですか？
 ```
 
-The second target is also available in **Settings → Translation → Second language**. Auto-detect remains available for the first target; if it resolves to the second target, only one translation is requested. Empty or identical text is omitted. If one translation fails, the original and successful translation still send, with an error in the app. Long messages share the [144-character OSC budget](https://docs.vrchat.com/docs/osc-as-input-controller#chatbox) across the lines. **Add my own words** controls original text for typed messages; microphone messages always include it. This change is not yet included in the 0.11.5 exports.
+The second target is also available in **Settings → Translation → Second language**. Auto-detect remains available for the first target; if it resolves to the second target, only one translation is requested. Empty or identical text is omitted. If one translation fails, the original and successful translation still send, with an error in the app. Long messages share the [144-character OSC budget](https://docs.vrchat.com/docs/osc-as-input-controller#chatbox) across the lines. **Add my own words** controls original text for typed messages; microphone messages always include it.
 
 In **Settings → Translation**, turn on **Add Speaker words** to also send other players' speech to your own VRChat OSC chatbox as `translation (original)`. It uses the translation into **I speak**, independently of **Add my own words** and the Send language. The switch is off by default. Long messages shorten both parts as needed; turning it off also stops speaker messages waiting to be sent.
 
@@ -97,7 +97,7 @@ Existing saved API settings are retained where recoverable. If an older installa
 
 ## Files it keeps
 
-- `%APPDATA%\VRChat-Translator\ui.json` — settings; `models.json` — keys and chosen models in plain text under your Windows profile. The app does not encrypt them or apply a separate file ACL.
+- `%APPDATA%\VRChat-Translator\ui.json` — settings; `models.json` — API addresses, keys, chosen models and fetched model lists in plain text under your Windows profile. The app does not encrypt them or apply a separate file ACL.
 - `%APPDATA%\VRChat-Translator\addons\` — empty unless you add your own translator (below).
 - `%LOCALAPPDATA%\VRChat-Translator\engine.log` — every sentence heard, its language, the translation and the delay. Look here first when nothing appears.
 - `%LOCALAPPDATA%\VRChat-Translator\local-model\` — downloaded local model files; size depends on your choices. Deleting the folder frees the space; the program offers the downloads again.
@@ -123,9 +123,9 @@ run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
 - Build the one-file program: `pwsh -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10` (use your validated native build directory; see [APO build instructions](apo/README.md)). `-Folder` builds a folder and ZIP. Without `-MixerBuild`, native mixer DLLs are not explicitly included by the build command.
 - Check a build: `VRChat-Translator.exe --selfcheck` writes `%LOCALAPPDATA%\VRChat-Translator\selfcheck.txt`
 
-Source validation for 0.11.9: **400 tests passed**, plus actual CPU inference with SenseVoice on a sample recording and NLLB translating English to Vietnamese. The EXE includes the local runtimes and microphone mixer. Whisper large-v3 has not been tested with downloaded weights on a GPU.
+Release validation for 0.11.9: **400 tests passed**, including clicking both model dropdown arrows and choosing models. The EXE passed its packaged self-check, bundled-runtime and native-DLL checks, source/artifact scans, ZIP checks and SHA-256 verification. The GitHub download, replacement and restart from 0.11.8 to 0.11.9 were verified, followed by a no-update check on the current version.
 
-Historical 0.11.5 checks covered automated tests, packaged self-checks, source/bundled-code privacy scans, and ZIP/checksum verification. A new package must be verified separately. These checks do not establish fresh-PC installation, live Windows 10 behavior or Japanese/Korean recognition accuracy with real services.
+Earlier source checks ran SenseVoice on a sample recording and NLLB translating English to Vietnamese. Fresh-PC installation, live Windows 10 behavior, Whisper large-v3 GPU inference and Japanese/Korean recognition accuracy with real services remain unverified. These checks were not repeated for the dropdown change.
 
 ## Layout
 

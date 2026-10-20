@@ -14,14 +14,14 @@ Source commits, local builds and published releases are separate steps. Keep pre
 
 Source version 0.11.9 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
 
-Existing 0.11.5 exports and reports are historical artifacts. This source update does not rebuild or publish them. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL.
+Version [0.11.9](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.9) is published with an EXE, ZIP, installer helper, usage notes and checksums. Its release tag points to source commit `ef75fdb`; later documentation commits do not change the published binary. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL.
 
 ## Current behavior
 
 - Voice translation uses **I speak / They speak**. Typed messages use the independent **Send** language. Japanese and Korean participate in auto-detection and translation instead of announcement-only handling. `LANGS`, recognition language lists and translation target names must stay aligned.
 - **Add Speaker words** optionally sends other players' translated and original text to the OSC chatbox. It is independent of the microphone's original-text option.
 - The header shows **VRChat** plus a light, with details on hover. Device arrows select microphone and subtitle audio. Header labels/meters support dragging with native movement and a manual fallback.
-- **Custom domain** setup saves API credentials and the fetched model catalog. Hearing and Translating each have a Connect button beside the domain selector and a model picker underneath; selections save immediately. Catalogs are bound to each domain’s URL and key fingerprint. Entering a URL and key triggers debounced discovery; model-list workers use captured inputs and UI polling, ignoring obsolete results. Settings displays the model currently in use.
+- **Custom domain** setup saves API credentials and the fetched model catalog. Hearing and Translating each have a Connect button beside the domain selector and a model picker underneath. Each picker has a visible down-arrow action that opens its dropdown; selections save immediately and manual model entry remains available. Catalogs are bound to each domain’s URL and key fingerprint. Entering a URL and key triggers debounced discovery; model-list workers use captured inputs and UI polling, ignoring obsolete results. Settings displays the model currently in use.
 - `ui/service_health.py` checks configured APIs silently on normal startup and after saved provider changes. It reports Checking connection / Online / Connection issue in Settings, with a 30-second deadline and stale-result protection. There is no startup popup. Checks use model-list/auth endpoints, not inference; custom 404 responses are reported as connection issues.
 - The music dialog uses a physical-microphone APO, one app-source picker with reload, volume, source meter and one Play/Stop button. Play validates before audio starts; success messages and the separate internal-test button were removed. Missing setup asks for consent, then uses the bundled installer helper with UAC if required. See [MUSIC_SETUP.md](MUSIC_SETUP.md).
 
@@ -55,7 +55,7 @@ Audio callbacks only enqueue samples. A cutting thread segments them, a hearing 
 | Local translation | `engine/local_inference.py`: shared CPU `LocalTranslator`, NLLB language tokens | `test_local_choices.py` |
 | Provider definitions, keys, models, HTTP errors | `engine/services.py` | `test_engine.py`, `test_ui.py` |
 | Startup/provider connection checks | `ui/service_health.py`, `ui/main.py`, `SettingsWindow` | `test_service_health.py` |
-| Model discovery and current-model labels | `ServiceDialog`, `SettingsWindow`, `engine/services.py` | `test_model_controls.py`, `test_ui.py` |
+| Model discovery, dropdown selection and current-model labels | `ServiceDialog`, `SettingsWindow`, `engine/services.py` | `test_model_controls.py`, `test_ui.py` |
 | Translation prompts and fallback | `vrc/translate.py`, `engine/translators.py` | `test_engine.py`, `test_chatbox.py` |
 | Speech scheduling and routing | `engine/speech.py` | `test_engine.py`, `test_typing.py` |
 | OSC, message limits, send queue, typing dots | `vrc/chatbox.py`, `ui/live_backend.py` | `test_chatbox.py`, `test_typing.py` |
@@ -84,9 +84,9 @@ These are code-review observations, not newly reproduced live failures. This doc
 
 ## Validation and commands
 
-Source version 0.11.9 passed **400 tests**, plus actual SenseVoice and NLLB CPU inference checks. Packaged self-checks cover the bundled runtimes and microphone mixer. Whisper large-v3 has not been run with downloaded weights on a GPU.
+Version 0.11.9 passed **400 tests**, including mouse clicks on both dropdown arrows and model selection persistence. Packaged checks verified the self-check, bundled runtimes, production mixer DLL hashes, committed-source match, source/artifact scans, ZIP integrity and uploaded asset checksums.
 
-Historical 0.11.5 package validation covered tests, packaged self-checks, Japanese/Korean language tables, native DLL hashes, privacy scans and ZIP checksums. Run tests and packaged checks again for each new release.
+The GitHub download and packaged replacement/restart from 0.11.8 to 0.11.9 passed, as did the new-version self-check and no-update check. Earlier source checks exercised SenseVoice and NLLB CPU inference; they were not rerun for this UI fix. Whisper large-v3 GPU inference remains untested. Verify each new binary separately.
 
 Prior live tests verified the development HyperX QuadCast APO attachment and selected-app injection on this Windows 11 PC. Fresh-PC installation, live Windows 10 behavior, other microphones and signed public deployment remain unverified. Japanese/Korean routing tests use fake services; there is no new live recognition benchmark for them.
 
@@ -96,4 +96,4 @@ Prior live tests verified the development HyperX QuadCast APO attachment and sel
 - Quality evaluation: `bench/README.md`, `BENCHMARK.md` and `bench/results/`. Benchmark adapters are experiments, not a second production engine. Their environments and real service calls are separate from unit tests.
 - Build assets are explicitly selected in `tools/build.ps1`; personal provider configuration is never bundled.
 
-Ask before each new export, as requested by the user. A local export does not authorize publication or imply that the working tree has been committed. Preserve existing exports and unrelated working-tree edits.
+Follow the user’s current authorization for commits, builds and GitHub publication; clarify only when the requested scope is unclear. Preserve existing release artifacts and unrelated working-tree edits. A documentation-only commit does not require rebuilding the EXE or moving its release tag.

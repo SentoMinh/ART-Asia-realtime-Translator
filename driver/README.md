@@ -1,6 +1,6 @@
 # VRChat Translator virtual microphone — development source
 
-**Historical prototype, unused by the current app.** Version 0.11.5 uses the physical-microphone [APO mixer](../apo/README.md) and bundled setup described in [MUSIC_SETUP.md](../MUSIC_SETUP.md). This directory is retained for reference; its kernel driver is not included in the current exports.
+**Historical prototype, unused by the current app.** The current app uses the physical-microphone [APO mixer](../apo/README.md) and bundled setup described in [MUSIC_SETUP.md](../MUSIC_SETUP.md). This directory is retained for reference; its kernel driver is not included in the current exports.
 
 This earlier design replaced the third-party cable proposal. Its intended path was:
 
