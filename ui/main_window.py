@@ -19,6 +19,7 @@ from .backend import AUTO, LANGS, PICK_LANGS, Backend, Status, Utterance
 from .config import Settings
 from .i18n import tr
 from .log_view import SHORT, LogView
+from .overlay_backdrop import CLICK_THROUGH_BELOW, OverlayBackdrop
 from .settings_window import SettingsWindow, fill_lang_combo, retranslate_lang_combo, select_data
 from .widgets import DialogPanel, LevelBar, ResizeGrip
 from vrc.audio import input_devices, output_devices
@@ -26,7 +27,6 @@ from vrc.chatbox import vrchat_window_origin
 
 GRIP = 6          # px along the top edge and corners that resize the window
 SHADOW_BELOW = 50  # backdrop % under which the letters get a dark shadow instead of a background
-CLICK_THROUGH_BELOW = 30
 WM_NCHITTEST = 0x0084
 HT = {(-1, -1): 13, (0, -1): 12, (1, -1): 14}  # HTTOPLEFT, HTTOP, HTTOPRIGHT
 
@@ -168,6 +168,7 @@ class MainWindow(QWidget):
         self._apply()
         backend.apply_settings(settings)
         self._refresh_send_target()
+        self._backdrop = OverlayBackdrop(self)
 
     # ---- building -------------------------------------------------------
 
@@ -640,6 +641,8 @@ class MainWindow(QWidget):
                 self.show()   # changing the flag hides the window
         if not s.auto_hide_bars:
             self._show_bars(True)
+        if hasattr(self, "_backdrop"):
+            self._backdrop.sync()
         self.update()
 
     @staticmethod
@@ -660,10 +663,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Below 30% background darkness, empty overlay space lets clicks through. Text and the typing box stay clickable.",
+            "Background darkness now fades smoothly across 30%. Below 30%, blank space still lets clicks through.",
             "Drag from the top controls. Use the resize grip beside Settings to resize the window.",
-            "Domain setup and model downloads now open inside Settings and move with it.",
-            "Use the button beside VRChat to move the translator to the game's top-left corner.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))
@@ -707,7 +708,8 @@ class MainWindow(QWidget):
         if self.settings.backdrop < CLICK_THROUGH_BELOW:
             # Windows passes clicks through alpha-zero pixels, including to other processes.
             painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor(11, 11, 13, max(alpha, 1)))
+            # Darkness is painted behind this surface; alpha 1 keeps controls interactive.
+            painter.setBrush(QColor(11, 11, 13, 1))
             height = self.bars.geometry().bottom() + 1 if bars else GRIP
             painter.drawRect(QRectF(0, 0, self.width(), height))
             if self.input_bar.isVisible():

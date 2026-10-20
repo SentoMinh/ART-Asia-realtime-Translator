@@ -1,6 +1,6 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.11.10**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.11.11**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 ## What the app does
 
@@ -12,7 +12,7 @@ It is an always-on-top desktop window. Live audio is a mix of the other players:
 
 Source commits, local builds and published releases are separate steps. Keep previous build artifacts when preparing a new release.
 
-Source version 0.11.10 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
+Source version 0.11.11 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
 
 Version [0.11.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.10) is published with an EXE, ZIP, installer helper, usage notes and checksums. Its release tag identifies the built source; later documentation commits do not change the published binary. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL.
 
@@ -22,7 +22,7 @@ Version [0.11.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/rele
 - **Add Speaker words** optionally sends other players' translated and original text to the OSC chatbox. It is independent of the microphone's original-text option.
 - The header shows **VRChat** plus a light, with details on hover. Device arrows select microphone and subtitle audio. Header labels/meters support dragging with native movement and a manual fallback.
 - The header’s Move to VRChat button uses `vrc.chatbox.vrchat_window_origin()` to find the largest visible, non-minimized window belonging to a VRChat process. ClientToScreen/SetWindowPos use native coordinates; the overlay moves without resizing or changing z-order. Hidden/minimized/missing windows leave it in place and show a tooltip.
-- Below 30% background darkness, `MainWindow.paintEvent()` leaves empty pixels at alpha zero so Windows passes input to other applications. Top controls and the typing box retain an interactive background. A visible `QSizeGrip` beside Settings resizes both dimensions; native edge hit testing accepts only the top edge and top corners at every opacity.
+- Below 30% background darkness, `MainWindow.paintEvent()` leaves empty pixels at alpha zero so Windows passes input to other applications. In 0.11.11, `OverlayBackdrop` paints the selected darkness on a separate input-transparent surface directly behind the text, so the body no longer disappears below 30%. It follows overlay position, size and visibility and is disposed with it. Top controls and the typing box retain an interactive background. A visible `QSizeGrip` beside Settings resizes both dimensions; native edge hit testing accepts only the top edge and top corners at every opacity.
 - `DialogPanel` embeds domain setup and local downloads in the Settings page stack, reusing the model list’s own scroll area to avoid nested scrolling. The title and sole Close button stay fixed. Closing a panel restores navigation; closing Settings cancels pending model discovery, while active downloads continue through the shared manager.
 - `ui.main.run()` schedules an embedded update notice after showing the window. `Settings.last_update_notice` records the version when shown; self-checks do not run GUI startup. Update the notice text with each release.
 - **Custom domain** setup saves API credentials and the fetched model catalog. Hearing and Translating each have a Connect button beside the domain selector and a model picker underneath. Each picker has a visible down-arrow action that opens its dropdown; selections save immediately and manual model entry remains available. Catalogs are bound to each domain’s URL and key fingerprint. Entering a URL and key triggers debounced discovery; model-list workers use captured inputs and UI polling, ignoring obsolete results. Settings displays the model currently in use.
@@ -101,3 +101,9 @@ Prior live tests verified the development HyperX QuadCast APO attachment and sel
 - Build assets are explicitly selected in `tools/build.ps1`; personal provider configuration is never bundled.
 
 Follow the user’s current authorization for commits, builds and GitHub publication; clarify only when the requested scope is unclear. Preserve existing release artifacts and unrelated working-tree edits. A documentation-only commit does not require rebuilding the EXE or moving its release tag.
+
+## Next feature discussion
+
+Read [ROADMAP.md](ROADMAP.md). Voice recognition is the priority; speaker identification is deferred. Mention that saved idea when planning future work. Temporary demo previews must be closed after verification.
+
+Source 0.11.11 passed 424 tests. A native Windows check measured the composed body pixels at 0/28/29/30/31% over a separate white window, verified smooth darkness across the threshold, click-through below 30%, text/input interaction, subtitle copy, and background alignment/visibility. Package and upgrade results belong to the corresponding release notes.
