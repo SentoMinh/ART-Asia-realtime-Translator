@@ -583,6 +583,7 @@ class SettingsWindow(QDialog):
     def set_up_local(self, role="hearing") -> None:
         dialog = LocalModelDialog(self, role=role)
         dialog.selected.connect(self._activate_local)
+        dialog.close_button.hide()
         self._open_panel(dialog)
 
     def _activate_local(self, model: str) -> None:
@@ -995,7 +996,7 @@ class LocalModelDialog(QDialog):
         listing.addStretch(1)
         scroll.setWidget(content)
         layout.addWidget(scroll, 1)
-        close = QPushButton(tr("Close"))
+        close = self.close_button = QPushButton(tr("Close"))
         close.setObjectName("plain")
         close.clicked.connect(self.accept)
         layout.addWidget(close, alignment=Qt.AlignRight)

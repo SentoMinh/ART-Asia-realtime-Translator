@@ -4,10 +4,17 @@ from __future__ import annotations
 from PySide6.QtCore import QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (QAbstractButton, QFrame, QHBoxLayout, QLabel,
-                               QPushButton, QScrollArea, QVBoxLayout, QWidget)
+                               QPushButton, QScrollArea, QSizeGrip, QVBoxLayout, QWidget)
 
 from . import theme
 from .i18n import tr
+
+
+class ResizeGrip(QSizeGrip):
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        theme.icon("resize").paint(painter, self.rect().adjusted(3, 3, -3, -3))
 
 
 class DialogPanel(QFrame):
@@ -28,14 +35,17 @@ class DialogPanel(QFrame):
         close.clicked.connect(dialog.reject)
         heading.addWidget(close)
         layout.addLayout(heading)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        dialog.setParent(scroll, Qt.Widget)
+        dialog.setParent(self, Qt.Widget)
         dialog.setAttribute(Qt.WA_DeleteOnClose, False)
         dialog.setMinimumSize(0, 0)
-        scroll.setWidget(dialog)
-        layout.addWidget(scroll, 1)
+        if dialog.findChild(QScrollArea) is not None:
+            layout.addWidget(dialog, 1)
+        else:
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.NoFrame)
+            scroll.setWidget(dialog)
+            layout.addWidget(scroll, 1)
 
 
 class LevelBar(QWidget):

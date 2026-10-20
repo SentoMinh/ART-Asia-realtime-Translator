@@ -8,6 +8,7 @@ from __future__ import annotations
 import ctypes
 import socket
 import struct
+import sys
 import threading
 import time
 from ctypes import wintypes
@@ -97,6 +98,41 @@ def find_vrchat(port: int = PORT) -> VRChatState:
         return VRChatState()
     owners = udp_port_owners(port)
     return VRChatState(running=True, pid=pids[0], listening=any(pid in owners for pid in pids))
+
+
+def vrchat_window_origin() -> tuple[int, int] | None:
+    """Physical screen position of the largest visible VRChat game client area."""
+    if sys.platform != "win32":
+        return None
+    pids = set(process_ids())
+    if not pids:
+        return None
+    user = ctypes.windll.user32
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    user.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+    user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user.IsWindowVisible.argtypes = user.IsIconic.argtypes = [wintypes.HWND]
+    user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+    user.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+    candidates = []
+
+    @callback_type
+    def visit(hwnd, _):
+        pid = wintypes.DWORD()
+        user.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value in pids and user.IsWindowVisible(hwnd) and not user.IsIconic(hwnd):
+            rect, point = wintypes.RECT(), wintypes.POINT()
+            if user.GetClientRect(hwnd, ctypes.byref(rect)) and user.ClientToScreen(hwnd, ctypes.byref(point)):
+                width, height = rect.right - rect.left, rect.bottom - rect.top
+                if width > 0 and height > 0:
+                    candidates.append((width * height, point.x, point.y))
+        return True
+
+    user.EnumWindows(visit, 0)
+    if candidates:
+        _, x, y = max(candidates)
+        return x, y
+    return None
 
 
 # ---- OSC --------------------------------------------------------------------

@@ -57,7 +57,7 @@ Open **Settings → Models → Local Model → Set up…** and choose a model:
 | SenseVoice Small | Hearing | CPU; Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese. |
 | NLLB-200 · CTranslate2 | Translation | CPU, INT8; English, Vietnamese, Chinese, Cantonese, Japanese and Korean. |
 
-The download panel opens inside Settings and moves with it. All models are listed directly, each with a **Download** button, download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. Whisper shares the downloaded NVIDIA cuBLAS library between its two choices.
+The download panel opens inside Settings and moves with it. Its model list has one scrollbar; the title and single Close button stay at the top. All models are listed directly, each with a **Download** button, download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. Whisper shares the downloaded NVIDIA cuBLAS library between its two choices.
 
 Local inference needs no API key. Select Local Model for both Hearing and Translating to run both steps on your PC. The first download needs internet access. Optional translation add-ons retain their existing fallback behavior.
 
@@ -65,6 +65,7 @@ Local inference needs no API key. Select Local Model for both Hearing and Transl
 
 | Part | What it does |
 |---|---|
+| Move to VRChat button | Beside the VRChat label: detects the visible game window and moves the translator to the top-left of its content area. Open or restore VRChat first. This moves once per click and preserves the overlay size. |
 | VRChat + light | Compact status indicator; hover to see connection, OSC and capture details. |
 | Mic / speaker buttons | Turn "my mic → chatbox" and "other players → subtitles" on or off. The bars show the sound level. |
 | Arrows beside mic / speaker | Pick a microphone or subtitle audio source. The subtitle source list starts with VRChat, followed by available output devices. |
@@ -91,7 +92,7 @@ In **Settings → Translation**, turn on **Add Speaker words** to also send othe
 
 Click a line in the chat log to copy what was said (the original text, not the translation).
 
-Drag the top controls, level meters or header labels to move the window. Resize from the top edge or top corners; side and bottom edges do not resize it. Header buttons distinguish clicks from dragging; native window movement has a manual fallback.
+Drag the top controls, level meters or header labels to move the window. Drag the visible resize grip beside Settings to change width and height. The top edge and top corners also resize; side and bottom edges do not. Header buttons distinguish clicks from dragging; native window movement has a manual fallback.
 
 In **Settings → Appearance → Background darkness**, values below **30%** make empty overlay space fully transparent and click-through. Subtitle letters remain clickable for copying, and the typing box and top controls stay usable. At **30%** or above, the full panel accepts clicks again. This was checked against a separate Windows application; live VRChat and Windows 10 behavior still need testing.
 
@@ -125,7 +126,7 @@ run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
 - Build the one-file program: `pwsh -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10` (use your validated native build directory; see [APO build instructions](apo/README.md)). `-Folder` builds a folder and ZIP. Without `-MixerBuild`, native mixer DLLs are not explicitly included by the build command.
 - Check a build: `VRChat-Translator.exe --selfcheck` writes `%LOCALAPPDATA%\VRChat-Translator\selfcheck.txt`
 
-Release validation for 0.11.10: **411 tests passed**, including the 30% click-through threshold, top-only resize edges, embedded setup panels and once-per-version update notices. Windows checks also verified cross-process click-through, retained text/input interaction and subtitle copying. The EXE passed its packaged self-check, bundled-runtime and native-DLL checks, source/artifact scans, ZIP checks and SHA-256 verification. The GitHub download, replacement and restart from 0.11.9 to 0.11.10 were verified, followed by a no-update check on the current version.
+Release validation for 0.11.10: **422 tests passed**, including the 30% click-through threshold, top-only resize edges, embedded setup panels and once-per-version update notices. Windows checks also verified actual mouse-drag resizing with the top grip, cross-process click-through, retained text/input interaction and subtitle copying, and window detection/placement against a separate test application. The EXE passed its packaged self-check, bundled-runtime and native-DLL checks, source/artifact scans, ZIP checks and SHA-256 verification. The GitHub download, replacement and restart from 0.11.9 to 0.11.10 were verified, followed by a no-update check on the current version.
 
 Earlier source checks ran SenseVoice on a sample recording and NLLB translating English to Vietnamese. Fresh-PC installation, live Windows 10 behavior, Whisper large-v3 GPU inference and Japanese/Korean recognition accuracy with real services remain unverified. These inference checks were not repeated for this UI update.
 
