@@ -1027,6 +1027,58 @@ def test_click_through_background_threshold_preserves_header_and_input(window, o
     window.hide()
 
 
+def test_backdrop_preserves_darkness_across_click_through_boundary(window):
+    from PySide6.QtCore import QPoint, Qt
+    window.setStyleSheet(theme.style_sheet())
+    window.show()
+    for opacity in (0, 1, 28, 29, 30, 31, 29, 0):
+        window.settings.backdrop = opacity
+        window.settings_changed()
+        QApplication.processEvents()
+        layer = window._backdrop
+        assert layer.isVisible() == (0 < opacity < 30)
+        if layer.isVisible():
+            assert layer.windowFlags() & Qt.WindowTransparentForInput
+            image = layer.grab().toImage()
+        else:
+            image = window.grab().toImage()
+        point = window.log.mapTo(window, QPoint(window.log.width() // 2, 20))
+        assert image.pixelColor(point * image.devicePixelRatio()).alpha() == round(255 * opacity / 100)
+    window.close()
+
+
+def test_backdrop_follows_geometry_visibility_and_destruction(app):
+    from PySide6.QtCore import QCoreApplication, QEvent, Qt
+    import shiboken6
+    window = MainWindow(Backend(), Settings(), save=lambda _: None)
+    window.settings.backdrop = 29
+    window.show()
+    window.settings_changed()
+    window.move(135, 150)
+    window.resize(675, 490)
+    QApplication.processEvents()
+    layer = window._backdrop
+    assert layer.geometry() == window.geometry()
+    window.showMinimized()
+    QApplication.processEvents()
+    assert not layer.isVisible()
+    window.showNormal()
+    QApplication.processEvents()
+    assert layer.isVisible()
+    window.hide()
+    assert not layer.isVisible()
+    window.show()
+    QApplication.processEvents()
+    assert layer.isVisible()
+    window.close()
+    assert not layer.isVisible()
+    # Deleting a closed overlay must also dispose of its unowned native surface.
+    window.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    assert not shiboken6.isValid(layer)
+
+
 @pytest.mark.parametrize("dpi", [96, 144, 192])
 def test_only_top_edge_and_top_corners_resize(window, monkeypatch, dpi):
     import ctypes

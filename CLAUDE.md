@@ -1,8 +1,10 @@
 # Project context
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes released version 0.11.10; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.11.11 and the preceding release validation; recheck current code before relying on its findings.
 
 ## Scope and existing work
+
+- Read `ROADMAP.md` when planning features: voice recognition is the current priority. Speaker 1 / Speaker 2 identification is deferred; remind the user when discussing future work. Close temporary demo previews after verification.
 
 - This is a Windows VRChat desktop translator written in Python 3.12 with PySide6.
 - Build on the existing implementation. Locate the relevant module and tests before adding a new abstraction or feature.
@@ -23,7 +25,7 @@ Read `CODEBASE.md` for the architecture, export status, test baseline and remain
 - `engine/stt.py`: cloud/local recognition through `load()` and `transcribe()` returning `Heard`.
 - `engine/services.py`: service registry, configuration, request helpers and per-domain model catalogs bound to URL/key fingerprints.
 - `ui/widgets.py`: `DialogPanel` embeds setup/download forms; preserve cancellation, navigation restoration and shared downloads. Keep the model list to one scroll area and one Close button.
-- `ui/main_window.py`: below 30%, alpha-zero blank space passes clicks through; text/input/top controls stay interactive. Use the visible top `QSizeGrip` to resize; only the top edge/corners also accept native edge resizing. The embedded update notice uses `Settings.last_update_notice` and must have current release text.
+- `ui/main_window.py`: below 30%, alpha-zero blank space passes clicks through; text/input/top controls stay interactive. `ui/overlay_backdrop.py` preserves the selected darkness on an input-transparent surface behind the text; keep its geometry, stacking and lifetime aligned with the overlay. Use the visible top `QSizeGrip` to resize; only the top edge/corners also accept native edge resizing. The embedded update notice uses `Settings.last_update_notice` and must have current release text.
 - `ui/settings_window.py`: API setup with Fetch models; Connect beside each domain; visible model dropdown arrows below Hearing/Translating. Selections save immediately; manual model entry remains available.
 - `ui/service_health.py`: silent startup/API checks, 30-second deadline, Settings status and stale-result handling. Do not reintroduce the startup popup.
 - `engine/translators.py`, `vrc/translate.py`: provider adapters, add-ons, fallback chain and shared prompts.
