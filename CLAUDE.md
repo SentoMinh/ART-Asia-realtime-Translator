@@ -1,16 +1,16 @@
 # Project context
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.11.6; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes released version 0.11.9; recheck current code before relying on its findings.
 
 ## Scope and existing work
 
 - This is a Windows VRChat desktop translator written in Python 3.12 with PySide6.
 - Build on the existing implementation. Locate the relevant module and tests before adding a new abstraction or feature.
 - `F:\Code\vrchat-translator` is a sibling reference copy. Compare it before porting work; do not synchronize folders automatically.
-- Both folders contained uncommitted changes during onboarding, including local-model downloads. Preserve unrelated edits and untracked work.
+- Check both working trees before synchronizing; earlier onboarding found uncommitted local-model changes. Preserve unrelated edits and untracked work.
 - Both copies share AppData settings, provider keys, logs and the local-model cache. Use temporary paths/fakes for checks that change state.
-- Source version 0.11.6 has one app and one build. Earlier local artifacts under `dist/0.11.5/` are historical and are not rebuilt by a source commit.
-- Ask the user before each new export. Use a new version directory; preserve previous exports. Exporting does not imply GitHub publication or source synchronization.
+- Version 0.11.9 has one app and one build. Its EXE/ZIP are published on GitHub, built from release source commit `ef75fdb`. Preserve artifacts under `dist/<version>/`; a source or documentation commit does not rebuild them.
+- Follow the user’s current authorization for commits, builds and publication. Use a new version directory for a new binary; preserve prior artifacts. Clarify scope only when authorization is missing or unclear.
 - Synchronize source through reviewed changes and privacy checks. Preserve unrelated local artifacts in destination checkouts.
 
 ## Architecture and conventions
@@ -21,7 +21,8 @@ Read `CODEBASE.md` for the architecture, export status, test baseline and remain
 - `vrc/audio.py`, `vrc/chatbox.py`: Windows capture and OSC integration.
 - `engine/vad.py`, `engine/speech.py`: segmentation, recognition scheduling, translation and routing.
 - `engine/stt.py`: cloud/local recognition through `load()` and `transcribe()` returning `Heard`.
-- `engine/services.py`: service registry, configuration, request helpers and model discovery.
+- `engine/services.py`: service registry, configuration, request helpers and per-domain model catalogs bound to URL/key fingerprints.
+- `ui/settings_window.py`: API setup with Fetch models; Connect beside each domain; visible model dropdown arrows below Hearing/Translating. Selections save immediately; manual model entry remains available.
 - `ui/service_health.py`: silent startup/API checks, 30-second deadline, Settings status and stale-result handling. Do not reintroduce the startup popup.
 - `engine/translators.py`, `vrc/translate.py`: provider adapters, add-ons, fallback chain and shared prompts.
 - `engine/local_model.py`, `ui/local_download.py`: verified/resumable downloads and Qt progress signals.
@@ -47,6 +48,6 @@ Read `CODEBASE.md` for the architecture, export status, test baseline and remain
 - UI snapshots: `.venv-app\Scripts\python.exe tools\snapshot_ui.py <output-folder>`.
 - Packaged check: `VRChat-Translator.exe --selfcheck`; it can probe devices/network. `--get-local-model` additionally permits a large model download.
 - Unit-test success is separate from live VRChat, GPU, service and packaged-build validation.
-- Historical package validation covered tests, packaged self-checks, privacy scans and ZIP/checksum checks. Live Windows 10 and fresh-machine mixer installation remain outstanding; selected-app music currently requires Windows 11.
+- Version 0.11.9 passed 400 tests, packaged self-checks, runtime/native-DLL checks, source/artifact scans and ZIP/checksum checks. The GitHub download and packaged upgrade from 0.11.8 to 0.11.9 were verified. Live Windows 10 and fresh-machine mixer installation remain outstanding; selected-app music currently requires Windows 11.
 - Provider credentials belong in the existing AppData configuration, not source files or test fixtures.
 - Source updates and packaged updates live in `tools/update.py` and `ui/updater.py`. Releases belong in `SentoMinh/ART-Asia-realtime-Translator`.

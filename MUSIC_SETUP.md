@@ -1,16 +1,16 @@
 # Music to microphone
 
-The current source app and 0.11.5 exports use our own Windows microphone mixer (APO). It adds music to the selected physical microphone; no virtual cable or separate virtual microphone is used.
+The current source app and published 0.11.9 EXE use our own Windows microphone mixer (APO). It adds music to the selected physical microphone; no virtual cable or separate virtual microphone is used.
 
 **The current development attachment is on Microphone (Virtual Desktop Audio).** VRChat used that headset microphone while the translator previously sent music to HyperX QuadCast. The attachment and translator selection now match the headset. Virtual Desktop did not load the stream-effect slot, but its legacy capture-effect slot passed live callback, WAV and selected-app injection tests. The HyperX attachment was removed and both microphones' existing Microsoft Voice Clarity references were preserved. Remote VRChat reception still needs a listener check. This is not a released installer or a Windows 10 certification claim.
 
-This compatibility fix is in source; the existing 0.11.5 EXEs do not include it. Use the source launcher below until a new export is approved. Setup now tries the unused legacy capture-effect slot if stream-effect validation fails, with rollback if neither works. The music panel warns when the active VRChat session log identifies a different microphone; unavailable or ambiguous logs are treated as unknown.
+The [0.11.9 release](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.9) includes this compatibility fix and the production mixer DLLs. Packaged self-checks and DLL hashes passed; fresh-PC installation remains untested. Setup now tries the unused legacy capture-effect slot if stream-effect validation fails, with rollback if neither works. The music panel warns when the active VRChat session log identifies a different microphone; unavailable or ambiguous logs are treated as unknown.
 
 Opening Music with a missing mixer offers **Install**, with the Windows administrator shield. After consent, the setup helper checks the selected microphone, requests UAC approval when setup is needed and opens a setup console. Builds made with `-MixerBuild` bundle the native mixer and setup launcher; those builds need no separate driver download. Source builds use their local native build. Installation briefly restarts Windows audio. Existing validated installations are detected without reinstalling. Declining UAC leaves setup off; failures are shown in the dialog. The mixer remains a development build, with clean-machine installation and Windows 10 live testing still outstanding.
 
 ## Try it now
 
-1. Use [apo/open_music.bat](apo/open_music.bat) for the corrected standalone source music window, or run the translator from source and click its music button.
+1. Open the released translator EXE and click its music button. For source development, use [apo/open_music.bat](apo/open_music.bat) for the standalone music window.
 2. Select the same microphone in VRChat and the translator. **Microphone (Virtual Desktop Audio)** is currently attached on the development PC. HyperX QuadCast was previously validated; other microphones still need live validation.
 3. Under **Music source**, select Spotify, your browser, or another running app, then click **▶**. Use the reload icon beside the source picker if you opened the app afterward. Start playback in that app as usual.
 4. Play checks the mixer before sending audio. Successful checks stay hidden; failures show an error and prevent playback. Adjust **Music volume** as needed. The same button becomes **■** to stop playback or cancel a pending check. Closing the panel keeps music running; Stop or closing the entire translator ends playback. Your ordinary microphone remains available.
