@@ -2,6 +2,8 @@
 
 Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.2 and the preceding release validation; recheck current code before relying on its findings.
 
+Read `CHANGELOG.md` for the reason behind recent changes, their implementation commits, regression tests and troubleshooting steps.
+
 ## Scope and existing work
 
 - Read `ROADMAP.md` when planning features: voice recognition is the current priority. Speaker 1 / Speaker 2 identification is deferred; remind the user when discussing future work. Close temporary demo previews after verification.
