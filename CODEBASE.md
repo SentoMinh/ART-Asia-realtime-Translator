@@ -1,6 +1,6 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.11.13**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.1**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 ## What the app does
 
@@ -12,7 +12,7 @@ It is an always-on-top desktop window. Live audio is a mix of the other players:
 
 Source commits, local builds and published releases are separate steps. Keep previous build artifacts when preparing a new release.
 
-Source version 0.11.13 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
+Source version 0.12.1 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
 
 Version [0.11.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.10) is published with an EXE, ZIP, installer helper, usage notes and checksums. Its release tag identifies the built source; later documentation commits do not change the published binary. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL.
 
@@ -115,3 +115,5 @@ Source 0.11.12 passed 428 tests, including corner resizing, partial copying from
 Source 0.11.13 adds `ui/language_picker.py` checkable dropdowns and migrates legacy scalar/second-language settings into validated lists. `Utterance.panel_targets` captures display choices before translation starts; `panel_translations` carries up to three results. `vrc.translate.translate_targets` deduplicates shared chatbox/panel destinations, reuses the original for a matching source, and keeps successes when another target fails. Both speech and typed jobs use it. Multiple recognition choices use language detection plus a selected-language filter; this does not add simultaneous-speaker identification.
 
 Source 0.11.13 passed 434 tests, covering language selection and limits, legacy migration, recognition preferences/filtering, three panel outputs, partial failures, captured destinations, chatbox separation and partial copying from the third translation. Native Windows captures verified the three pickers fit at 440 pixels in English, Chinese and Vietnamese; all preview windows closed automatically. Live multilingual microphone/VRChat recognition and external translation services were not exercised for this change.
+
+Version 0.12.1 republishes the three-language selection feature under the requested version number. Application behavior is unchanged from 0.11.13; release assets are rebuilt from the versioned source.
