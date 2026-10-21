@@ -1,6 +1,6 @@
 # Project context
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.11.11 and the preceding release validation; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.11.12 and the preceding release validation; recheck current code before relying on its findings.
 
 ## Scope and existing work
 
@@ -25,7 +25,7 @@ Read `CODEBASE.md` for the architecture, export status, test baseline and remain
 - `engine/stt.py`: cloud/local recognition through `load()` and `transcribe()` returning `Heard`.
 - `engine/services.py`: service registry, configuration, request helpers and per-domain model catalogs bound to URL/key fingerprints.
 - `ui/widgets.py`: `DialogPanel` embeds setup/download forms; preserve cancellation, navigation restoration and shared downloads. Keep the model list to one scroll area and one Close button.
-- `ui/main_window.py`: below 30%, alpha-zero blank space passes clicks through; text/input/top controls stay interactive. `ui/overlay_backdrop.py` preserves the selected darkness on an input-transparent surface behind the text; keep its geometry, stacking and lifetime aligned with the overlay. Use the visible top `QSizeGrip` to resize; only the top edge/corners also accept native edge resizing. The embedded update notice uses `Settings.last_update_notice` and must have current release text.
+- `ui/main_window.py`: below 30%, alpha-zero blank space passes clicks through; text/input/top controls stay interactive. `ui/overlay_backdrop.py` preserves the selected darkness on an input-transparent surface behind the text; keep its geometry, stacking and lifetime aligned with the overlay. Use the standard bottom-right `QSizeGrip` to resize; only the top edge/corners also accept native edge resizing. The embedded update notice uses `Settings.last_update_notice` and must have current release text.
 - `ui/settings_window.py`: API setup with Fetch models; Connect beside each domain; visible model dropdown arrows below Hearing/Translating. Selections save immediately; manual model entry remains available.
 - `ui/service_health.py`: silent startup/API checks, 30-second deadline, Settings status and stale-result handling. Do not reintroduce the startup popup.
 - `engine/translators.py`, `vrc/translate.py`: provider adapters, add-ons, fallback chain and shared prompts.

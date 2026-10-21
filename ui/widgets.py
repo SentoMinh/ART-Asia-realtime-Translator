@@ -4,17 +4,10 @@ from __future__ import annotations
 from PySide6.QtCore import QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (QAbstractButton, QFrame, QHBoxLayout, QLabel,
-                               QPushButton, QScrollArea, QSizeGrip, QVBoxLayout, QWidget)
+                               QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from . import theme
 from .i18n import tr
-
-
-class ResizeGrip(QSizeGrip):
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        painter = QPainter(self)
-        theme.icon("resize").paint(painter, self.rect().adjusted(3, 3, -3, -3))
 
 
 class DialogPanel(QFrame):

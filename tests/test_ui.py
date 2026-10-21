@@ -1101,7 +1101,7 @@ def test_only_top_edge_and_top_corners_resize(window, monkeypatch, dpi):
 
 
 @pytest.mark.parametrize("opacity", [0, 29, 30, 85])
-def test_top_resize_grip_changes_both_dimensions(window, opacity):
+def test_corner_resize_grip_changes_both_dimensions(window, opacity):
     from PySide6.QtCore import QPoint, Qt
     from PySide6.QtTest import QTest
     window.settings.backdrop = opacity
@@ -1109,14 +1109,74 @@ def test_top_resize_grip_changes_both_dimensions(window, opacity):
     window.show()
     QApplication.processEvents()
     grip = window.resize_grip
-    assert grip.isVisible() and window.bars.isAncestorOf(grip)
+    assert grip.isVisible() and grip.parentWidget() is window
+    assert grip.geometry().bottomRight() == window.rect().bottomRight() - QPoint(2, 2)
     before = window.size()
     start = grip.rect().center()
     QTest.mousePress(grip, Qt.LeftButton, pos=start)
-    QTest.mouseMove(grip, start + QPoint(50, -40))
-    QTest.mouseRelease(grip, Qt.LeftButton, pos=start + QPoint(50, -40))
+    QTest.mouseMove(grip, start + QPoint(50, 40))
+    QTest.mouseRelease(grip, Qt.LeftButton, pos=start + QPoint(50, 40))
     assert window.width() > before.width() and window.height() > before.height()
+    assert grip.geometry().bottomRight() == window.rect().bottomRight() - QPoint(2, 2)
+    window._show_bars(False)
+    QApplication.processEvents()
+    assert grip.isVisible()
+    if opacity < 30:
+        image = window.grab().toImage()
+        point = grip.pos() + QPoint(1, 1)
+        assert image.pixelColor(point * image.devicePixelRatio()).alpha() > 0
     window.hide()
+
+
+@pytest.mark.parametrize("field", ["original", "translation", "translation2"])
+def test_subtitle_drag_copies_only_selected_text(window, field):
+    from PySide6.QtCore import QPoint, QPointF, Qt
+    from PySide6.QtGui import QFont, QFontMetrics, QMouseEvent
+    from PySide6.QtCore import QEvent
+    from PySide6.QtTest import QTest
+    window.setStyleSheet(theme.style_sheet())
+    window.show()
+    row = window.log.add_or_update(Utterance(
+        id=901, source="speaker", original="alpha original words", translation="alpha translated words",
+        translation2="alpha second translation", src_lang="en", dst_lang="vi", dst_lang2="zh", final=True))
+    QApplication.processEvents()
+    label = getattr(row, field)
+    font = QFont(label.font())
+    font.setPixelSize(14 if field == "original" else 17)
+    start = QPoint(0, label.height() // 2)
+    end = QPoint(QFontMetrics(font).horizontalAdvance("alpha"), start.y())
+    QApplication.clipboard().setText("unchanged until release")
+    QTest.mousePress(label, Qt.LeftButton, pos=start)
+    assert QApplication.clipboard().text() == "unchanged until release"
+    move = QMouseEvent(QEvent.MouseMove, QPointF(end), QPointF(label.mapToGlobal(end)),
+                       Qt.NoButton, Qt.LeftButton, Qt.NoModifier)
+    QApplication.sendEvent(label, move)
+    assert label.selectedText() == "alpha"
+    QTest.mouseRelease(label, Qt.LeftButton, pos=end)
+    assert QApplication.clipboard().text() == "alpha"
+    assert label.selectedText() == "alpha"
+    QApplication.clipboard().setText("replace using keyboard")
+    QTest.keyClick(label, Qt.Key_C, Qt.ControlModifier)
+    assert QApplication.clipboard().text() == "alpha"
+    window.close()
+
+
+def test_subtitle_single_click_still_copies_original(window):
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+    window.show()
+    row = window.log.add_or_update(Utterance(
+        id=902, source="speaker", original="你好 & <world>", translation="Hello world",
+        src_lang="zh", dst_lang="en", final=True))
+    QApplication.processEvents()
+    QTest.mouseClick(row.translation, Qt.LeftButton, pos=QPoint(2, row.translation.height() // 2))
+    assert QApplication.clipboard().text() == "你好 & <world>"
+    # Selection must copy the displayed characters, including escaped rich-text content.
+    QTest.mousePress(row.original, Qt.LeftButton, pos=QPoint(0, row.original.height() // 2))
+    row.original.setSelection(3, 9)
+    QTest.mouseRelease(row.original, Qt.LeftButton, pos=QPoint(20, row.original.height() // 2))
+    assert QApplication.clipboard().text() == "& <world>"
+    window.close()
 
 
 def test_the_program_icon_loads(app):

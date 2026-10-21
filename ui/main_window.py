@@ -10,7 +10,7 @@ from PySide6.QtCore import QEvent, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QColor, QCursor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGraphicsDropShadowEffect,
                                QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton,
-                               QToolButton, QToolTip, QVBoxLayout, QWidget)
+                               QSizeGrip, QToolButton, QToolTip, QVBoxLayout, QWidget)
 
 from engine import local_model
 
@@ -21,7 +21,7 @@ from .i18n import tr
 from .log_view import SHORT, LogView
 from .overlay_backdrop import CLICK_THROUGH_BELOW, OverlayBackdrop
 from .settings_window import SettingsWindow, fill_lang_combo, retranslate_lang_combo, select_data
-from .widgets import DialogPanel, LevelBar, ResizeGrip
+from .widgets import DialogPanel, LevelBar
 from vrc.audio import input_devices, output_devices
 from vrc.chatbox import vrchat_window_origin
 
@@ -133,7 +133,7 @@ class MainWindow(QWidget):
         self.setMinimumSize(*config.MIN_SIZE)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(GRIP + 4, GRIP + 2, GRIP + 4, GRIP + 4)
+        root.setContentsMargins(GRIP + 4, GRIP + 2, GRIP + 4, 18)
         root.setSpacing(6)
         self.bars = QFrame()
         self.bars.setObjectName("bars")
@@ -146,6 +146,10 @@ class MainWindow(QWidget):
         root.addWidget(self.bars)
         root.addWidget(self.log, 1)
         root.addWidget(self._build_input_bar())
+        self.resize_grip = QSizeGrip(self)
+        self.resize_grip.setFixedSize(16, 16)
+        self.resize_grip.setAccessibleName(tr("Resize window"))
+        self._tips.append((self.resize_grip, "Drag to resize the window"))
 
         self._declined_switches: dict[tuple[str, str], float] = {}
         self._switch_dialog = None
@@ -245,11 +249,6 @@ class MainWindow(QWidget):
         row.addWidget(self.ui_lang_button)
         row.addWidget(self.pin_button)
         row.addWidget(self._button("gear", "Settings", self.open_settings))
-        self.resize_grip = ResizeGrip(bar)
-        self.resize_grip.setFixedSize(24, 24)
-        self.resize_grip.setAccessibleName(tr("Resize window"))
-        self._tips.append((self.resize_grip, "Drag to resize the window"))
-        row.addWidget(self.resize_grip)
         row.addWidget(self._button("min", "Minimise", self.showMinimized))
         row.addWidget(self._button("max", "Maximise", self.toggle_maximized))
         row.addWidget(self._button("close", "Close", self.close, "close"))
@@ -663,8 +662,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Background darkness now fades smoothly across 30%. Below 30%, blank space still lets clicks through.",
-            "Drag from the top controls. Use the resize grip beside Settings to resize the window.",
+            "Drag the bottom-right corner grip to resize the window. Drag the top controls to move it.",
+            "Drag over subtitle text to copy just the selection. A normal click still copies the original text.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))
@@ -714,6 +713,8 @@ class MainWindow(QWidget):
             painter.drawRect(QRectF(0, 0, self.width(), height))
             if self.input_bar.isVisible():
                 painter.drawRoundedRect(QRectF(self.input_bar.geometry()), 9, 9)
+            if self.resize_grip.isVisible():
+                painter.drawRect(QRectF(self.resize_grip.geometry()))
             return
         if bars:
             alpha = max(alpha, 1)   # alpha 0 lets clicks fall through to the game
@@ -722,6 +723,11 @@ class MainWindow(QWidget):
         painter.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 10, 10)
 
     # ---- window ---------------------------------------------------------
+
+    def resizeEvent(self, event):
+        self.resize_grip.move(self.width() - self.resize_grip.width() - 2,
+                              self.height() - self.resize_grip.height() - 2)
+        super().resizeEvent(event)
 
     def move_to_vrchat(self) -> None:
         origin = vrchat_window_origin()
