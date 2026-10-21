@@ -325,9 +325,16 @@ class SpeechEngine:
 
     def finish(self, line: Utterance, segment: Segment) -> None:
         line = dataclasses.replace(line, final=True)    # a copy: the window holds the first one
+        def show_progress(translations):
+            ready = tuple((code, translations[code]) for code in line.panel_targets if translations.get(code))
+            if ready:
+                self.backend.utterance.emit(dataclasses.replace(
+                    line, final=False, panel_translations=ready,
+                    latency_ms=int((self._clock() - segment.speech_end) * 1000)))
+
         translations, errors = translate_targets(
             self._translator, line.original, (line.dst_lang, *line.panel_targets),
-            line.src_lang if line.src_lang in LANGS else "", heard=True)
+            line.src_lang if line.src_lang in LANGS else "", heard=True, on_result=show_progress)
         line.translation = translations.get(line.dst_lang, "") if line.dst_lang != line.src_lang else ""
         line.panel_translations = tuple((code, translations.get(code, "")) for code in line.panel_targets)
         for code, error in errors.items():

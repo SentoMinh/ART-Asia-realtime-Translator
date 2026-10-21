@@ -256,8 +256,16 @@ class LiveBackend(Backend):
             return
         _, utterance, target, source = job
         started = time.perf_counter()
+        def show_progress(translations):
+            ready = tuple((code, translations[code]) for code in utterance.panel_targets if translations.get(code))
+            if ready:
+                self.utterance.emit(dataclasses.replace(
+                    utterance, panel_translations=ready,
+                    latency_ms=int((time.perf_counter() - started) * 1000)))
+
         translations, errors = translate_targets(
-            self._translator, utterance.original, (target, *utterance.panel_targets), source)
+            self._translator, utterance.original, (target, *utterance.panel_targets), source,
+            on_result=show_progress)
         utterance = dataclasses.replace(utterance, panel_translations=tuple(
             (code, translations.get(code, "")) for code in utterance.panel_targets))
         translation = translations.get(target, "")

@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **[0.12.1](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.1)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **[0.12.2](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.2)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
@@ -17,7 +17,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.12.1](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.1). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.12.2](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.2). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -79,7 +79,7 @@ Local inference needs no API key. Select Local Model for both Hearing and Transl
 
 For example, set **I speak: English, Chinese**, **They speak: Vietnamese, Japanese**, **Translated to: English, Chinese, Korean**, and **Send: Chinese**. The panel displays the three selected output languages. Microphone messages sent to VRChat use the first selected **They speak** language (Vietnamese); Auto-detect follows the last language heard. Typed messages keep their independent Send destination and use the first I speak language as their source.
 
-The same three pickers are available in **Settings → Translation**. At least one choice stays selected in each box. Existing saved language choices migrate automatically, with the old I speak language as the initial panel destination. Translations shared by the panel and chatbox are requested once. If one output fails, the original and successful outputs remain visible, with an error in the app. Microphone chatbox messages include the original and one translation; long messages share the app's 144-character budget. **Add my own words** controls original text for typed messages. More output languages can take longer to translate and require more API requests.
+The same three pickers are available in **Settings → Translation**. At least one choice stays selected in each box. Existing saved language choices migrate automatically, with the old I speak language as the initial panel destination. Translations shared by the panel and chatbox are requested once. If one output fails, the original and successful outputs remain visible, with an error in the app. Microphone chatbox messages include the original and one translation; long messages share the app's 144-character budget. **Add my own words** controls original text for typed messages. Each completed panel translation appears immediately while the remaining languages continue, with a translating indicator until completion. More output languages still take longer to finish and require more API requests; recognition settings and chatbox timing are unchanged.
 
 In **Settings → Translation**, turn on **Add Speaker words** to also send other players' speech to your own VRChat OSC chatbox as `translation (original)`. It uses the first **Translated to** language, independently of **Add my own words** and the Send language. The switch is off by default. Long messages shorten both parts as needed; turning it off also stops speaker messages waiting to be sent.
 
