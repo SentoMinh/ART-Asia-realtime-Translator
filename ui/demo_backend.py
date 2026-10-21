@@ -52,7 +52,8 @@ class DemoBackend(Backend):
 
     def send_text(self, text: str) -> None:
         self.utterance.emit(Utterance(
-            id=self._take_id(), source="typed", original=text, src_lang=self.settings.my_lang,
+            id=self._take_id(), source="typed", original=text, src_lang=self.settings.spoken_languages(True)[0],
+            panel_targets=tuple(self.settings.panel_languages()),
             dst_lang=self.target_lang(), final=True, sent=False,
             note="demo: no engine yet, nothing was translated or sent"))
 
@@ -65,7 +66,7 @@ class DemoBackend(Backend):
         return send if send != AUTO else self._last_heard or self.speech_target_lang()
 
     def speech_target_lang(self) -> str:
-        their = self.settings.their_lang
+        their = self.settings.spoken_languages(False)[0]
         return (self._last_heard or "en") if their == AUTO else their
 
     def _tick(self) -> None:
@@ -82,20 +83,20 @@ class DemoBackend(Backend):
         if not enabled:
             self._advance()
             return
-        src = self.settings.my_lang if mine else lang
-        dst = self.speech_target_lang() if mine else self.settings.my_lang
-        heard = texts[src]
+        src = self.settings.spoken_languages(True)[0] if mine else lang
+        dst = self.speech_target_lang() if mine else self.settings.panel_languages()[0]
+        heard = texts.get(src, texts["en"])
         if self._current is None:
             self._current = Utterance(id=self._take_id(), source="mic" if mine else "speaker",
                                       speaker=who, src_lang=src, dst_lang=dst,
-                                      dst_lang2=self.settings.their_lang2 if mine and self.settings.their_lang2 != dst else "")
+                                      panel_targets=tuple(self.settings.panel_languages()))
         self._pos += 1 if src == "zh" else 3
         u = self._current
         u.original = heard[:self._pos]
         if self._pos >= len(heard):
             u.final = True
-            u.translation = "" if src == dst else texts[dst]
-            u.translation2 = texts.get(u.dst_lang2, "") if u.dst_lang2 != src else ""
+            u.translation = "" if src == dst else texts.get(dst, "")
+            u.panel_translations = tuple((code, texts.get(code, "")) for code in u.panel_targets)
             u.latency_ms = random.randint(600, 1400)
             if mine:
                 u.sent = False

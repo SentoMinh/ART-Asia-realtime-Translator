@@ -1,6 +1,6 @@
 # Project context
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.11.12 and the preceding release validation; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.11.13 and the preceding release validation; recheck current code before relying on its findings.
 
 ## Scope and existing work
 

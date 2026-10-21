@@ -935,7 +935,7 @@ def test_chain_notifies_on_switch_when_model_is_used():
 
 
 
-def test_microphone_translates_into_two_targets_and_keeps_success_on_partial_failure():
+def test_microphone_translates_three_panel_targets_and_keeps_partial_success():
     class Translator:
         def __init__(self, failed=""):
             self.calls = []
@@ -944,32 +944,35 @@ def test_microphone_translates_into_two_targets_and_keeps_success_on_partial_fai
             self.calls.append((target, heard))
             if target == self.failed:
                 raise TranslateError("offline")
-            return {"vi": "Xin chào", "ja": "こんにちは"}[target]
-    for failed in ("", "vi", "ja"):
-        clock, window = Clock(), Window(my_lang="en", their_lang="vi", their_lang2="ja")
+            return {"vi": "Xin chào", "ja": "こんにちは", "ko": "안녕하세요"}[target]
+    for failed in ("", "vi", "ja", "ko"):
+        clock, window = Clock(), Window(my_lang="en", their_lang="vi", translated_to=["vi", "ja", "ko"])
         window.speech_target_lang = lambda: "vi"
         translator = Translator(failed)
         engine(window, Hears("Hello", "en"), translator, clock).hear(MIC, sentence(clock))
         line = window.sent[0]
-        assert translator.calls == [("vi", True), ("ja", True)]
+        assert translator.calls == [("vi", True), ("ja", True), ("ko", True)]
         assert line.translation == ("" if failed == "vi" else "Xin chào")
-        assert line.translation2 == ("" if failed == "ja" else "こんにちは")
+        assert dict(line.panel_translations) == {
+            code: "" if code == failed else text
+            for code, text in (("vi", "Xin chào"), ("ja", "こんにちは"), ("ko", "안녕하세요"))}
         assert ("offline" in line.note) == bool(failed)
 
 
-def test_two_targets_are_captured_before_settings_change():
+def test_panel_targets_are_captured_before_settings_change():
     class Pending:
         def submit(self, function, *args):
             self.function, self.args = function, args
-    clock, window = Clock(), Window(my_lang="en", their_lang="vi", their_lang2="ja")
+    clock, window = Clock(), Window(my_lang="en", their_lang="vi", translated_to=["en", "ja", "ko"])
     window.speech_target_lang = lambda: "vi"
     speech = engine(window, Hears("Hello", "en"), clock=clock)
     pending = Pending()
     speech._mic_pool = pending
     speech.hear(MIC, sentence(clock))
-    window.settings.their_lang2 = "ko"
+    window.settings.translated_to = ["zh"]
     pending.function(*pending.args)
-    assert window.sent[0].dst_lang2 == "ja"
+    assert window.sent[0].panel_targets == ("en", "ja", "ko")
+    assert dict(window.sent[0].panel_translations)["en"] == "Hello"
 
 
 def test_auto_resolving_to_second_target_does_not_translate_twice():
@@ -988,6 +991,20 @@ def test_two_their_languages_allow_detection_and_prefer_both():
     assert hears.prefer[:2] == ("vi", "ja")
     assert window.utterance.seen[-1].dst_lang == "en"
     assert not window.utterance.seen[-1].dst_lang2
+
+
+@pytest.mark.parametrize("source", [MIC, SPEAKER])
+@pytest.mark.parametrize("heard_lang,accepted", [("ja", True), ("ko", False)])
+def test_multiple_source_languages_detect_and_filter(source, heard_lang, accepted):
+    clock, hears = Clock(), Hears("こんにちは", heard_lang)
+    window = Window(my_languages=["en", "zh", "ja"], their_languages=["en", "zh", "ja"],
+                    translated_to=["vi", "en", "zh"])
+    engine(window, hears, clock=clock).hear(source, sentence(clock))
+    assert hears.asked == [None]
+    assert hears.prefer == ("en", "zh", "ja")
+    assert bool(window.utterance.seen) == accepted
+    if accepted:
+        assert window.utterance.seen[0].panel_targets == ("vi", "en", "zh")
 
 
 def test_saved_model_change_is_seen_even_when_file_stamp_is_unchanged(models):

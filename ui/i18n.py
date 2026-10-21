@@ -4,6 +4,12 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Translated to": "翻译为",
+    "Choose up to 3 languages you speak.": "最多选择 3 种您使用的语言。",
+    "Choose up to 3 languages they speak, or Auto-detect.": "最多选择 3 种对方使用的语言，或选择自动检测。",
+    "Choose up to 3 translation languages to show on the panel.": "最多选择 3 种在面板上显示的翻译语言。",
+    "Choose up to 3 languages in I speak and They speak.": "在“我说”和“对方说”中分别最多选择 3 种语言。",
+    "Translated to chooses up to 3 languages shown on the panel.": "“翻译为”可选择最多 3 种在面板上显示的语言。",
     "Connect": "连接",
     "Connected": "已连接",
     "Fetch models and save, then choose models under Hearing and Translating.": "获取模型并保存，然后在语音识别和翻译下选择模型。",
@@ -285,6 +291,12 @@ _ZH = {
 }
 
 _VI = {
+    "Translated to": "Dịch sang",
+    "Choose up to 3 languages you speak.": "Chọn tối đa 3 ngôn ngữ bạn nói.",
+    "Choose up to 3 languages they speak, or Auto-detect.": "Chọn tối đa 3 ngôn ngữ họ nói, hoặc Tự nhận diện.",
+    "Choose up to 3 translation languages to show on the panel.": "Chọn tối đa 3 ngôn ngữ dịch để hiển thị trên bảng.",
+    "Choose up to 3 languages in I speak and They speak.": "Chọn tối đa 3 ngôn ngữ cho mỗi mục Tôi nói và Họ nói.",
+    "Translated to chooses up to 3 languages shown on the panel.": "Dịch sang chọn tối đa 3 ngôn ngữ hiển thị trên bảng.",
     "Connect": "Kết nối",
     "Connected": "Đã kết nối",
     "Fetch models and save, then choose models under Hearing and Translating.": "Lấy danh sách mô hình và lưu, rồi chọn mô hình bên dưới Nhận dạng và Dịch.",

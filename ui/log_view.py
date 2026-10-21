@@ -67,8 +67,9 @@ class LogRow(QFrame):
         self.original = SelectableText(self)
         self.translation = SelectableText(self)
         self.translation2 = SelectableText(self)
+        self.translation3 = SelectableText(self)
         self.header.setAttribute(Qt.WA_TransparentForMouseEvents)
-        for label in (self.header, self.original, self.translation, self.translation2):
+        for label in (self.header, self.original, self.translation, self.translation2, self.translation3):
             label.setWordWrap(True)
             label.setTextFormat(Qt.RichText)
             layout.addWidget(label)
@@ -107,9 +108,12 @@ class LogRow(QFrame):
         color = theme.ACCENT if mine else theme.speaker_color(u.speaker)
         meta = []
         other = self.other_language()
-        if u.src_lang and u.dst_lang and u.src_lang != u.dst_lang and not other:
+        if u.panel_targets and not other:
+            targets = " / ".join(SHORT.get(code, code) for code in u.panel_targets)
+            meta.append(f"{SHORT.get(u.src_lang, u.src_lang)} → {targets}")
+        elif u.src_lang and u.dst_lang and u.src_lang != u.dst_lang and not other:
             meta.append(f"{SHORT.get(u.src_lang, u.src_lang)} → {SHORT.get(u.dst_lang, u.dst_lang)}")
-        if u.translation2:
+        if u.translation2 and not u.panel_targets:
             meta.append(SHORT.get(u.dst_lang2, u.dst_lang2))
         if u.source == "typed":
             meta.append(tr("typed"))
@@ -139,6 +143,23 @@ class LogRow(QFrame):
             waiting = tr("translating…" if u.source == "typed" else "listening…")
             self.translation.setText(self._span(waiting, dim, small + 1, italic=True))
             self.translation.setVisible(True)
+        elif u.panel_targets:
+            self.original.setText(self._span(u.original, dim, max(self._font_px - 3, 11)))
+            show_original = self._show_original and bool(u.original)
+            self.original.setVisible(show_original)
+            values = dict(u.panel_translations)
+            visible = False
+            for index, label in enumerate((self.translation, self.translation2, self.translation3)):
+                code = u.panel_targets[index] if index < len(u.panel_targets) else ""
+                text = values.get(code, "")
+                shown = bool(text) and not (code == u.src_lang and show_original)
+                label.setVisible(shown)
+                if shown:
+                    label.setText(self._span(SHORT.get(code, code) + " · ", dim, small + 1)
+                                  + self._span(text, theme.TEXT, self._font_px))
+                    visible = True
+            if not visible and not show_original:
+                self.original.setVisible(bool(u.original))
         elif translated:
             self.original.setText(self._span(u.original, dim, max(self._font_px - 3, 11)))
             self.original.setVisible(self._show_original and bool(u.original))
@@ -148,8 +169,10 @@ class LogRow(QFrame):
             self.original.setText(self._span(u.original, theme.TEXT, self._font_px))
             self.original.setVisible(True)
             self.translation.setVisible(False)
-        self.translation2.setText(self._span(u.translation2, theme.TEXT, self._font_px))
-        self.translation2.setVisible(bool(u.final and u.translation2 and not other))
+        if not (u.final and u.panel_targets and not other):
+            self.translation2.setText(self._span(u.translation2, theme.TEXT, self._font_px))
+            self.translation2.setVisible(bool(u.final and u.translation2 and not other))
+            self.translation3.hide()
         self._shade_letters(self._shadow)
 
     def _shade_letters(self, on: bool) -> None:

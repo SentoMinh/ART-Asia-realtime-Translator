@@ -1303,29 +1303,41 @@ def test_switch_model_dialog_recommends_download_local_when_none_ready_and_missi
 
 
 
-def test_second_language_picker_saves_syncs_and_can_be_removed(window, tmp_path):
-    window.their_lang.setCurrentIndex(window.their_lang.findData("vi"))
-    window.their_lang2.setCurrentIndex(window.their_lang2.findData("ja"))
-    assert window.settings.their_lang2 == "ja"
-    assert not window.swap_button.isEnabled()
+def test_language_pickers_save_sync_and_swap_without_changing_panel_languages(window, tmp_path):
+    window.my_lang.set_selected(["en", "zh", "yue"], emit=True)
+    window.their_lang.set_selected(["vi", "ja", "ko"], emit=True)
+    window.translated_to.set_selected(["en", "ja", "vi"], emit=True)
+    assert window.swap_button.isEnabled()
     window.open_settings()
-    assert window._dialog.their_lang2.currentData() == "ja"
-    window._dialog.their_lang2.setCurrentIndex(window._dialog.their_lang2.findData("ko"))
-    assert window.their_lang2.currentData() == "ko"
+    assert window._dialog.their_lang.selected_codes() == ["vi", "ja", "ko"]
+    window._dialog.translated_to.set_selected(["zh", "ko"], emit=True)
+    assert window.translated_to.selected_codes() == ["zh", "ko"]
     path = tmp_path / "settings.json"
     config.save(window.settings, path)
-    assert config.load(path).their_lang2 == "ko"
-    window.their_lang2.setCurrentIndex(0)
-    assert window.settings.their_lang2 == "" and window.swap_button.isEnabled()
+    restored = config.load(path)
+    assert restored.their_languages == ["vi", "ja", "ko"]
+    assert restored.my_languages == ["en", "zh", "yue"]
+    assert restored.translated_to == ["zh", "ko"]
+    window._swap()
+    assert window.my_lang.selected_codes() == ["vi", "ja", "ko"]
+    assert window.their_lang.selected_codes() == ["en", "zh", "yue"]
+    assert window.translated_to.selected_codes() == ["zh", "ko"]
 
 
-def test_second_language_cannot_duplicate_primary_or_be_invalid(window):
-    window.their_lang.setCurrentIndex(window.their_lang.findData("ja"))
-    window.their_lang2.setCurrentIndex(window.their_lang2.findData("ja"))
-    assert window.settings.their_lang2 == "" and window.their_lang2.currentData() == ""
-    assert Settings(their_lang2="invalid").clean().their_lang2 == ""
-    assert Settings(their_lang2=AUTO).clean().their_lang2 == ""
-    assert Settings().their_lang2 == ""
+def test_language_settings_migrate_old_choices_and_validate_new_lists(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text('{"my_lang":"zh","their_lang":"vi","their_lang2":"ja"}')
+    saved = config.load(path)
+    assert saved.my_languages == ["zh"]
+    assert saved.their_languages == ["vi", "ja"] and saved.their_lang2 == ""
+    assert saved.translated_to == ["zh"]
+    saved.my_languages = ["en", "en", None, "bad", "zh", "ja", "ko"]
+    saved.their_languages = ["zh", AUTO]
+    saved.translated_to = ["bad", AUTO]
+    saved.clean()
+    assert saved.my_languages == ["en", "zh", "ja"]
+    assert saved.their_languages == [AUTO]
+    assert saved.translated_to == ["en"]
 
 
 def test_log_displays_both_translations(app):
@@ -1336,6 +1348,74 @@ def test_log_displays_both_translations(app):
     assert not row.translation.isHidden() and not row.translation2.isHidden()
     row.set_utterance(Utterance(id=99, source="mic", original="Hello", final=True))
     assert row.translation2.isHidden()
+
+
+def test_language_picker_mouse_keyboard_limit_and_auto(window):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    picker = window.their_lang
+    window.show()
+    picker.showPopup()
+    QApplication.processEvents()
+    def click(code):
+        index = picker.model().index(picker.findData(code), 0)
+        QTest.mouseClick(picker.view().viewport(), Qt.LeftButton,
+                         pos=picker.view().visualRect(index).center())
+        QApplication.processEvents()
+    try:
+        for code in ("en", "zh", "ja"):
+            click(code)
+        assert picker.selected_codes() == ["en", "zh", "ja"]
+        assert picker.view().isVisible()
+        click("ko")
+        assert picker.selected_codes() == ["en", "zh", "ja"]
+        click("zh")
+        index = picker.model().index(picker.findData("ko"), 0)
+        picker.view().setCurrentIndex(index)
+        QTest.keyClick(picker.view(), Qt.Key_Space)
+        assert picker.selected_codes() == ["en", "ja", "ko"]
+        click(AUTO)
+        assert picker.selected_codes() == [AUTO]
+        click(AUTO)
+        assert picker.selected_codes() == [AUTO]
+        assert not window.swap_button.isEnabled()
+    finally:
+        picker.hidePopup()
+        window.hide()
+
+
+def test_panel_shows_only_selected_targets_and_keeps_successful_outputs(app):
+    log = LogView()
+    line = Utterance(id=87, source="mic", original="Hello", src_lang="en", dst_lang="vi",
+                     translation="chatbox only", panel_targets=("zh", "ja", "ko"),
+                     panel_translations=(("zh", "你好"), ("ja", "こんにちは"), ("ko", "안녕하세요")),
+                     final=True)
+    row = log.add_or_update(line)
+    labels = (row.translation, row.translation2, row.translation3)
+    for label, (code, text) in zip(labels, line.panel_translations):
+        assert not label.isHidden() and text in label.text()
+        assert "chatbox only" not in label.text()
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+    log.show()
+    QApplication.processEvents()
+    QTest.mousePress(row.translation3, Qt.LeftButton, pos=QPoint(1, 1))
+    row.translation3.setSelection(5, 5)  # Select only Korean text, without the language prefix.
+    QTest.mouseRelease(row.translation3, Qt.LeftButton, pos=QPoint(40, 1))
+    assert QApplication.clipboard().text() == "안녕하세요"
+    log.hide()
+    line.panel_translations = (("zh", "你好"), ("ja", ""), ("ko", "안녕하세요"))
+    row.set_utterance(line)
+    assert row.translation2.isHidden() and not row.translation3.isHidden()
+    line.panel_targets = ("en",)
+    line.panel_translations = (("en", "Hello"),)
+    row.set_utterance(line)
+    assert not row.original.isHidden() and all(label.isHidden() for label in labels)
+    log.set_look(17, False, False)
+    assert row.original.isHidden() and "Hello" in row.translation.text()
+    line.panel_translations = (("en", ""),)
+    row.set_utterance(line)
+    assert not row.original.isHidden()  # Keep the heard text if every translation fails.
 
 
 @pytest.mark.parametrize("kind", ["domain", "local"])

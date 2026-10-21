@@ -46,6 +46,8 @@ class Utterance:
     note: str = ""                 # e.g. "cut to 144 characters"
     dst_lang2: str = ""            # optional second microphone translation, captured per utterance
     translation2: str = ""
+    panel_targets: tuple[str, ...] = ()
+    panel_translations: tuple[tuple[str, str], ...] = ()
 
 
 class Backend(QObject):

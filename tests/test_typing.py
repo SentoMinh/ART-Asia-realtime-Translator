@@ -289,10 +289,11 @@ def test_voice_and_typed_messages_use_separate_languages(
         text = finished[-1]
         typed_target = last_heard if typed == "auto" else typed
         assert (text.source, text.dst_lang, text.sent) == ("typed", typed_target, True)
-        assert translator.asked[-1] == ("typed hello", typed_target, mine, False)
+        typed_calls = [] if mine == typed_target else [("typed hello", typed_target, mine, False)]
+        assert translator.asked == expected_calls + typed_calls
         voice_text = "hello" if mine == voice_target else f"hello\n{voice_target}: hello"
         assert [text for event, text in box.events if event == "send"] == [
-            voice_text, f"{typed_target}: typed hello"]
+            voice_text, "typed hello" if mine == typed_target else f"{typed_target}: typed hello"]
     finally:
         live.stop()
 
@@ -406,20 +407,26 @@ def test_speaker_words_report_osc_off_without_sending(app):
 
 
 
-def test_two_voice_translations_send_together_and_do_not_change_typed_target(app):
-    live, box, clock = backend(app, my_lang="en", their_lang="vi", their_lang2="ja", send_lang="ko")
+def test_panel_languages_do_not_change_voice_or_typed_chatbox_target(app):
+    live, box, clock = backend(app, my_languages=["en"], their_languages=["vi", "ja"],
+                               translated_to=["en", "ja", "ko"], send_lang="ko")
     translator = RoutingTranslator()
+    finished = []
+    live.utterance.connect(lambda line: finished.append(line) if line.final else None)
     live._translator = translator
     hears = Hears("hello")
     eng = SpeechEngine(live, engines={"gemini": hears, "local": hears}, translator=translator,
                        clock=clock, vads={MIC: LoudIsSpeech(), SPEAKER: LoudIsSpeech()})
     try:
         eng.hear(MIC, sentence())
-        assert translator.asked == [("hello", "vi", "en", True), ("hello", "ja", "en", True)]
-        assert [text for event, text in box.events if event == "send"] == ["hello\nvi: hello\nja: hello"]
+        assert translator.asked == [("hello", code, "en", True) for code in ("vi", "ja", "ko")]
+        assert [text for event, text in box.events if event == "send"] == ["hello\nvi: hello"]
         clock.now += 2
         live.send_text("typed hello")
-        assert translator.asked[-1] == ("typed hello", "ko", "en", False)
+        assert translator.asked[-2:] == [("typed hello", code, "en", False) for code in ("ko", "ja")]
         assert [text for event, text in box.events if event == "send"][-1] == "ko: typed hello"
+        assert finished[-1].panel_targets == ("en", "ja", "ko")
+        assert dict(finished[-1].panel_translations) == {
+            "en": "typed hello", "ja": "ja: typed hello", "ko": "ko: typed hello"}
     finally:
         live.stop()
