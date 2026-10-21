@@ -2,6 +2,8 @@
 
 Updated for source version **0.12.2**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
+Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
+
 ## What the app does
 
 A Python 3.12 / PySide6 desktop companion for VRChat. It captures VRChat audio or a selected playback device for translated subtitles, translates your microphone into the OSC chatbox, and translates typed messages into that same chatbox. Conversation languages are English, Mandarin, Cantonese, Vietnamese, Japanese and Korean; interface languages remain English, Chinese and Vietnamese.

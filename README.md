@@ -9,6 +9,8 @@ A small always-on-top window for VRChat (desktop mode) that:
 
 Version **[0.12.2](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.2)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
+See the [change log](CHANGELOG.md) for implementation details, measurements and troubleshooting notes.
+
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
 **It stays on your languages.** Auto-detect recognizes all six supported languages for translation. Other languages are checked for confidence before being announced with a line such as 【Speaking Spanish】. Uncertain speech is checked against the supported languages.
