@@ -421,6 +421,7 @@ class MainWindow(QWidget):
             self._music_dialog = MusicDialog(self.settings, self)
             self._music_dialog.state_changed.connect(self._on_music_state_changed)
             self._music_dialog.peak_changed.connect(self._update_music_glow)
+            self._music_dialog.settings_changed.connect(self.settings_changed)
         self._music_dialog.refresh()
         self._music_dialog.show()
         self._music_dialog.raise_()
@@ -663,8 +664,7 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Translations appear as each language finishes, without waiting for the remaining languages.",
-            "Speech recognition settings and VRChat chatbox timing are unchanged.",
+            "Music setup now shows when the mixer is installed on another microphone and lets you select it.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))

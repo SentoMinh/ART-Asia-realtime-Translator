@@ -67,9 +67,22 @@ def installed(microphone):
     return True
 
 
+def registered_microphone():
+    """Name of the existing validated attachment, with its files and registry checked."""
+    state = apo_setup.load_state()
+    if not state or state.get("phase") != "validated":
+        return ""
+    microphone = state.get("microphone", "")
+    return microphone if microphone and installed(microphone) else ""
+
+
 def install(microphone):
     if installed(microphone):
         return {"ok": True, "already_installed": True}
+    existing = registered_microphone()
+    if existing:
+        raise RuntimeError(f"The mixer is already installed on {existing}. Select that microphone in the translator "
+                           "and VRChat. Moving it to another microphone requires removing the existing attachment first.")
     build = native_build()
     if build is None:
         raise RuntimeError("The microphone mixer files are missing from this installation.")

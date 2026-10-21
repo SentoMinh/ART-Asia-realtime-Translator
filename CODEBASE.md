@@ -1,6 +1,6 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.2**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.3**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
 
@@ -14,7 +14,7 @@ It is an always-on-top desktop window. Live audio is a mix of the other players:
 
 Source commits, local builds and published releases are separate steps. Keep previous build artifacts when preparing a new release.
 
-Source version 0.12.2 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
+Source version 0.12.3 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
 
 Version [0.11.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.10) is published with an EXE, ZIP, installer helper, usage notes and checksums. Its release tag identifies the built source; later documentation commits do not change the published binary. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL.
 
@@ -123,3 +123,5 @@ Version 0.12.1 republishes the three-language selection feature under the reques
 Version 0.12.2 displays each completed panel translation while later targets continue. `translate_targets(on_result=...)` reports snapshots after intermediate successes; speech and typed workers emit separate non-final utterance copies with the same ID. `LogRow` renders available outputs and a translating indicator, preserving selections in unchanged labels. Final error handling and one-time chatbox sending remain in the existing completion paths. Request order/count, model parameters, recognition thresholds, fallback cooldowns and OSC pacing are unchanged.
 
 A controlled five-run benchmark with 120 ms per translation measured median first-panel-result latency of 361.0 ms before and 120.5 ms after for three destinations. Total completion was 361.0 / 361.2 ms; one destination was 120.3 / 120.5 ms. This isolates display waiting, not real server or speech-recognition speed. Source checks cover partial failures, immutable snapshots, row reuse, selection retention and Qt worker delivery while a later translation is blocked; live audio and external-service latency require separate measurements.
+
+Version 0.12.3 detects a validated mixer attached to another microphone using `apo_install.registered_microphone()`. The music dialog names it and offers a selection button that revalidates the installed files/registry and resolves an active endpoint before changing and saving the translator microphone. It suppresses the futile second-install prompt; the installer also reports the existing device before requesting UAC. Moving an attachment still requires explicit removal using its journal.
