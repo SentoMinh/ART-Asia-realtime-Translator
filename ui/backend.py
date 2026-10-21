@@ -40,7 +40,7 @@ class Utterance:
     src_lang: str = ""
     dst_lang: str = ""
     speaker: int = 0               # 1, 2, 3… for "speaker" lines; 0 = unknown
-    final: bool = False            # False while the person is still talking
+    final: bool = False            # False while recognizing or translating remaining languages
     latency_ms: int | None = None
     sent: bool | None = None       # chatbox: True sent, False failed, None not sent (yet)
     note: str = ""                 # e.g. "cut to 144 characters"

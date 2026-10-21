@@ -117,6 +117,8 @@ class LogRow(QFrame):
             meta.append(SHORT.get(u.dst_lang2, u.dst_lang2))
         if u.source == "typed":
             meta.append(tr("typed"))
+        if u.panel_translations and not u.final:
+            meta.append(tr("translating…"))
         # the delay and "sent to chatbox" were shown while testing; engine.log still has the delay.
         # A failed send is still worth seeing.
         if mine and u.final and u.sent is False:
@@ -136,7 +138,7 @@ class LogRow(QFrame):
             self.original.setText(self._span(other, dim, self._font_px, italic=True))
             self.original.setVisible(True)
             self.translation.setVisible(False)
-        elif not u.final:
+        elif not u.final and not u.panel_translations:
             # still talking: the heard text grows, the translation comes after
             self.original.setText(self._span(u.original or "…", theme.TEXT, self._font_px))
             self.original.setVisible(True)
@@ -169,7 +171,7 @@ class LogRow(QFrame):
             self.original.setText(self._span(u.original, theme.TEXT, self._font_px))
             self.original.setVisible(True)
             self.translation.setVisible(False)
-        if not (u.final and u.panel_targets and not other):
+        if not ((u.final or u.panel_translations) and u.panel_targets and not other):
             self.translation2.setText(self._span(u.translation2, theme.TEXT, self._font_px))
             self.translation2.setVisible(bool(u.final and u.translation2 and not other))
             self.translation3.hide()

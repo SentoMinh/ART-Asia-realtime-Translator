@@ -4,6 +4,8 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Translations appear as each language finishes, without waiting for the remaining languages.": "每种语言翻译完成后立即显示，无需等待其余语言。",
+    "Speech recognition settings and VRChat chatbox timing are unchanged.": "语音识别设置和 VRChat 聊天框发送时序保持不变。",
     "Translated to": "翻译为",
     "Choose up to 3 languages you speak.": "最多选择 3 种您使用的语言。",
     "Choose up to 3 languages they speak, or Auto-detect.": "最多选择 3 种对方使用的语言，或选择自动检测。",
@@ -291,6 +293,8 @@ _ZH = {
 }
 
 _VI = {
+    "Translations appear as each language finishes, without waiting for the remaining languages.": "Bản dịch xuất hiện ngay khi từng ngôn ngữ hoàn tất, không cần chờ các ngôn ngữ còn lại.",
+    "Speech recognition settings and VRChat chatbox timing are unchanged.": "Cài đặt nhận dạng giọng nói và thời điểm gửi vào khung chat VRChat không thay đổi.",
     "Translated to": "Dịch sang",
     "Choose up to 3 languages you speak.": "Chọn tối đa 3 ngôn ngữ bạn nói.",
     "Choose up to 3 languages they speak, or Auto-detect.": "Chọn tối đa 3 ngôn ngữ họ nói, hoặc Tự nhận diện.",

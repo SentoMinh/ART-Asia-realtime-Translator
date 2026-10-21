@@ -975,6 +975,34 @@ def test_panel_targets_are_captured_before_settings_change():
     assert dict(window.sent[0].panel_translations)["en"] == "Hello"
 
 
+@pytest.mark.parametrize("source", [MIC, SPEAKER])
+@pytest.mark.parametrize("failed", ["", "ja", "ko"])
+def test_panel_results_arrive_before_later_translations_without_extra_sends(source, failed):
+    clock, window = Clock(), Window(my_lang="en", translated_to=["vi", "ja", "ko"])
+    window.speech_target_lang = lambda: "vi"
+    class Translator:
+        def translate(self, text, target, source, heard=False):
+            assert heard
+            if target in ("ja", "ko"):
+                partial = window.utterance.seen[-1]
+                assert not partial.final
+                assert dict(partial.panel_translations)["vi"] == "vi: Hello"
+                assert window.sent == []
+            if target == failed:
+                raise TranslateError("offline")
+            return f"{target}: {text}"
+    engine(window, Hears("Hello", "en"), Translator(), clock).hear(source, sentence(clock))
+    partial = window.utterance.seen[1]
+    assert partial.panel_translations == (("vi", "vi: Hello"),) and not partial.final
+    assert window.utterance.seen[0].panel_translations == ()
+    final = window.sent[0] if source == MIC else window.utterance.seen[-1]
+    assert final.final and final.id == partial.id
+    assert dict(final.panel_translations) == {
+        code: "" if code == failed else f"{code}: Hello" for code in ("vi", "ja", "ko")}
+    assert ("offline" in final.note) == bool(failed)
+    assert len(window.sent) == (1 if source == MIC else 0)
+
+
 def test_auto_resolving_to_second_target_does_not_translate_twice():
     clock, window, translator = Clock(), Window(my_lang="en", their_lang2="ja"), Fixed("こんにちは")
     window.last_heard = "ja"

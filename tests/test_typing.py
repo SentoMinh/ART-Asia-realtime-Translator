@@ -430,3 +430,73 @@ def test_panel_languages_do_not_change_voice_or_typed_chatbox_target(app):
             "en": "typed hello", "ja": "ja: typed hello", "ko": "ko: typed hello"}
     finally:
         live.stop()
+
+
+def test_typed_partial_results_do_not_send_or_mutate_earlier_updates(app):
+    live, box, clock = backend(app, my_lang="en", send_lang="vi", translated_to=["vi", "ja", "ko"])
+    updates = []
+    live.utterance.connect(updates.append)
+    class Translator:
+        def translate(self, text, target, source):
+            if target != "vi":
+                assert not updates[-1].final
+                assert dict(updates[-1].panel_translations)["vi"] == "Xin chào"
+                assert not any(event == "send" for event, _ in box.events)
+            if target == "ko":
+                raise TranslateError("offline")
+            return {"vi": "Xin chào", "ja": "こんにちは"}[target]
+    live._translator = Translator()
+    try:
+        live.send_text("Hello")
+        first = updates[1]
+        assert not first.final and first.panel_translations == (("vi", "Xin chào"),)
+        assert first.note == "" and first.sent is None
+        final = updates[-1]
+        assert final.final and final.id == first.id
+        assert dict(final.panel_translations) == {"vi": "Xin chào", "ja": "こんにちは", "ko": ""}
+        assert "offline" in final.note
+        assert [text for event, text in box.events if event == "send"] == ["Xin chào"]
+    finally:
+        live.stop()
+
+
+def test_worker_delivers_first_subtitle_while_later_language_is_blocked(app):
+    import threading
+    from PySide6.QtTest import QTest
+    from ui.log_view import LogView
+    waiting, release = threading.Event(), threading.Event()
+    live, box, _ = backend(app, my_lang="en", send_lang="vi", translated_to=["vi", "ja"])
+    class Translator:
+        def prepare(self):
+            pass
+        def translate(self, text, target, source):
+            if target == "ja":
+                waiting.set()
+                assert release.wait(5), "Test must release the translator"
+            return f"{target}: {text}"
+    log = LogView()
+    live.utterance.connect(log.add_or_update)
+    live._translator = Translator()
+    live._threaded = True
+    live.start()
+    try:
+        live.send_text("Hello")
+        assert waiting.wait(3)
+        QTest.qWait(50)
+        row = log.rows()[0]
+        assert "vi: Hello" in row.translation.text() and not row.translation.isHidden()
+        assert not row.utterance.final and row.translation2.isHidden()
+        assert not any(event == "send" for event, _ in box.events)
+        release.set()
+        for _ in range(100):
+            if row.utterance.final:
+                break
+            QTest.qWait(10)
+        assert row.utterance.final and "ja: Hello" in row.translation2.text()
+        assert [text for event, text in box.events if event == "send"] == ["vi: Hello"]
+    finally:
+        release.set()
+        live.stop()
+        live._worker.join(timeout=5)
+        assert not live._worker.is_alive()
+        log.deleteLater()

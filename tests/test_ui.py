@@ -1418,6 +1418,27 @@ def test_panel_shows_only_selected_targets_and_keeps_successful_outputs(app):
     assert not row.original.isHidden()  # Keep the heard text if every translation fails.
 
 
+def test_panel_partial_results_update_one_row_and_keep_selection(app):
+    from dataclasses import replace
+    log = LogView()
+    first = Utterance(id=102, source="speaker", original="Hello", src_lang="en",
+                      panel_targets=("vi", "ja", "ko"), panel_translations=(("vi", "Xin chào"),))
+    row = log.add_or_update(first)
+    assert not row.translation.isHidden() and "Xin chào" in row.translation.text()
+    assert row.translation2.isHidden() and row.translation3.isHidden()
+    assert "translating" in row.header.text()
+    row.translation.setSelection(5, 3)
+    selected = row.translation.selectedText()
+    second = replace(first, panel_translations=first.panel_translations + (("ja", "こんにちは"),))
+    assert log.add_or_update(second) is row and len(log.rows()) == 1
+    assert row.translation.selectedText() == selected
+    assert not row.translation2.isHidden() and row.translation3.isHidden()
+    final = replace(second, final=True, panel_translations=second.panel_translations + (("ko", "안녕하세요"),))
+    log.add_or_update(final)
+    assert not row.translation3.isHidden() and "translating" not in row.header.text()
+    assert not first.final and first.panel_translations == (("vi", "Xin chào"),)
+
+
 @pytest.mark.parametrize("kind", ["domain", "local"])
 def test_setup_panels_are_inside_settings_and_move_with_it(window, kind):
     from PySide6.QtCore import QPoint

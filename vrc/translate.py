@@ -15,19 +15,22 @@ class TranslateError(Exception):
     """No translation right now; the message says why in plain words."""
 
 
-def translate_targets(translator, text, targets, source="", heard=False):
+def translate_targets(translator, text, targets, source="", heard=False, on_result=None):
     """Translate each distinct destination once; one failed language does not hide the others."""
     translations, errors = {}, {}
-    for target in dict.fromkeys(code for code in targets if code):
+    targets = list(dict.fromkeys(code for code in targets if code))
+    for index, target in enumerate(targets):
         if target == source:
             translations[target] = text
-            continue
-        try:
-            translations[target] = (translator.translate(text, target, source, heard=True) if heard
-                                    else translator.translate(text, target, source))
-        except Exception as error:
-            translations[target] = ""
-            errors[target] = error
+        else:
+            try:
+                translations[target] = (translator.translate(text, target, source, heard=True) if heard
+                                        else translator.translate(text, target, source))
+            except Exception as error:
+                translations[target] = ""
+                errors[target] = error
+        if on_result is not None and translations[target] and index < len(targets) - 1:
+            on_result(translations.copy())
     return translations, errors
 
 

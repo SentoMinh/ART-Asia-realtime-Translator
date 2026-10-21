@@ -663,8 +663,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Choose up to 3 languages in I speak and They speak.",
-            "Translated to chooses up to 3 languages shown on the panel.",
+            "Translations appear as each language finishes, without waiting for the remaining languages.",
+            "Speech recognition settings and VRChat chatbox timing are unchanged.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))
