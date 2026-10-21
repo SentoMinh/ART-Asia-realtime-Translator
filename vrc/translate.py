@@ -15,6 +15,22 @@ class TranslateError(Exception):
     """No translation right now; the message says why in plain words."""
 
 
+def translate_targets(translator, text, targets, source="", heard=False):
+    """Translate each distinct destination once; one failed language does not hide the others."""
+    translations, errors = {}, {}
+    for target in dict.fromkeys(code for code in targets if code):
+        if target == source:
+            translations[target] = text
+            continue
+        try:
+            translations[target] = (translator.translate(text, target, source, heard=True) if heard
+                                    else translator.translate(text, target, source))
+        except Exception as error:
+            translations[target] = ""
+            errors[target] = error
+    return translations, errors
+
+
 def chat_messages(text: str, target: str, likely_source: str = "", heard: bool = False) -> list[dict]:
     """`heard`: the text came from speech recognition, not from typing."""
     name = TARGET_NAMES[target]

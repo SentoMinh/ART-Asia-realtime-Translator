@@ -17,6 +17,15 @@ MIN_SIZE = (440, 220)
 VAD_RANGE = (0.3, 0.9)    # how sure the voice detector must be that someone talks
 
 
+def language_choices(values, fallback, with_auto=False) -> list[str]:
+    values = values if isinstance(values, (list, tuple)) else []
+    codes = list(dict.fromkeys(code for code in values
+                              if isinstance(code, str) and (code in LANGS or with_auto and code == AUTO)))
+    if with_auto and AUTO in codes:
+        return [AUTO]
+    return codes[:3] or list(fallback)
+
+
 def default_path() -> Path:
     base = os.environ.get("APPDATA") or str(Path.home())
     return Path(base) / "VRChat-Translator" / "ui.json"
@@ -24,9 +33,12 @@ def default_path() -> Path:
 
 @dataclass
 class Settings:
-    my_lang: str = "vi"            # my spoken language and the target for other players' subtitles
-    their_lang: str = AUTO          # their spoken language and my mic's target; AUTO = detect theirs
-    their_lang2: str = ""           # optional second microphone translation target
+    my_lang: str = "vi"            # primary language; retained for saved settings compatibility
+    their_lang: str = AUTO          # primary chatbox destination; Auto follows the last heard language
+    their_lang2: str = ""           # migrated from the old + picker
+    my_languages: list[str] = field(default_factory=list)
+    their_languages: list[str] = field(default_factory=list)
+    translated_to: list[str] = field(default_factory=list)
     send_lang: str = AUTO           # typed text is translated into this; AUTO = the language heard last
     ui_lang: str = "en"             # language of the window itself: en | zh | vi
     mic_on: bool = True             # my mic → chatbox
@@ -54,6 +66,15 @@ class Settings:
     w: int = 560
     h: int = 460
 
+    def spoken_languages(self, microphone: bool) -> list[str]:
+        if microphone:
+            return language_choices(self.my_languages, [self.my_lang])
+        fallback = [self.their_lang] + ([self.their_lang2] if self.their_lang2 else [])
+        return language_choices(self.their_languages or fallback, [AUTO], with_auto=True)
+
+    def panel_languages(self) -> list[str]:
+        return language_choices(self.translated_to, [self.spoken_languages(True)[0]])
+
     def clean(self) -> "Settings":
         self.hearing = services.migrate_provider(self.hearing)
         self.translating = services.migrate_provider(self.translating)
@@ -69,6 +90,11 @@ class Settings:
             self.their_lang = AUTO
         if self.their_lang2 not in LANGS or self.their_lang2 == self.their_lang:
             self.their_lang2 = ""
+        self.my_languages = self.spoken_languages(True)
+        self.their_languages = self.spoken_languages(False)
+        self.translated_to = self.panel_languages()
+        self.my_lang, self.their_lang = self.my_languages[0], self.their_languages[0]
+        self.their_lang2 = ""  # The old + box is migrated into their_languages.
         if self.send_lang != AUTO and self.send_lang not in LANGS:
             self.send_lang = AUTO
         if self.ui_lang not in UI_LANGS:

@@ -19,8 +19,9 @@ from .backend import AUTO, LANGS, PICK_LANGS, Backend, Status, Utterance
 from .config import Settings
 from .i18n import tr
 from .log_view import SHORT, LogView
+from .language_picker import LanguagePicker
 from .overlay_backdrop import CLICK_THROUGH_BELOW, OverlayBackdrop
-from .settings_window import SettingsWindow, fill_lang_combo, retranslate_lang_combo, select_data
+from .settings_window import SettingsWindow
 from .widgets import DialogPanel, LevelBar
 from vrc.audio import input_devices, output_devices
 from vrc.chatbox import vrchat_window_origin
@@ -115,7 +116,7 @@ class MainWindow(QWidget):
     def __init__(self, backend: Backend, settings: Settings, save=config.save):
         super().__init__()
         self.backend = backend
-        self.settings = settings
+        self.settings = settings.clean()
         self._save = save
         self._dialog: SettingsWindow | None = None
         self._notice = None
@@ -292,30 +293,30 @@ class MainWindow(QWidget):
         row = QHBoxLayout(box)
         row.setContentsMargins(4, 0, 0, 0)
         row.setSpacing(6)
-        self.my_lang = QComboBox()
-        fill_lang_combo(self.my_lang, with_auto=False)
-        self.my_lang.currentIndexChanged.connect(self._lang_picked)
-        self.their_lang = QComboBox()
-        fill_lang_combo(self.their_lang, with_auto=True)
-        self.their_lang.currentIndexChanged.connect(self._lang_picked)
-        self.their_lang2 = QComboBox()
-        fill_lang_combo(self.their_lang2, with_auto=False, optional=True)
-        self.their_lang2.currentIndexChanged.connect(self._lang_picked)
+        self.my_lang = LanguagePicker()
+        self.their_lang = LanguagePicker(with_auto=True)
+        self.translated_to = LanguagePicker()
+        for picker in (self.my_lang, self.their_lang, self.translated_to):
+            picker.selection_changed.connect(self._lang_picked)
         self._tips.extend([
-            (self.my_lang, "Your language. Subtitles are translated into it."),
-            (self.their_lang2, "Optional second translation of your microphone. OSC shows the original and each translation on a separate line."),
-            (self.their_lang, "Your microphone is translated into this language. Auto-detect uses the "
-                              "language heard last. Typed text uses the Send menu."),
+            (self.my_lang, "Choose up to 3 languages you speak."),
+            (self.their_lang, "Choose up to 3 languages they speak, or Auto-detect."),
+            (self.translated_to, "Choose up to 3 translation languages to show on the panel."),
         ])
         self.swap_button = self._button("swap", "Swap the two languages", self._swap)
         for text, widget in (("I speak", self.my_lang), ("", self.swap_button),
-                             ("They speak", self.their_lang), ("+", self.their_lang2)):
+                             ("They speak", self.their_lang), ("Translated to", self.translated_to)):
             if text:
-                label = QLabel(text)
+                column = QVBoxLayout()
+                column.setSpacing(2)
+                label = QLabel(tr(text))
                 label.setObjectName("dim")
                 self._labels.append((label, text))
-                row.addWidget(label)
-            row.addWidget(widget)
+                column.addWidget(label)
+                column.addWidget(widget)
+                row.addLayout(column)
+            else:
+                row.addWidget(widget, 0, Qt.AlignBottom)
         row.addStretch(1)
         row.addWidget(self._button("trash", "Clear the chat log", self.log.clear))
         box.enable_child_dragging()
@@ -527,9 +528,9 @@ class MainWindow(QWidget):
         self.settings_changed()
 
     def _lang_picked(self) -> None:
-        self.settings.my_lang = self.my_lang.currentData()
-        self.settings.their_lang = self.their_lang.currentData()
-        self.settings.their_lang2 = self.their_lang2.currentData()
+        self.settings.my_languages = self.my_lang.selected_codes()
+        self.settings.their_languages = self.their_lang.selected_codes()
+        self.settings.translated_to = self.translated_to.selected_codes()
         self.settings_changed()
 
     def _send_lang_picked(self, code: str) -> None:
@@ -567,10 +568,9 @@ class MainWindow(QWidget):
             label.setText(tr(text))
         self.my_lang.setAccessibleName(tr("I speak"))
         self.their_lang.setAccessibleName(tr("They speak"))
-        self.their_lang2.setAccessibleName(tr("Second language"))
-        retranslate_lang_combo(self.my_lang)
-        retranslate_lang_combo(self.their_lang)
-        retranslate_lang_combo(self.their_lang2)
+        self.translated_to.setAccessibleName(tr("Translated to"))
+        for picker in (self.my_lang, self.their_lang, self.translated_to):
+            picker.retranslate()
         self.input.setPlaceholderText(tr("Type a message — Enter translates and sends it"))
         self.input.setAccessibleName(tr("Message to translate and send"))
         for code, action in self.send_lang_actions.items():
@@ -589,9 +589,10 @@ class MainWindow(QWidget):
                 self._dialog.nav.setCurrentRow(page)
 
     def _swap(self) -> None:
-        if self.settings.their_lang == AUTO or self.settings.their_lang2:
+        if AUTO in self.settings.spoken_languages(False):
             return
-        self.settings.my_lang, self.settings.their_lang = self.settings.their_lang, self.settings.my_lang
+        self.settings.my_languages, self.settings.their_languages = (
+            self.settings.spoken_languages(False), self.settings.spoken_languages(True))
         self.settings_changed()
 
     def settings_changed(self) -> None:
@@ -625,10 +626,10 @@ class MainWindow(QWidget):
         tip = tr("Always on top: on" if s.always_on_top else "Always on top: off")
         self.pin_button.setToolTip(tip)
         self.pin_button.setAccessibleName(tip)
-        select_data(self.my_lang, s.my_lang)
-        select_data(self.their_lang, s.their_lang)
-        select_data(self.their_lang2, s.their_lang2)
-        self.swap_button.setEnabled(s.their_lang != AUTO and not s.their_lang2)
+        self.my_lang.set_selected(s.spoken_languages(True))
+        self.their_lang.set_selected(s.spoken_languages(False))
+        self.translated_to.set_selected(s.panel_languages())
+        self.swap_button.setEnabled(AUTO not in s.spoken_languages(False))
         # the background darkness is the only background there is: no boxes behind the rows or
         # the buttons, so at a low setting only the letters show, with a shadow to stay readable
         self.log.set_look(s.font_px, s.show_original, s.backdrop < SHADOW_BELOW)
@@ -662,8 +663,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Drag the bottom-right corner grip to resize the window. Drag the top controls to move it.",
-            "Drag over subtitle text to copy just the selection. A normal click still copies the original text.",
+            "Choose up to 3 languages in I speak and They speak.",
+            "Translated to chooses up to 3 languages shown on the panel.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))

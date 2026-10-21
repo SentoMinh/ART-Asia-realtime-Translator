@@ -6,6 +6,7 @@ benchmarked. It plugs into on_game_audio / on_mic_audio.
 """
 from __future__ import annotations
 
+import dataclasses
 import queue
 import threading
 import time
@@ -14,7 +15,7 @@ from collections import deque
 from PySide6.QtCore import QTimer, Signal
 
 from vrc.chatbox import MIN_GAP_S, Chatbox, TypingDots, VRChatState, find_vrchat, fit, fit_bilingual, fit_lines
-from vrc.translate import NoTranslator, TranslateError
+from vrc.translate import NoTranslator, TranslateError, translate_targets
 
 from .backend import AUTO, Backend, Status, Utterance
 from .config import Settings
@@ -204,12 +205,12 @@ class LiveBackend(Backend):
             return self.settings.send_lang
         if self.last_heard:
             return self.last_heard
-        their = self.settings.their_lang
+        their = self.settings.spoken_languages(False)[0]
         return their if their != AUTO else DEFAULT_TARGET
 
     def speech_target_lang(self) -> str:
         """Voice replies follow 'They speak'; only Auto follows the last player heard."""
-        their = self.settings.their_lang
+        their = self.settings.spoken_languages(False)[0]
         return their if their != AUTO else self.last_heard or DEFAULT_TARGET
 
     # ---- "typing…" in VRChat: only before the first message after a quiet time ----------
@@ -230,7 +231,8 @@ class LiveBackend(Backend):
         if not text:
             return
         utterance = Utterance(id=self._next_id, source="typed", original=text,
-                              src_lang=self.settings.my_lang, dst_lang=self.target_lang())
+                              src_lang=self.settings.spoken_languages(True)[0], dst_lang=self.target_lang(),
+                              panel_targets=tuple(self.settings.panel_languages()))
         self._next_id += 1
         self.utterance.emit(utterance)   # shown at once as "translating…"
         if self.settings.chatbox_typing:
@@ -254,20 +256,23 @@ class LiveBackend(Backend):
             return
         _, utterance, target, source = job
         started = time.perf_counter()
-        translation, error = "", ""
-        try:
-            translation = self._translator.translate(utterance.original, target, source)
-        except TranslateError as problem:
-            error = str(problem)
-            self.switch_prompt_requested.emit("translating", self.settings.translating, str(problem))
-        except Exception as problem:   # the worker must survive anything, or typing goes silent
-            error = f"translation failed: {problem}"
+        translations, errors = translate_targets(
+            self._translator, utterance.original, (target, *utterance.panel_targets), source)
+        utterance = dataclasses.replace(utterance, panel_translations=tuple(
+            (code, translations.get(code, "")) for code in utterance.panel_targets))
+        translation = translations.get(target, "")
+        error = str(errors[target]) if target in errors else ""
+        utterance.note = ", ".join(f"not translated ({code}): {problem}"
+                                   for code, problem in errors.items() if code != target)
+        for problem in errors.values():
+            if isinstance(problem, TranslateError):
+                self.switch_prompt_requested.emit("translating", self.settings.translating, str(problem))
         self._translated.emit(utterance, translation, error, int((time.perf_counter() - started) * 1000))
 
     def _on_translated(self, utterance: Utterance, translation: str, error: str, ms: int) -> None:
         utterance.final = True
         utterance.translation = translation
-        notes = []
+        notes = [utterance.note] if utterance.note else []
         if error:
             notes.append(f"not translated: {error}")
             utterance.dst_lang = utterance.src_lang     # the row shows only the typed text

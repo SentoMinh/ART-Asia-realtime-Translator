@@ -21,6 +21,7 @@ from . import __version__, local_download, theme
 from .backend import AUTO, LANGS, PICK_LANGS
 from .config import BACKDROP_RANGE, FONT_RANGE, VAD_RANGE, Settings
 from .i18n import tr
+from .language_picker import LanguagePicker
 
 try:
     from vrc.audio import input_devices
@@ -143,23 +144,17 @@ class SettingsWindow(QDialog):
         layout.addWidget(side)
         layout.addWidget(self.pages, 1)
 
-        self.my_lang = QComboBox()
-        fill_lang_combo(self.my_lang, with_auto=False)
-        self.my_lang.currentIndexChanged.connect(lambda: self._set("my_lang", self.my_lang.currentData()))
-        self.their_lang = QComboBox()
-        fill_lang_combo(self.their_lang, with_auto=True)
-        self.their_lang.currentIndexChanged.connect(
-            lambda: self._set("their_lang", self.their_lang.currentData()))
-        self.their_lang2 = QComboBox()
-        fill_lang_combo(self.their_lang2, with_auto=False, optional=True)
-        self.their_lang2.currentIndexChanged.connect(
-            lambda: self._set("their_lang2", self.their_lang2.currentData()))
+        self.my_lang = LanguagePicker()
+        self.their_lang = LanguagePicker(with_auto=True)
+        self.translated_to = LanguagePicker()
+        self.my_lang.selection_changed.connect(lambda values: self._set("my_languages", values))
+        self.their_lang.selection_changed.connect(lambda values: self._set("their_languages", values))
+        self.translated_to.selection_changed.connect(lambda values: self._set("translated_to", values))
 
         self._page("Translation", [
-            ("I speak", "Your language. Subtitles are translated into it.", self.my_lang),
-            ("They speak", "Your microphone is translated into this language. Auto-detect uses the "
-                           "language heard last. Typed text uses the Send menu.", self.their_lang),
-            ("Second language", "Optional second translation of your microphone. OSC shows the original and each translation on a separate line.", self.their_lang2),
+            ("I speak", "Choose up to 3 languages you speak.", self.my_lang),
+            ("They speak", "Choose up to 3 languages they speak, or Auto-detect.", self.their_lang),
+            ("Translated to", "Choose up to 3 translation languages to show on the panel.", self.translated_to),
             ("Voice detector", "Only listens while someone talks. Turn it off if it cuts words or "
                                "misses quiet voices.", self._switch("vad_on")),
             ("Show the original text", "Shows what was heard above its translation.",
@@ -377,9 +372,9 @@ class SettingsWindow(QDialog):
 
     def sync(self) -> None:
         """Show the current values (also after a change made in the main window)."""
-        select_data(self.my_lang, self.settings.my_lang)
-        select_data(self.their_lang, self.settings.their_lang)
-        select_data(self.their_lang2, self.settings.their_lang2)
+        self.my_lang.set_selected(self.settings.spoken_languages(True))
+        self.their_lang.set_selected(self.settings.spoken_languages(False))
+        self.translated_to.set_selected(self.settings.panel_languages())
         self.mic_device.blockSignals(True)
         self.mic_device.setCurrentIndex(max(self.mic_device.findData(self.settings.mic_device), 0))
         self.mic_device.blockSignals(False)
