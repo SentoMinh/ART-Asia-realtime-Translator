@@ -4,6 +4,10 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Music setup now shows when the mixer is installed on another microphone and lets you select it.": "音乐设置现在会显示已安装混音器的其他麦克风，并允许您选择它。",
+    "The mixer is installed on {microphone}. Use that microphone here and in VRChat. Moving it requires removing the existing attachment first.": "混音器已安装在 {microphone} 上。请在此处和 VRChat 中选择该麦克风。要更换安装位置，需先移除现有连接。",
+    "Use {microphone}": "使用 {microphone}",
+    "The installed mixer is no longer available. Refresh and try again.": "已安装的混音器不再可用。请刷新后重试。",
     "Translations appear as each language finishes, without waiting for the remaining languages.": "每种语言翻译完成后立即显示，无需等待其余语言。",
     "Speech recognition settings and VRChat chatbox timing are unchanged.": "语音识别设置和 VRChat 聊天框发送时序保持不变。",
     "Translated to": "翻译为",
@@ -293,6 +297,10 @@ _ZH = {
 }
 
 _VI = {
+    "Music setup now shows when the mixer is installed on another microphone and lets you select it.": "Cài đặt nhạc sẽ hiển thị micro khác đã cài bộ trộn và cho phép bạn chọn micro đó.",
+    "The mixer is installed on {microphone}. Use that microphone here and in VRChat. Moving it requires removing the existing attachment first.": "Bộ trộn đã được cài trên {microphone}. Hãy chọn micro đó ở đây và trong VRChat. Muốn chuyển sang micro khác, cần gỡ kết nối hiện tại trước.",
+    "Use {microphone}": "Dùng {microphone}",
+    "The installed mixer is no longer available. Refresh and try again.": "Bộ trộn đã cài không còn khả dụng. Hãy làm mới và thử lại.",
     "Translations appear as each language finishes, without waiting for the remaining languages.": "Bản dịch xuất hiện ngay khi từng ngôn ngữ hoàn tất, không cần chờ các ngôn ngữ còn lại.",
     "Speech recognition settings and VRChat chatbox timing are unchanged.": "Cài đặt nhận dạng giọng nói và thời điểm gửi vào khung chat VRChat không thay đổi.",
     "Translated to": "Dịch sang",

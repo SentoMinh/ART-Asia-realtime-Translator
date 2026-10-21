@@ -7,10 +7,38 @@ import pytest
 from vrc import apo_install as installer
 
 
+@pytest.fixture(autouse=True)
+def isolated_attachment(monkeypatch):
+    monkeypatch.setattr(installer.apo_setup, "load_state", lambda: None)
+
+
 def test_installed_mixer_does_not_request_admin_or_restart_audio(monkeypatch):
     monkeypatch.setattr(installer, "installed", lambda _: True)
     monkeypatch.setattr(installer.subprocess, "run", lambda *a, **kw: pytest.fail("Must not elevate"))
     assert installer.install("HyperX") == {"ok": True, "already_installed": True}
+
+
+def test_other_microphone_reports_existing_attachment_before_setup(monkeypatch):
+    monkeypatch.setattr(installer.apo_setup, "load_state", lambda: {
+        "phase": "validated", "microphone": "Virtual Desktop Audio"})
+    monkeypatch.setattr(installer, "installed", lambda name: name == "Virtual Desktop Audio")
+    monkeypatch.setattr(installer, "native_build", lambda: pytest.fail("Must not prepare a second installation"))
+    monkeypatch.setattr(installer.subprocess, "run", lambda *a, **kw: pytest.fail("Must not elevate"))
+    with pytest.raises(RuntimeError, match="already installed on Virtual Desktop Audio"):
+        installer.install("HyperX")
+
+
+def test_registered_microphone_requires_validated_unchanged_installation(monkeypatch):
+    state = {"phase": "removed", "microphone": "Headset"}
+    monkeypatch.setattr(installer.apo_setup, "load_state", lambda: state)
+    monkeypatch.setattr(installer, "installed", lambda _: pytest.fail("Removed attachment must not be used"))
+    assert installer.registered_microphone() == ""
+    state["phase"] = "validated"
+    def changed(_):
+        raise RuntimeError("configuration changed")
+    monkeypatch.setattr(installer, "installed", changed)
+    with pytest.raises(RuntimeError, match="configuration changed"):
+        installer.registered_microphone()
 
 
 def test_frozen_setup_uses_bundled_executable(monkeypatch):

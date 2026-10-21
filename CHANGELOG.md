@@ -1,5 +1,15 @@
 # Change log
 
+## 0.12.3 — 2026-10-22 — Mixer installed on a different microphone
+
+**Cause:** setup treated a selected microphone with no attachment as a new installation, even when the mixer was already registered on another device. The registration guard then refused installation with a generic backup/removal error. A read-only check on the affected PC found a validated Virtual Desktop Audio attachment with all 19 registry entries matching its journal; HyperX QuadCast was selected in the dialog.
+
+**Fix:** `vrc/apo_install.py::registered_microphone` identifies the validated installation and checks its files and registry. `MusicDialog.refresh` shows the existing device and a **Use [microphone]** button instead of another Install prompt. Clicking it rechecks the installation and active endpoint, changes the translator microphone, and signals `MainWindow.settings_changed` to save/apply the selection. The installer also names the existing device if invoked directly.
+
+**To troubleshoot:** choose the installed microphone in both the translator and VRChat, select a running app under Music source, then press Play. Moving the mixer to another microphone still requires removing the old attachment using its rollback journal; this fix does not silently move it or restart Windows audio. If the saved configuration differs from Windows, the existing guard still refuses to overwrite it.
+
+Regression tests in `tests/test_apo_install.py` and `tests/test_music_dialog.py` cover suppression of a second installation/UAC, validation of existing state, saving the selected device, enabling Play after selecting a source app, and rejecting a disconnected microphone before changing settings. All 447 tests passed. A native Windows check verified the existing-device message and selection button against the actual saved attachment, then closed the window. No installation or music playback was performed on the affected PC for this fix.
+
 ## 0.12.2 — 2026-10-22 — Earlier multilingual subtitles
 
 Implementation commit: [5672680](https://github.com/SentoMinh/ART-Asia-realtime-Translator/commit/5672680aac4ccf3afd8ed689fd4a4ac89108e835). The corresponding development checkout commit is `5587160`.

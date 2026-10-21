@@ -22,6 +22,7 @@ def isolated_tests(monkeypatch):
     i18n.set_lang("en")
     monkeypatch.setattr(music_dialog, "prototype_test_command", lambda: None)
     monkeypatch.setattr(music_dialog, "attachment_for", lambda _: None)
+    monkeypatch.setattr(music_dialog.apo_install, "registered_microphone", lambda: "")
     monkeypatch.setattr(music_dialog, "running_apps", lambda: [])
     monkeypatch.setattr(music_dialog, "MicrophoneStatus", lambda: SimpleNamespace(microphone="", refresh=lambda: None))
     yield
@@ -223,6 +224,52 @@ def test_declining_setup_does_not_launch_installer(app, monkeypatch):
     button.click()
     assert not dialog.setup_running
     dialog.close()
+
+
+def test_other_attachment_offers_use_button_and_persists_choice(app, monkeypatch):
+    from ui.backend import Backend
+    from ui.main_window import MainWindow
+    existing = "Microphone (Virtual Desktop Audio)"
+    monkeypatch.setattr(music_dialog.apo_install, "registered_microphone", lambda: existing)
+    monkeypatch.setattr(music_dialog.apo_install, "endpoint_for", lambda name: "endpoint")
+    monkeypatch.setattr(music_dialog.apo_install, "setup_command", lambda _: pytest.fail("Must not install again"))
+    monkeypatch.setattr(music_dialog, "attachment_for", lambda name: {"phase": "validated"} if name == existing else None)
+    monkeypatch.setattr(music_dialog, "requires_device_routing", lambda: False)
+    monkeypatch.setattr(music_dialog, "running_apps", lambda: [(123, "Music player")])
+    saved = []
+    window = MainWindow(Backend(), Settings(mic_device="HyperX"), save=lambda s: saved.append(s.mic_device))
+    try:
+        window.open_music()
+        dialog = window._music_dialog
+        assert existing in dialog.result.text()
+        assert dialog.install_button.isHidden() and not dialog.use_installed_button.isHidden()
+        assert not hasattr(dialog, "_setup_prompt")
+        assert not dialog.play_button.isEnabled()
+        dialog.use_installed_button.click()
+        assert window.settings.mic_device == existing and saved[-1] == existing
+        assert dialog.mic_note.text() == existing
+        assert dialog.use_installed_button.isHidden() and dialog.install_button.isHidden()
+        dialog.apps.setCurrentIndex(dialog.apps.findData(123))
+        assert dialog.play_button.isEnabled()
+    finally:
+        window.close()
+
+
+def test_use_existing_attachment_checks_endpoint_before_changing_selection(app, monkeypatch):
+    monkeypatch.setattr(music_dialog.apo_install, "registered_microphone", lambda: "Disconnected headset")
+    def unavailable(_):
+        raise RuntimeError("Microphone is not active")
+    monkeypatch.setattr(music_dialog.apo_install, "endpoint_for", unavailable)
+    dialog = music_dialog.MusicDialog(Settings(mic_device="HyperX"))
+    saved = []
+    dialog.settings_changed.connect(lambda: saved.append(True))
+    try:
+        dialog.use_installed_button.click()
+        assert dialog.settings.mic_device == "HyperX" and not saved
+        assert "not active" in dialog.result.text()
+    finally:
+        dialog.shutdown()
+        dialog.close()
 
 
 def test_close_or_reject_keeps_music_active(ready_dialog):

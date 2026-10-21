@@ -1,6 +1,6 @@
 # Project context
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.2 and the preceding release validation; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.3 and the preceding release validation; recheck current code before relying on its findings.
 
 Read `CHANGELOG.md` for the reason behind recent changes, their implementation commits, regression tests and troubleshooting steps.
 

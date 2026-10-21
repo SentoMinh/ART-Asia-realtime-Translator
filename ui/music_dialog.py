@@ -36,6 +36,7 @@ def prototype_test_command():
 class MusicDialog(QDialog):
     state_changed = Signal(bool)
     peak_changed = Signal(float)
+    settings_changed = Signal()
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -43,6 +44,7 @@ class MusicDialog(QDialog):
         self.player = ApoPlayer()
         self._vrchat_microphone = MicrophoneStatus()
         self._attachment = None
+        self._installed_microphone = ""
         self._was_busy = False
         self._was_active = False
         self._test_command = None
@@ -108,6 +110,9 @@ class MusicDialog(QDialog):
         self.install_button.setIcon(self.style().standardIcon(QStyle.SP_VistaShield))
         self.install_button.clicked.connect(self.offer_setup)
         layout.addWidget(self.install_button)
+        self.use_installed_button = QPushButton()
+        self.use_installed_button.clicked.connect(self.use_installed_microphone)
+        layout.addWidget(self.use_installed_button)
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)
         self.details.setMaximumBlockCount(200)
@@ -160,6 +165,9 @@ class MusicDialog(QDialog):
     def offer_setup(self):
         if self.setup_running or self.player.busy or self.test_running:
             return
+        self.refresh()
+        if self._installed_microphone:
+            return
         self._setup_prompted = True
         prompt = QMessageBox(self)
         prompt.setWindowTitle(tr("Microphone audio setup required"))
@@ -189,6 +197,20 @@ class MusicDialog(QDialog):
         except Exception as error:
             self._set_result(str(error))
         self._update_controls()
+
+    def use_installed_microphone(self):
+        if self.setup_running or self.player.busy or self.test_running:
+            return
+        try:
+            microphone = apo_install.registered_microphone()
+            if not microphone:
+                raise RuntimeError(tr("The installed mixer is no longer available. Refresh and try again."))
+            apo_install.endpoint_for(microphone)
+            self.settings.mic_device = microphone
+            self.settings_changed.emit()
+            self.refresh()
+        except Exception as error:
+            self._set_result(str(error))
 
     def _read_setup_output(self):
         self._setup_output += bytes(self._setup_process.readAllStandardOutput()).decode("utf-8", errors="replace")
@@ -224,9 +246,14 @@ class MusicDialog(QDialog):
 
     def refresh(self):
         self.mic_note.setText(self.settings.mic_device or tr("Windows default"))
+        self._installed_microphone = ""
         setup_error = ""
         try:
             self._attachment = attachment_for(self.settings.mic_device)
+            if self._attachment is None:
+                self._installed_microphone = apo_install.registered_microphone()
+                if self._installed_microphone:
+                    setup_error = tr("The mixer is installed on {microphone}. Use that microphone here and in VRChat. Moving it requires removing the existing attachment first.").format(microphone=self._installed_microphone)
         except Exception as error:
             self._attachment = None
             setup_error = str(error)
@@ -265,8 +292,11 @@ class MusicDialog(QDialog):
         self.refresh_button.setEnabled(not busy)
         self.volume.setEnabled(ready)
         self.apps.setEnabled(ready and not busy)
-        self.install_button.setVisible(self._attachment is None)
+        self.install_button.setVisible(self._attachment is None and not self._installed_microphone)
         self.install_button.setEnabled(not busy)
+        self.use_installed_button.setText(tr("Use {microphone}").format(microphone=self._installed_microphone))
+        self.use_installed_button.setVisible(bool(self._installed_microphone))
+        self.use_installed_button.setEnabled(not busy)
 
     def toggle_music(self):
         if self.player.busy or self.test_running:
