@@ -5,7 +5,7 @@ from html import escape
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication
-from PySide6.QtWidgets import (QFrame, QGraphicsDropShadowEffect, QLabel, QScrollArea, QVBoxLayout,
+from PySide6.QtWidgets import (QApplication, QFrame, QGraphicsDropShadowEffect, QLabel, QScrollArea, QVBoxLayout,
                                QWidget)
 
 from . import theme
@@ -15,6 +15,39 @@ from .i18n import tr, tr_note
 MAX_ROWS = 200
 FLOATING_DIM = "#d9d9e3"   # the small grey text, lighter when there is no background behind it
 SHORT = {"en": "EN", "zh": "ZH", "vi": "VI", "yue": "ZH(HK)", "ja": "JA", "ko": "KO"}
+
+
+class SelectableText(QLabel):
+    """Keep click-to-copy while letting Qt handle partial text selection."""
+
+    def __init__(self, row):
+        super().__init__(row)
+        self.row = row
+        self._press_position = None
+        self.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        self.setCursor(Qt.IBeamCursor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._press_position = event.position().toPoint()
+        super().mousePressEvent(event)
+        event.accept()
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._press_position = event.position().toPoint()
+        super().mouseDoubleClickEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if event.button() == Qt.LeftButton and self._press_position is not None:
+            distance = (event.position().toPoint() - self._press_position).manhattanLength()
+            self._press_position = None
+            if self.hasSelectedText():
+                self.row.copy_text(self.selectedText())
+            elif distance < QApplication.startDragDistance():
+                self.row.copy_text(self.row.main_text())
+        event.accept()
 
 
 class LogRow(QFrame):
@@ -31,13 +64,13 @@ class LogRow(QFrame):
         layout.setContentsMargins(8, 5, 8, 6)
         layout.setSpacing(1)
         self.header = QLabel()
-        self.original = QLabel()
-        self.translation = QLabel()
-        self.translation2 = QLabel()
+        self.original = SelectableText(self)
+        self.translation = SelectableText(self)
+        self.translation2 = SelectableText(self)
+        self.header.setAttribute(Qt.WA_TransparentForMouseEvents)
         for label in (self.header, self.original, self.translation, self.translation2):
             label.setWordWrap(True)
             label.setTextFormat(Qt.RichText)
-            label.setAttribute(Qt.WA_TransparentForMouseEvents)
             layout.addWidget(label)
         self.refresh()
 
@@ -68,7 +101,7 @@ class LogRow(QFrame):
         u = self.utterance
         mine = u.source in ("mic", "typed")
         dim = FLOATING_DIM if self._shadow else theme.DIM
-        self.setToolTip(tr("Click to copy the original text"))
+        self.setToolTip(tr("Click to copy the original text. Drag to select and copy only that text."))
         name = tr("You") if mine else (tr("Speaker {n}").format(n=u.speaker) if u.speaker
                                        else tr("Speaker"))
         color = theme.ACCENT if mine else theme.speaker_color(u.speaker)
@@ -140,11 +173,16 @@ class LogRow(QFrame):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and self.main_text():
-            QGuiApplication.clipboard().setText(self.main_text())
-            self._copied = True
-            self.refresh()
-            QTimer.singleShot(1200, self._uncopy)
+            self.copy_text(self.main_text())
         super().mousePressEvent(event)
+
+    def copy_text(self, text):
+        if not text:
+            return
+        QGuiApplication.clipboard().setText(text)
+        self._copied = True
+        self.refresh()
+        QTimer.singleShot(1200, self._uncopy)
 
     def _uncopy(self):
         self._copied = False

@@ -55,7 +55,6 @@ _SVG = {
     "globe": '<circle cx="12" cy="12" r="8.5"/>'
              '<path d="M3.5 12h17M12 3.5c-3.2 2.6-3.2 14.4 0 17M12 3.5c3.2 2.6 3.2 14.4 0 17"/>',
     "down":'<path d="M7 10l5 5 5-5"/>',
-    "resize": '<path d="M5 15v4h4M5 19L19 5M15 5h4v4"/>',
     "dock": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 16L8 9M8 9h5M8 9v5"/>',
     "trash":'<path d="M5 7h14M10 7V4.5h4V7M7 7l1 12.5h8L17 7"/>',
 }
@@ -83,8 +82,6 @@ def style_sheet() -> str:
     QToolButton:hover {{ background: rgba(255,255,255,26); }}
     QToolButton#close:hover {{ background: {ERROR}; }}
     QToolButton:focus {{ border: 1px solid {ACCENT}; }}
-    QSizeGrip {{ background: {LINE}; border: 1px solid {DIM}; border-radius: 4px; }}
-    QSizeGrip:hover {{ border-color: {ACCENT}; }}
     QLabel#dim {{ color: {DIM}; font-size: 12px; }}
     QComboBox {{ background: rgba(255,255,255,18); border: 1px solid transparent;
                  border-radius: 6px; padding: 3px 8px; min-height: 20px; }}
