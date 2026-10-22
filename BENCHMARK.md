@@ -1,5 +1,7 @@
 # Benchmark
 
+For the current ART 0.12.4 comparison, see [Modal versus local latency — 22 October 2026](LATENCY_REPORT.md). Warm NLLB translation measured 561 ms on Modal versus 299 ms locally; Auto hearing on shared EN/ZH clips measured 1,160 ms with Modal SenseVoice versus 311 ms with local Whisper turbo. VRChat was not running, the recognizers differ, and Modal omitted part of two multi-sentence inputs. The report separates startup, first-result display, complete-result timing and quality limitations. The older evaluation below remains historical.
+
 Before the program was built, the candidate speech and translation models were measured on the same recordings in English, Chinese and Vietnamese, in two situations: **your own microphone** and **other players heard through VRChat**, with world music behind their voices.
 
 This is a historical evaluation, not the current provider configuration. Version 0.11.5 supports six conversation languages, including Japanese and Korean; the measurements below do not benchmark those added languages. Choose current hearing and translation models in Settings → Models.
