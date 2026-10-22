@@ -65,6 +65,8 @@ The download panel opens inside Settings and moves with it. Its model list has o
 
 Local inference needs no API key. Select Local Model for both Hearing and Translating to run both steps on your PC. The first download needs internet access. Optional translation add-ons retain their existing fallback behavior.
 
+**Cannot download NLLB from China or another restricted network?** Use the [offline NLLB package](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/download/v0.12.3/ART-NLLB-200-CT2-offline.zip) (about 558 MiB; [SHA-256](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/download/v0.12.3/ART-NLLB-200-CT2-offline.zip.sha256)). Download it on a working connection or transfer the ZIP by USB or a file-sharing service. Close ART, extract the ZIP, and double-click **Install-NLLB.cmd**. Then open Settings → Models, select **Local Model** for Translating, and choose **Use model** for NLLB. No administrator, Python, Hugging Face connection or API key is needed during installation. The installer checks the four pinned model files and preserves any replaced folder as a backup. It works with v0.12.3; the app EXE is unchanged. GitHub access from mainland China is not verified, so file transfer is the fallback if that download is also unavailable. The model remains [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/); attribution is included in the ZIP.
+
 ## The window
 
 | Part | What it does |
