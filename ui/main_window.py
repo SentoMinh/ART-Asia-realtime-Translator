@@ -664,6 +664,7 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
+            "Local translation now keeps separate sentences and retries runaway repetition.",
             "Music setup now shows when the mixer is installed on another microphone and lets you select it.",
             "This update notice appears once per version.",
         ):

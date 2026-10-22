@@ -4,6 +4,7 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Local translation now keeps separate sentences and retries runaway repetition.": "本地翻译现在会分别处理各个句子，并在出现大量重复时重试。",
     "Music setup now shows when the mixer is installed on another microphone and lets you select it.": "音乐设置现在会显示已安装混音器的其他麦克风，并允许您选择它。",
     "The mixer is installed on {microphone}. Use that microphone here and in VRChat. Moving it requires removing the existing attachment first.": "混音器已安装在 {microphone} 上。请在此处和 VRChat 中选择该麦克风。要更换安装位置，需先移除现有连接。",
     "Use {microphone}": "使用 {microphone}",
@@ -297,6 +298,7 @@ _ZH = {
 }
 
 _VI = {
+    "Local translation now keeps separate sentences and retries runaway repetition.": "Dịch cục bộ giờ xử lý từng câu riêng và thử lại khi kết quả lặp quá nhiều.",
     "Music setup now shows when the mixer is installed on another microphone and lets you select it.": "Cài đặt nhạc sẽ hiển thị micro khác đã cài bộ trộn và cho phép bạn chọn micro đó.",
     "The mixer is installed on {microphone}. Use that microphone here and in VRChat. Moving it requires removing the existing attachment first.": "Bộ trộn đã được cài trên {microphone}. Hãy chọn micro đó ở đây và trong VRChat. Muốn chuyển sang micro khác, cần gỡ kết nối hiện tại trước.",
     "Use {microphone}": "Dùng {microphone}",
