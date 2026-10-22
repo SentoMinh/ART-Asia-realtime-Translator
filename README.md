@@ -11,6 +11,8 @@ Version **[0.12.3](https://github.com/SentoMinh/ART-Asia-realtime-Translator/rel
 
 See the [change log](CHANGELOG.md) for implementation details, measurements and troubleshooting notes.
 
+Planned local translation model comparisons prioritize low latency. See [the Qwen and alternative-model plan](LOCAL_TRANSLATION_PLAN.md); listed candidates are not yet added to the app.
+
 Version 0.12.3 keeps separately punctuated sentences in local translation, retries excessive repetition once, and offers to select a microphone that already has the music mixer installed.
 
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
