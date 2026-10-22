@@ -1,6 +1,9 @@
 """Local hearing choices and CPU translation; model files stay in the user's cache."""
 from __future__ import annotations
 
+from collections import Counter
+import logging
+import re
 import threading
 
 from . import local_model
@@ -68,6 +71,34 @@ LANGUAGES = {"en": "eng_Latn", "vi": "vie_Latn", "zh": "zho_Hans", "yue": "yue_H
              "ja": "jpn_Jpan", "ko": "kor_Hang"}
 
 
+def translation_sentences(text):
+    """Keep punctuation while giving the sentence-trained model each sentence."""
+    sentences, start = [], 0
+    for boundary in re.finditer(r'''([.!?。！？]+)["'”’」』）)]*(\s*)''', text):
+        punctuation = boundary[1]
+        if not any(char in "。！？" for char in punctuation) and not boundary[2] and boundary.end() < len(text):
+            continue  # Decimal points, URLs and abbreviations inside a word.
+        if punctuation == "." and re.search(
+                r"(?:\b(?i:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|e\.g|i\.e)|\b[A-Z]|\b(?:[A-Za-z]\.)+[A-Za-z])\.$",
+                text[:boundary.start() + 1]):
+            continue
+        if punctuation == "...":
+            continue
+        sentences.append(text[start:boundary.end()].strip())
+        start = boundary.end()
+    if text[start:].strip():
+        sentences.append(text[start:].strip())
+    # shortcut: conservative punctuation rules, use a language-aware splitter if ambiguous boundaries recur.
+    return sentences
+
+
+def translation_loop(tokens, source_tokens):
+    if len(tokens) < max(48, 2 * len(source_tokens)):
+        return False
+    ngrams = Counter(tuple(tokens[index:index + 4]) for index in range(len(tokens) - 3))
+    return max(ngrams.values(), default=0) >= 6
+
+
 class LocalTranslator:
     def __init__(self):
         self._model = self._tokenizer = None
@@ -98,14 +129,29 @@ class LocalTranslator:
                                                   inter_threads=1, intra_threads=2)
                     self._model, self._tokenizer = model, tokenizer
                 # NLLB's source format is language token + text + EOS.
-                tokens = [LANGUAGES[source], *self._tokenizer.encode(text, add_special_tokens=False).tokens, "</s>"]
-                result = self._model.translate_batch([tokens], target_prefix=[[LANGUAGES[target]]], beam_size=1)
-                translated = result[0].hypotheses[0][1:]
-                ids = [self._tokenizer.token_to_id(token) for token in translated]
-                answer = self._tokenizer.decode(ids, skip_special_tokens=True).strip()
-                if not answer:
+                tokens = [[LANGUAGES[source], *self._tokenizer.encode(sentence, add_special_tokens=False).tokens, "</s>"]
+                          for sentence in translation_sentences(text)]
+                if not tokens:
                     raise ValueError("the translation came back empty")
-                return answer
+                results = self._model.translate_batch(tokens, target_prefix=[[LANGUAGES[target]]] * len(tokens), beam_size=1)
+                if len(results) != len(tokens):
+                    raise ValueError("the translation omitted a sentence")
+                answers = []
+                for original, result in zip(tokens, results):
+                    translated = result.hypotheses[0][1:]
+                    if translation_loop(translated, original):
+                        logging.getLogger(__name__).warning("Local NLLB repetition detected (%s -> %s); retrying sentence once", source, target)
+                        retry = self._model.translate_batch([original], target_prefix=[[LANGUAGES[target]]],
+                                                            beam_size=1, no_repeat_ngram_size=4)
+                        translated = retry[0].hypotheses[0][1:]
+                        if translation_loop(translated, original):
+                            raise ValueError("the translation kept repeating")
+                    ids = [self._tokenizer.token_to_id(token) for token in translated]
+                    answer = self._tokenizer.decode(ids, skip_special_tokens=True).strip()
+                    if not answer:
+                        raise ValueError("a sentence translation came back empty")
+                    answers.append(answer)
+                return " ".join(answers)
             except Exception as error:
                 raise TranslateError(f"Local NLLB could not translate: {error}") from error
 

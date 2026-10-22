@@ -1,6 +1,20 @@
 # Change log
 
-## 0.12.3 — 2026-10-22 — Mixer installed on a different microphone
+## 0.12.3 — 2026-10-22 — Local translation and microphone setup fixes
+
+### Local translation repeats or drops a later sentence
+
+**Cause:** replaying the reported text with the installed NLLB/CTranslate2 model reproduced both failures before rendering: a short, stuttered Chinese input expanded into a 256-token English repetition loop, and “Can you wait a bit? I want to move to VR first.” returned only the first Chinese sentence. The overlay and chatbox did not remove the missing sentence.
+
+**Fix:** `engine/local_inference.py::LocalTranslator.translate` batches separately punctuated sentences, keeping their order and language prefixes. `translation_sentences` preserves common abbreviations, initials, decimal points, URLs and closing quotes. A missing or empty sentence result raises an error instead of returning an incomplete success.
+
+`translation_loop` detects a four-token sequence repeated at least six times in output that has grown to at least 48 tokens and twice its source length. Only that sentence is retried once with `no_repeat_ngram_size=4`; persistent repetition becomes an ordinary translation error. A warning in `engine.log` identifies the retry. Normal single-sentence decoding, CPU thread counts and the shared model lock are unchanged. The repetition setting is documented in the [CTranslate2 API](https://opennmt.net/CTranslate2/python/ctranslate2.Translator.html).
+
+**Verification and limits:** the real-model replay retained both sentences, including VR, and replaced the large repeated block with a bounded answer. Three ordinary single-sentence outputs were unchanged. Regression tests in `tests/test_local_translation_quality.py` cover punctuation, legitimate repetitions, ordered sentence results, empty/missing results and the one-retry limit. All 463 tests passed. Sentence boundaries are conservative punctuation rules and may miss ambiguous abbreviations or unpunctuated speech. Translating sentences separately can lose context between sentences. A repetition retry adds latency to the failed sentence; it does not correct misrecognized speech or guarantee the model's wording. No live microphone/VRChat audio was replayed.
+
+**To diagnose or undo:** check the original recognition first, then look for `Local NLLB repetition detected` in the log. The behavior is confined to `engine/local_inference.py`; cloud providers, speech recognition and the progressive subtitle change in 0.12.2 are separate. Reverting this change should also update its tests and release notice, and any published replacement binary needs a new version.
+
+### Mixer installed on a different microphone
 
 **Cause:** setup treated a selected microphone with no attachment as a new installation, even when the mixer was already registered on another device. The registration guard then refused installation with a generic backup/removal error. A read-only check on the affected PC found a validated Virtual Desktop Audio attachment with all 19 registry entries matching its journal; HyperX QuadCast was selected in the dialog.
 
@@ -8,7 +22,7 @@
 
 **To troubleshoot:** choose the installed microphone in both the translator and VRChat, select a running app under Music source, then press Play. Moving the mixer to another microphone still requires removing the old attachment using its rollback journal; this fix does not silently move it or restart Windows audio. If the saved configuration differs from Windows, the existing guard still refuses to overwrite it.
 
-Regression tests in `tests/test_apo_install.py` and `tests/test_music_dialog.py` cover suppression of a second installation/UAC, validation of existing state, saving the selected device, enabling Play after selecting a source app, and rejecting a disconnected microphone before changing settings. All 447 tests passed. A native Windows check verified the existing-device message and selection button against the actual saved attachment, then closed the window. No installation or music playback was performed on the affected PC for this fix.
+Regression tests in `tests/test_apo_install.py` and `tests/test_music_dialog.py` cover suppression of a second installation/UAC, validation of existing state, saving the selected device, enabling Play after selecting a source app, and rejecting a disconnected microphone before changing settings. These are included in the 463 passing tests above. A native Windows check verified the existing-device message and selection button against the actual saved attachment, then closed the window. No installation or music playback was performed on the affected PC for this fix.
 
 ## 0.12.2 — 2026-10-22 — Earlier multilingual subtitles
 
