@@ -150,11 +150,26 @@ class SettingsWindow(QDialog):
         self.my_lang.selection_changed.connect(lambda values: self._set("my_languages", values))
         self.their_lang.selection_changed.connect(lambda values: self._set("their_languages", values))
         self.translated_to.selection_changed.connect(lambda values: self._set("translated_to", values))
+        self.chatbox_mode = QComboBox()
+        self.chatbox_mode.addItem(tr("Follow 'They speak'"), True)
+        self.chatbox_mode.addItem(tr("Custom languages"), False)
+        self.chatbox_mode.setAccessibleName(tr("Chatbox languages"))
+        self.chatbox_languages = LanguagePicker()
+        self.chatbox_languages.setAccessibleName(tr("Custom languages"))
+        self.chatbox_languages.selection_changed.connect(
+            lambda values: self._set("chatbox_custom_languages", values))
+        self.chatbox_mode.currentIndexChanged.connect(self._chatbox_mode_changed)
+        chatbox_control = QWidget()
+        chatbox_layout = QVBoxLayout(chatbox_control)
+        chatbox_layout.setContentsMargins(0, 0, 0, 0)
+        chatbox_layout.addWidget(self.chatbox_mode)
+        chatbox_layout.addWidget(self.chatbox_languages)
 
         self._page("Translation", [
             ("I speak", "Choose up to 3 languages you speak.", self.my_lang),
             ("They speak", "Choose up to 3 languages they speak, or Auto-detect.", self.their_lang),
             ("Translated to", "Choose up to 3 translation languages to show on the panel.", self.translated_to),
+            ("Chatbox languages", "Send your voice and Auto typed messages in up to 3 languages. Auto-detect follows the last language heard, or English until then.", chatbox_control),
             ("Voice detector", "Only listens while someone talks. Turn it off if it cuts words or "
                                "misses quiet voices.", self._switch("vad_on")),
             ("Show the original text", "Shows what was heard above its translation.",
@@ -375,6 +390,9 @@ class SettingsWindow(QDialog):
         self.my_lang.set_selected(self.settings.spoken_languages(True))
         self.their_lang.set_selected(self.settings.spoken_languages(False))
         self.translated_to.set_selected(self.settings.panel_languages())
+        select_data(self.chatbox_mode, self.settings.chatbox_follow)
+        self.chatbox_languages.set_selected(self.settings.chatbox_custom_languages)
+        self.chatbox_languages.setVisible(not self.settings.chatbox_follow)
         self.mic_device.blockSignals(True)
         self.mic_device.setCurrentIndex(max(self.mic_device.findData(self.settings.mic_device), 0))
         self.mic_device.blockSignals(False)
@@ -586,6 +604,11 @@ class SettingsWindow(QDialog):
         self._set(role, "local")
         self.show_local_status()
         self.sync()
+
+    def _chatbox_mode_changed(self) -> None:
+        follow = self.chatbox_mode.currentData()
+        self.chatbox_languages.setVisible(not follow)
+        self._set("chatbox_follow", follow)
 
     def _set(self, name: str, value) -> None:
         setattr(self.settings, name, value)

@@ -541,14 +541,13 @@ class MainWindow(QWidget):
     def _refresh_send_target(self) -> None:
         """The Send button names the language the next typed line goes into."""
         choice = self.settings.send_lang
-        target = self.backend.target_lang()
-        short = SHORT.get(target, target)
+        targets = self.backend.target_langs()
+        short = ", ".join(SHORT.get(target, target) for target in targets)
         self.send_lang_actions.get(choice, self.send_lang_actions[AUTO]).setChecked(True)
-        name = tr(LANGS.get(target, target))
+        name = ", ".join(tr(LANGS.get(target, target)) for target in targets)
         if choice == AUTO:
             self.send_button.setText(f"{tr('Send')} · {tr('Auto')} {short}")
-            tip = tr("Auto: translates into the language heard last from audio "
-                     "(right now: {lang})").format(lang=name)
+            tip = tr("Auto: follows chatbox languages (right now: {lang})").format(lang=name)
         else:
             self.send_button.setText(f"{tr('Send')} · {short}")
             tip = tr("Translates into {lang}").format(lang=name)
@@ -575,7 +574,7 @@ class MainWindow(QWidget):
         self.input.setPlaceholderText(tr("Type a message — Enter translates and sends it"))
         self.input.setAccessibleName(tr("Message to translate and send"))
         for code, action in self.send_lang_actions.items():
-            action.setText(tr("Auto — the language heard last") if code == AUTO else tr(LANGS[code]))
+            action.setText(tr("Auto — follow chatbox languages") if code == AUTO else tr(LANGS[code]))
         for code, action in self.ui_lang_actions.items():
             action.setChecked(code == i18n.lang())
         self.show_status(self._status)
@@ -664,8 +663,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Local translation now keeps separate sentences and retries runaway repetition.",
-            "Music setup now shows when the mixer is installed on another microphone and lets you select it.",
+            "Chatbox messages now follow all languages in They speak. Choose custom languages in Settings → Translation.",
+            "Translated to controls the panel. Shared translations are reused for the chatbox.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))

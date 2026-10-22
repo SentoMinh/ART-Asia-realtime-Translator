@@ -48,6 +48,8 @@ class Utterance:
     translation2: str = ""
     panel_targets: tuple[str, ...] = ()
     panel_translations: tuple[tuple[str, str], ...] = ()
+    chatbox_targets: tuple[str, ...] = ()
+    chatbox_translations: tuple[tuple[str, str], ...] = ()
 
 
 class Backend(QObject):
@@ -74,6 +76,10 @@ class Backend(QObject):
     def target_lang(self) -> str:
         """The language typed text would be translated into right now (shown on the Send button)."""
         return "en"
+
+    def target_langs(self) -> list[str]:
+        """All destinations of the next typed message, in display order."""
+        return [self.target_lang()]
 
     def speech_target_lang(self) -> str:
         """The language my microphone is translated into, independent of the Send menu."""

@@ -17,7 +17,7 @@ from PySide6.QtCore import QTimer, Signal
 from vrc.chatbox import MIN_GAP_S, Chatbox, TypingDots, VRChatState, find_vrchat, fit, fit_bilingual, fit_lines
 from vrc.translate import NoTranslator, TranslateError, translate_targets
 
-from .backend import AUTO, Backend, Status, Utterance
+from .backend import Backend, Status, Utterance
 from .config import Settings
 
 try:
@@ -27,7 +27,6 @@ except ImportError:      # numpy missing: the window still works, without sound
 
 POLL_MS = 2000
 LEVEL_MS = 50           # how often the level bars move
-DEFAULT_TARGET = "en"   # everything on Auto and nobody was heard yet
 
 
 class LiveBackend(Backend):
@@ -199,19 +198,13 @@ class LiveBackend(Backend):
         self.mic_level.emit(self._mic.level() if self._mic else 0.0)
 
     def target_lang(self) -> str:
-        """The language typed text is translated into: the one picked next to Send, else the
-        language heard last from audio, else "They speak", else English."""
-        if self.settings.send_lang != AUTO:
-            return self.settings.send_lang
-        if self.last_heard:
-            return self.last_heard
-        their = self.settings.spoken_languages(False)[0]
-        return their if their != AUTO else DEFAULT_TARGET
+        return self.target_langs()[0]
+
+    def target_langs(self) -> list[str]:
+        return self.settings.chatbox_languages(self.last_heard, typed=True)
 
     def speech_target_lang(self) -> str:
-        """Voice replies follow 'They speak'; only Auto follows the last player heard."""
-        their = self.settings.spoken_languages(False)[0]
-        return their if their != AUTO else self.last_heard or DEFAULT_TARGET
+        return self.settings.chatbox_languages(self.last_heard)[0]
 
     # ---- "typing…" in VRChat: only before the first message after a quiet time ----------
 
@@ -232,7 +225,8 @@ class LiveBackend(Backend):
             return
         utterance = Utterance(id=self._next_id, source="typed", original=text,
                               src_lang=self.settings.spoken_languages(True)[0], dst_lang=self.target_lang(),
-                              panel_targets=tuple(self.settings.panel_languages()))
+                              panel_targets=tuple(self.settings.panel_languages()),
+                              chatbox_targets=tuple(self.target_langs()))
         self._next_id += 1
         self.utterance.emit(utterance)   # shown at once as "translating…"
         if self.settings.chatbox_typing:
@@ -264,10 +258,11 @@ class LiveBackend(Backend):
                     latency_ms=int((time.perf_counter() - started) * 1000)))
 
         translations, errors = translate_targets(
-            self._translator, utterance.original, (target, *utterance.panel_targets), source,
+            self._translator, utterance.original, (target, *utterance.chatbox_targets, *utterance.panel_targets), source,
             on_result=show_progress)
         utterance = dataclasses.replace(utterance, panel_translations=tuple(
-            (code, translations.get(code, "")) for code in utterance.panel_targets))
+            (code, translations.get(code, "")) for code in utterance.panel_targets),
+            chatbox_translations=tuple((code, translations.get(code, "")) for code in utterance.chatbox_targets))
         translation = translations.get(target, "")
         error = str(errors[target]) if target in errors else ""
         utterance.note = ", ".join(f"not translated ({code}): {problem}"
@@ -305,10 +300,15 @@ class LiveBackend(Backend):
             return
         notes = [utterance.note] if utterance.note else []
         translation = utterance.translation
+        chatbox_texts = [text for _, text in utterance.chatbox_translations if text]
         if utterance.source == "mic":
-            outgoing, cut = fit_lines(utterance.original, translation, utterance.translation2)
+            texts = chatbox_texts if utterance.chatbox_targets else [translation, utterance.translation2]
+            outgoing, cut = fit_lines(utterance.original, *texts)
         elif speaker:
             outgoing, cut = fit_bilingual(translation, utterance.original)
+        elif len(utterance.chatbox_targets) > 1:
+            original = utterance.original if self.settings.chatbox_original or not chatbox_texts else ""
+            outgoing, cut = fit_lines(original, *chatbox_texts)
         else:
             outgoing = translation or utterance.original
             if translation and self.settings.chatbox_original and translation != utterance.original:

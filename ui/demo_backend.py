@@ -62,12 +62,13 @@ class DemoBackend(Backend):
         return self._next_id - 1
 
     def target_lang(self) -> str:
-        send = self.settings.send_lang
-        return send if send != AUTO else self._last_heard or self.speech_target_lang()
+        return self.target_langs()[0]
+
+    def target_langs(self) -> list[str]:
+        return self.settings.chatbox_languages(self._last_heard, typed=True)
 
     def speech_target_lang(self) -> str:
-        their = self.settings.spoken_languages(False)[0]
-        return (self._last_heard or "en") if their == AUTO else their
+        return self.settings.chatbox_languages(self._last_heard)[0]
 
     def _tick(self) -> None:
         who, lang, texts = SCRIPT[self._line % len(SCRIPT)]

@@ -1,5 +1,15 @@
 # Change log
 
+## 0.12.4 — 2026-10-22 — Multiple chatbox languages
+
+Your microphone and typed Send → Auto now follow every selected **They speak** language, rather than only one destination. With English speech and Chinese + Vietnamese listeners, one microphone chatbox message contains English, Chinese and Vietnamese on separate lines. **Settings → Translation → Chatbox languages** offers Follow 'They speak' (default) or up to three Custom languages. **Translated to** continues to control only panel outputs. An explicit Send language still overrides destinations for typed messages only. Auto-detect follows the last heard language, or English before one is heard. Optional Add Speaker words keeps its existing first-panel-language behavior.
+
+`Settings.chatbox_languages` resolves these choices; the config loader validates custom selections. `Utterance.chatbox_targets` captures each message's destinations before queued work starts. `SpeechEngine.finish` and `LiveBackend._run` pass the ordered union of chatbox and panel targets through `translate_targets`, reusing shared results and original text for matching source languages. Successful outputs survive errors in other targets. `LiveBackend._queue_for_chatbox` uses `fit_lines` to deduplicate and share the 144-character budget across original plus up to three translations. No separate OSC messages are created. Single-language typed messages retain their existing optional `translation (original)` format.
+
+Latency: overlapping languages add no translation calls. A new distinct target still adds inference time; requests remain sequential and chatbox delivery waits for completion. Speech recognition, inference settings, fallback handling and OSC pacing are unchanged. To investigate missing chatbox languages, inspect captured `chatbox_targets`, per-target `chatbox_translations`, the explicit Send override and each utterance's error note. Changing choices during a queued message affects subsequent messages only.
+
+Validation: all 479 tests passed. Regression checks cover reuse, source-language matches, partial/all failures, custom targets, typed overrides, captured choices, saved settings, UI synchronization, four-line truncation and duplicate removal. A native Windows preview verified the Settings control and update notice, then closed automatically after 12 seconds. Live reception by another VRChat player is not verified for this change.
+
 ## 0.12.3 — 2026-10-22 — Local translation and microphone setup fixes
 
 ### Optional offline NLLB installation package

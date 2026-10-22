@@ -289,7 +289,9 @@ class SpeechEngine:
             target = self.backend.speech_target_lang()
         line = Utterance(id=next(self._ids), source=source, original=text,
                          src_lang=heard.lang, dst_lang=target,
-                         panel_targets=tuple(settings.panel_languages()))
+                         panel_targets=tuple(settings.panel_languages()),
+                         chatbox_targets=tuple(settings.chatbox_languages(self.backend.last_heard))
+                         if source == MIC else ())
         self.backend.utterance.emit(line)          # shown at once, as "translating…"
         pool = self._mic_pool if source == MIC else self._pool
         if pool is not None:
@@ -333,10 +335,11 @@ class SpeechEngine:
                     latency_ms=int((self._clock() - segment.speech_end) * 1000)))
 
         translations, errors = translate_targets(
-            self._translator, line.original, (line.dst_lang, *line.panel_targets),
+            self._translator, line.original, (line.dst_lang, *line.chatbox_targets, *line.panel_targets),
             line.src_lang if line.src_lang in LANGS else "", heard=True, on_result=show_progress)
         line.translation = translations.get(line.dst_lang, "") if line.dst_lang != line.src_lang else ""
         line.panel_translations = tuple((code, translations.get(code, "")) for code in line.panel_targets)
+        line.chatbox_translations = tuple((code, translations.get(code, "")) for code in line.chatbox_targets)
         for code, error in errors.items():
             label = "not translated" if code == line.dst_lang else f"not translated ({code})"
             line.note = ", ".join(filter(None, [line.note, f"{label}: {error}"]))
