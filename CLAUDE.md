@@ -7,6 +7,7 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 ## Scope and existing work
 
 - Read `ROADMAP.md` when planning features: voice recognition is the current priority. Speaker 1 / Speaker 2 identification is deferred; remind the user when discussing future work. Close temporary demo previews after verification.
+- Local translation preference: **low latency first**. Read `LOCAL_TRANSLATION_PLAN.md` for Qwen and other candidates. Pick the fastest measured option that preserves meaning on the target PC with VRChat running; keep larger models as alternatives. Do not claim a speed winner before benchmarking or silently switch the user's model.
 
 - This is a Windows VRChat desktop translator written in Python 3.12 with PySide6.
 - Build on the existing implementation. Locate the relevant module and tests before adding a new abstraction or feature.
