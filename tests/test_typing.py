@@ -262,7 +262,7 @@ class RoutingTranslator:
     ("en", "auto", "vi", "yue", "yue"),
     ("vi", "auto", "zh", "", "en"),       # nobody heard yet: keep the English fallback
     ("en", "en", "zh", "vi", "en"),       # voice already in its target; typing still translates
-    ("en", "vi", "auto", "zh", "vi"),     # typed Auto and explicit voice can differ
+        ("en", "vi", "auto", "zh", "vi"),     # typed Auto follows the chatbox choices
 ])
 def test_voice_and_typed_messages_use_separate_languages(
         app, mine, theirs, typed, last_heard, voice_target):
@@ -287,7 +287,7 @@ def test_voice_and_typed_messages_use_separate_languages(
         clock.now += 2
         live.send_text("typed hello")
         text = finished[-1]
-        typed_target = last_heard if typed == "auto" else typed
+        typed_target = voice_target if typed == "auto" else typed
         assert (text.source, text.dst_lang, text.sent) == ("typed", typed_target, True)
         typed_calls = [] if mine == typed_target else [("typed hello", typed_target, mine, False)]
         assert translator.asked == expected_calls + typed_calls
@@ -420,7 +420,7 @@ def test_panel_languages_do_not_change_voice_or_typed_chatbox_target(app):
     try:
         eng.hear(MIC, sentence())
         assert translator.asked == [("hello", code, "en", True) for code in ("vi", "ja", "ko")]
-        assert [text for event, text in box.events if event == "send"] == ["hello\nvi: hello"]
+        assert [text for event, text in box.events if event == "send"] == ["hello\nvi: hello\nja: hello"]
         clock.now += 2
         live.send_text("typed hello")
         assert translator.asked[-2:] == [("typed hello", code, "en", False) for code in ("ko", "ja")]

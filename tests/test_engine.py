@@ -497,7 +497,7 @@ class Window:
         self.on_game_audio = self.on_mic_audio = None
 
     def speech_target_lang(self) -> str:
-        return self.last_heard or "en"
+        return self.settings.chatbox_languages(self.last_heard)[0]
 
     def send_to_chatbox(self, line, text=None) -> None:
         self.sent.append(line)
@@ -973,6 +973,32 @@ def test_panel_targets_are_captured_before_settings_change():
     pending.function(*pending.args)
     assert window.sent[0].panel_targets == ("en", "ja", "ko")
     assert dict(window.sent[0].panel_translations)["en"] == "Hello"
+
+
+def test_microphone_captures_all_chatbox_targets_and_reuses_panel_results():
+    class Pending:
+        def submit(self, function, *args):
+            self.function, self.args = function, args
+    class Translator:
+        def __init__(self):
+            self.calls = []
+        def translate(self, text, target, source, heard=False):
+            self.calls.append((target, heard))
+            return f"{target}: {text}"
+    clock, window = Clock(), Window(my_languages=["en"], their_languages=["zh", "vi", "en"],
+                                    translated_to=["en", "zh", "vi"])
+    translator = Translator()
+    speech = engine(window, Hears("Hello", "en"), translator, clock)
+    speech._mic_pool = pending = Pending()
+    speech.hear(MIC, sentence(clock))
+    window.settings.their_languages = ["ja"]
+    window.settings.translated_to = ["ko"]
+    pending.function(*pending.args)
+    assert translator.calls == [("zh", True), ("vi", True)]
+    line = window.sent[0]
+    assert line.chatbox_targets == ("zh", "vi", "en")
+    assert dict(line.chatbox_translations) == {"zh": "zh: Hello", "vi": "vi: Hello", "en": "Hello"}
+    assert dict(line.panel_translations) == dict(line.chatbox_translations)
 
 
 @pytest.mark.parametrize("source", [MIC, SPEAKER])

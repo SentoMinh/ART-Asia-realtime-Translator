@@ -983,7 +983,7 @@ def test_demo_voice_and_typed_auto_use_the_same_rules_as_live(app):
     mine = [u for u in heard if u.source == "mic" and u.final]
     assert mine and mine[0].dst_lang == "vi"
     demo.send_text("hello")
-    assert heard[-1].source == "typed" and heard[-1].dst_lang == "zh"
+    assert heard[-1].source == "typed" and heard[-1].dst_lang == "vi"
 
 
 def test_a_see_through_window_shows_only_the_letters(window):
@@ -1338,6 +1338,34 @@ def test_language_settings_migrate_old_choices_and_validate_new_lists(tmp_path):
     assert saved.my_languages == ["en", "zh", "ja"]
     assert saved.their_languages == [AUTO]
     assert saved.translated_to == ["en"]
+
+
+def test_chatbox_languages_settings_save_and_stay_separate_from_panel(window, tmp_path):
+    window.backend.target_langs = lambda: window.settings.chatbox_languages(typed=True)
+    window.their_lang.set_selected(["zh", "vi"], emit=True)
+    window.open_settings()
+    dialog = window._dialog
+    assert dialog.chatbox_mode.currentData() is True
+    assert dialog.chatbox_languages.isHidden()
+    assert window.backend.target_langs() == ["zh", "vi"]
+    assert "ZH, VI" in window.send_button.text()
+    panel = window.settings.panel_languages()
+    dialog.chatbox_mode.setCurrentIndex(dialog.chatbox_mode.findData(False))
+    dialog.chatbox_languages.set_selected(["en", "ja", "ko"], emit=True)
+    assert not dialog.chatbox_languages.isHidden()
+    assert window.backend.target_langs() == ["en", "ja", "ko"]
+    assert window.settings.panel_languages() == panel
+    path = tmp_path / "chatbox.json"
+    config.save(window.settings, path)
+    restored = config.load(path)
+    assert not restored.chatbox_follow and restored.chatbox_languages() == ["en", "ja", "ko"]
+    restored.chatbox_custom_languages = [None, "bad", "zh", "zh", "vi", "ja", "ko"]
+    assert restored.clean().chatbox_languages() == ["zh", "vi", "ja"]
+    restored.chatbox_follow = True
+    assert restored.chatbox_languages("ko") == ["zh", "vi"]
+    restored.their_languages = [AUTO]
+    assert restored.chatbox_languages("ko") == ["ko"]
+    assert restored.chatbox_languages("bad") == ["en"]
 
 
 def test_log_displays_both_translations(app):

@@ -39,7 +39,9 @@ class Settings:
     my_languages: list[str] = field(default_factory=list)
     their_languages: list[str] = field(default_factory=list)
     translated_to: list[str] = field(default_factory=list)
-    send_lang: str = AUTO           # typed text is translated into this; AUTO = the language heard last
+    send_lang: str = AUTO           # typed override; AUTO follows the chatbox language choices
+    chatbox_follow: bool = True
+    chatbox_custom_languages: list[str] = field(default_factory=lambda: ["en"])
     ui_lang: str = "en"             # language of the window itself: en | zh | vi
     mic_on: bool = True             # my mic → chatbox
     mic_device: str = ""            # microphone name; "" = the Windows default
@@ -75,6 +77,14 @@ class Settings:
     def panel_languages(self) -> list[str]:
         return language_choices(self.translated_to, [self.spoken_languages(True)[0]])
 
+    def chatbox_languages(self, last_heard: str = "", *, typed: bool = False) -> list[str]:
+        if typed and self.send_lang in LANGS:
+            return [self.send_lang]
+        if not self.chatbox_follow:
+            return language_choices(self.chatbox_custom_languages, ["en"])
+        choices = self.spoken_languages(False)
+        return [last_heard if last_heard in LANGS else "en"] if AUTO in choices else choices
+
     def clean(self) -> "Settings":
         self.hearing = services.migrate_provider(self.hearing)
         self.translating = services.migrate_provider(self.translating)
@@ -93,6 +103,7 @@ class Settings:
         self.my_languages = self.spoken_languages(True)
         self.their_languages = self.spoken_languages(False)
         self.translated_to = self.panel_languages()
+        self.chatbox_custom_languages = language_choices(self.chatbox_custom_languages, ["en"])
         self.my_lang, self.their_lang = self.my_languages[0], self.their_languages[0]
         self.their_lang2 = ""  # The old + box is migrated into their_languages.
         if self.send_lang != AUTO and self.send_lang not in LANGS:

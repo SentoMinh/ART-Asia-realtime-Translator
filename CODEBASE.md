@@ -1,6 +1,6 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.3**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.4**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
 
@@ -14,13 +14,13 @@ It is an always-on-top desktop window. Live audio is a mix of the other players:
 
 Source commits, local builds and published releases are separate steps. Keep previous build artifacts when preparing a new release.
 
-Source version 0.12.3 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
+Source version 0.12.4 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
 
 Version [0.11.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.10) is published with an EXE, ZIP, installer helper, usage notes and checksums. Its release tag identifies the built source; later documentation commits do not change the published binary. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL.
 
 ## Current behavior
 
-- **I speak / They speak** each accept up to three recognition languages. **Translated to** independently selects up to three panel outputs. Microphone chatbox messages use the first They speak choice (Auto follows last heard); typed messages use the independent **Send** language and first I speak source. Japanese and Korean participate in auto-detection and translation instead of announcement-only handling. `LANGS`, recognition language lists and translation target names must stay aligned.
+- **I speak / They speak** each accept up to three recognition languages. **Translated to** independently selects up to three panel outputs. Microphone and typed Send → Auto chatbox messages follow every They speak choice, or custom destinations from Settings → Translation → Chatbox languages. Auto-detect follows last heard, falling back to English. An explicit Send language overrides typed destinations only; typed input uses the first I speak source. Targets are captured per utterance and shared panel/chatbox translations are requested once. `fit_lines` deduplicates and divides one 144-character message budget across microphone original plus up to three translations. Japanese and Korean participate in auto-detection and translation instead of announcement-only handling. `LANGS`, recognition language lists and translation target names must stay aligned.
 - **Add Speaker words** optionally sends other players' translated and original text to the OSC chatbox. It is independent of the microphone's original-text option.
 - The header shows **VRChat** plus a light, with details on hover. Device arrows select microphone and subtitle audio. Header labels/meters support dragging with native movement and a manual fallback.
 - The header’s Move to VRChat button uses `vrc.chatbox.vrchat_window_origin()` to find the largest visible, non-minimized window belonging to a VRChat process. ClientToScreen/SetWindowPos use native coordinates; the overlay moves without resizing or changing z-order. Hidden/minimized/missing windows leave it in place and show a tooltip.

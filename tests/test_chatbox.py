@@ -221,11 +221,79 @@ def test_target_language_follows_they_speak(app):
     assert backend.target_lang() == "zh"                     # picked next to Send: always that one
     assert backend._translator.asked[0][1] == "zh"
     backend.apply_settings(Settings(send_lang="auto", their_lang="zh"))
-    assert backend.target_lang() == "vi"                     # auto: the language heard last from audio
+    assert backend.target_lang() == "zh"                     # Auto follows chatbox choices
     backend.last_heard = ""
     assert backend.target_lang() == "zh"                     # nobody heard yet: "They speak"
     backend.apply_settings(Settings())
     assert backend.target_lang() == "en"                     # everything on auto
+
+
+@pytest.mark.parametrize("failed", [(), ("zh",), ("vi",), ("zh", "vi")])
+def test_typed_chatbox_reuses_panel_translations_and_keeps_successful_languages(app, failed):
+    backend, box, _, seen, _ = make(app, READY)
+    backend.apply_settings(Settings(my_languages=["en"], their_languages=["zh", "vi"],
+                                    translated_to=["en", "zh", "vi"]))
+    calls = []
+    def translate(text, target, source):
+        assert not box.sent
+        calls.append(target)
+        if target in failed:
+            raise TranslateError("offline")
+        return {"zh": "我想再试一次。", "vi": "Tôi muốn thử lại."}[target]
+    backend._translator.translate = translate
+    backend.send_text("I want to try it again.")
+    expected = [text for code, text in (("zh", "我想再试一次。"), ("vi", "Tôi muốn thử lại.")) if code not in failed]
+    assert box.sent == ["\n".join(expected) if expected else "I want to try it again."]
+    assert calls == ["zh", "vi"]
+    assert ("offline" in seen[-1][2]) == bool(failed)
+
+
+def test_custom_chatbox_targets_and_explicit_typed_override(app):
+    backend, box, _, _, _ = make(app, READY)
+    backend.apply_settings(Settings(my_languages=["en"], their_languages=["zh", "vi"],
+                                    chatbox_follow=False, chatbox_custom_languages=["ja", "ko"]))
+    backend.last_heard = "zh"
+    assert backend.target_langs() == ["ja", "ko"]
+    assert backend.speech_target_lang() == "ja"
+    backend.settings.send_lang = "vi"
+    assert backend.target_langs() == ["vi"]
+    assert backend.speech_target_lang() == "ja"
+    backend.send_text("hello")
+    assert backend._translator.asked == [("hello", "vi", "en")]
+    assert box.sent == ["HELLO"]
+
+
+@pytest.mark.parametrize("source", ["mic", "typed"])
+def test_four_chatbox_lines_share_budget_and_deduplicate_original(app, source):
+    from ui.backend import Utterance
+    backend, box, _, seen, _ = make(app, READY)
+    backend.settings.chatbox_original = True
+    line = Utterance(id=501, source=source, original="a" * 180,
+                     chatbox_targets=("zh", "vi", "ja"),
+                     chatbox_translations=(("zh", "中" * 180), ("vi", "b" * 180), ("ja", "日" * 180)))
+    backend._queue_for_chatbox(line)
+    assert len(box.sent) == 1 and len(box.sent[0]) == MAX_CHARS
+    assert len(box.sent[0].splitlines()) == 4
+    assert all(text.endswith("…") for text in box.sent[0].splitlines())
+    assert "cut to 144" in seen[-1][2]
+    backend._last_sent = -100
+    line.original = "hello"
+    line.chatbox_translations = (("en", "hello"), ("zh", "你好"), ("vi", "xin chào"))
+    backend._queue_for_chatbox(line)
+    assert box.sent[-1] == "hello\n你好\nxin chào"
+
+
+def test_typed_targets_are_captured_before_settings_change(app):
+    backend, box, _, _, _ = make(app, READY, threaded=True)
+    backend.apply_settings(Settings(my_languages=["en"], their_languages=["zh", "vi"],
+                                    translated_to=["en"]))
+    backend._translator.translate = lambda text, target, source: f"{target}: {text}"
+    backend.send_text("hello")
+    backend.settings.their_languages = ["ja"]
+    backend.settings.chatbox_follow = False
+    backend.settings.chatbox_custom_languages = ["ko"]
+    backend._run(backend._jobs.get_nowait())
+    assert box.sent == ["zh: hello\nvi: hello"]
 
 
 def test_failed_translation_sends_the_typed_text_and_says_why(app):

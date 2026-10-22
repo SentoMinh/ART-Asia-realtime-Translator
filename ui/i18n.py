@@ -4,6 +4,14 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Follow 'They speak'": "跟随“对方说”",
+    "Custom languages": "自选语言",
+    "Chatbox languages": "聊天框语言",
+    "Send your voice and Auto typed messages in up to 3 languages. Auto-detect follows the last language heard, or English until then.": "将您的语音和自动模式下的输入消息发送为最多 3 种语言。自动检测跟随最近听到的语言，尚未听到时使用英语。",
+    "Auto — follow chatbox languages": "自动 — 跟随聊天框语言",
+    "Auto: follows chatbox languages (right now: {lang})": "自动：跟随聊天框语言（当前：{lang}）",
+    "Chatbox messages now follow all languages in They speak. Choose custom languages in Settings → Translation.": "聊天框消息现在跟随“对方说”中选择的所有语言。可在设置 → 翻译中自选语言。",
+    "Translated to controls the panel. Shared translations are reused for the chatbox.": "“翻译为”控制面板语言。聊天框会复用相同语言的翻译。",
     "Local translation now keeps separate sentences and retries runaway repetition.": "本地翻译现在会分别处理各个句子，并在出现大量重复时重试。",
     "Music setup now shows when the mixer is installed on another microphone and lets you select it.": "音乐设置现在会显示已安装混音器的其他麦克风，并允许您选择它。",
     "The mixer is installed on {microphone}. Use that microphone here and in VRChat. Moving it requires removing the existing attachment first.": "混音器已安装在 {microphone} 上。请在此处和 VRChat 中选择该麦克风。要更换安装位置，需先移除现有连接。",
@@ -298,6 +306,14 @@ _ZH = {
 }
 
 _VI = {
+    "Follow 'They speak'": "Theo ‘Họ nói’",
+    "Custom languages": "Ngôn ngữ tùy chọn",
+    "Chatbox languages": "Ngôn ngữ khung chat",
+    "Send your voice and Auto typed messages in up to 3 languages. Auto-detect follows the last language heard, or English until then.": "Gửi giọng nói và tin nhắn nhập ở chế độ Tự động bằng tối đa 3 ngôn ngữ. Tự động nhận diện dùng ngôn ngữ nghe gần nhất, hoặc tiếng Anh nếu chưa nghe được.",
+    "Auto — follow chatbox languages": "Tự động — theo ngôn ngữ khung chat",
+    "Auto: follows chatbox languages (right now: {lang})": "Tự động: theo ngôn ngữ khung chat (hiện tại: {lang})",
+    "Chatbox messages now follow all languages in They speak. Choose custom languages in Settings → Translation.": "Tin nhắn khung chat giờ theo tất cả ngôn ngữ trong Họ nói. Chọn ngôn ngữ riêng tại Cài đặt → Dịch.",
+    "Translated to controls the panel. Shared translations are reused for the chatbox.": "Dịch sang điều khiển ngôn ngữ trên bảng. Khung chat dùng lại các bản dịch chung.",
     "Local translation now keeps separate sentences and retries runaway repetition.": "Dịch cục bộ giờ xử lý từng câu riêng và thử lại khi kết quả lặp quá nhiều.",
     "Music setup now shows when the mixer is installed on another microphone and lets you select it.": "Cài đặt nhạc sẽ hiển thị micro khác đã cài bộ trộn và cho phép bạn chọn micro đó.",
     "The mixer is installed on {microphone}. Use that microphone here and in VRChat. Moving it requires removing the existing attachment first.": "Bộ trộn đã được cài trên {microphone}. Hãy chọn micro đó ở đây và trong VRChat. Muốn chuyển sang micro khác, cần gỡ kết nối hiện tại trước.",

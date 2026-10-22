@@ -7,13 +7,13 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **[0.12.3](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.3)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **[0.12.4](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.4)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 See the [change log](CHANGELOG.md) for implementation details, measurements and troubleshooting notes.
 
 Planned local translation model comparisons prioritize low latency. See [the Qwen and alternative-model plan](LOCAL_TRANSLATION_PLAN.md); listed candidates are not yet added to the app.
 
-Version 0.12.3 keeps separately punctuated sentences in local translation, retries excessive repetition once, and offers to select a microphone that already has the music mixer installed.
+Version 0.12.4 sends your chatbox messages in all selected **They speak** languages. Choose **Custom languages** under Settings → Translation → Chatbox languages to use separate destinations.
 
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
@@ -23,7 +23,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.12.3](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.3). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.12.4](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.4). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -83,11 +83,11 @@ Local inference needs no API key. Select Local Model for both Hearing and Transl
 | Pin | Always on top. |
 | I speak / They speak | Check up to three spoken languages in each dropdown. With multiple choices, recognition detects the language and ignores results outside your selection. They speak also offers Auto-detect as a separate choice. |
 | Translated to | Check up to three translation languages to show on the panel for microphone speech, other players and typed messages. Each output is labeled with its language. |
-| Text box + Send | Type, press Enter: translated and sent to the chatbox. The arrow picks the language for typed text independently of voice translation. Auto uses the last language heard, or "They speak" before anyone is heard (English if both are Auto). |
+| Text box + Send | Type, press Enter: translated and sent to the chatbox. Auto follows Chatbox languages; the arrow can override this with one language for typed text only. The button shows the current destinations. |
 
-For example, set **I speak: English, Chinese**, **They speak: Vietnamese, Japanese**, **Translated to: English, Chinese, Korean**, and **Send: Chinese**. The panel displays the three selected output languages. Microphone messages sent to VRChat use the first selected **They speak** language (Vietnamese); Auto-detect follows the last language heard. Typed messages keep their independent Send destination and use the first I speak language as their source.
+For example, set **I speak: English**, **They speak: Chinese, Vietnamese**, and **Translated to: English, Chinese, Vietnamese**. Your microphone sends original English, Chinese and Vietnamese as separate lines in one VRChat message. **Translated to** controls only the panel. **Settings → Translation → Chatbox languages** defaults to **Follow 'They speak'**, or choose **Custom languages** (up to three). When They speak uses Auto-detect, chatbox messages follow the last language heard, falling back to English before anyone is heard. Typed messages use the first I speak language as their source; an explicit Send language overrides chatbox choices for typed messages only.
 
-The same three pickers are available in **Settings → Translation**. At least one choice stays selected in each box. Existing saved language choices migrate automatically, with the old I speak language as the initial panel destination. Translations shared by the panel and chatbox are requested once. If one output fails, the original and successful outputs remain visible, with an error in the app. Microphone chatbox messages include the original and one translation; long messages share the app's 144-character budget. **Add my own words** controls original text for typed messages. Each completed panel translation appears immediately while the remaining languages continue, with a translating indicator until completion. More output languages still take longer to finish and require more API requests; recognition settings and chatbox timing are unchanged.
+The same three pickers are available in **Settings → Translation**. At least one choice stays selected in each box. Existing settings default to following They speak. Destinations are captured when each message starts. Shared panel/chatbox translations are requested once, and a target matching the source reuses the original. Successful translations survive a failed target; if all chatbox targets fail, the original is sent. Duplicate text lines are removed. Microphone messages include the original plus up to three translations, sharing one 144-character budget; long lines are shortened while keeping space for every language. **Add my own words** controls original text for typed messages. Each completed panel translation appears while the remaining languages continue. Additional distinct targets add translation work and can delay the complete chatbox message; no extra OSC messages or parallel inference jobs are introduced.
 
 In **Settings → Translation**, turn on **Add Speaker words** to also send other players' speech to your own VRChat OSC chatbox as `translation (original)`. It uses the first **Translated to** language, independently of **Add my own words** and the Send language. The switch is off by default. Long messages shorten both parts as needed; turning it off also stops speaker messages waiting to be sent.
 
