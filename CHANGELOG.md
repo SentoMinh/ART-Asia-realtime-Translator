@@ -1,5 +1,13 @@
 # Change log
 
+## Unreleased — 2026-10-23 — HF-Mirror fallback and agent handoff
+
+The user authorized keeping Hugging Face and using `https://hf-mirror.com/` when the original model download cannot connect. `engine/local_model.py::_fetch` now switches to the same pinned file path on HF-Mirror after a connection interruption, short response or refused HTTP response. Partial files retain Range resume; a full 200 response restarts safely. The original size and SHA-256 still gate installation. Cancellation and file-open/write errors do not switch hosts; mirror retries are bounded. Oversized responses are discarded rather than repeatedly downloaded. Non-Hugging-Face hosts are unchanged.
+
+Validation: **490 tests passed**, including 39 focused downloader/local-model/offline-installer tests. Added cases cover primary success, HTTP/network failure, resume across sources, ignored Range, mirror corruption, both sources unavailable, bounded retries, cancellation, disk failure and oversized output. A real pinned NLLB `config.json` download passed SHA-256 after simulated primary failure, but the mirror redirected back to Hugging Face. This does not prove availability in mainland China or a full weights download.
+
+[AGENT_HANDOFF.md](AGENT_HANDOFF.md) records current release/source status, completed behavior, measured latency, open model choices, safe export/build steps and next checks. The current published EXE remains **0.12.4** and does **not** contain this fallback. No model was added/removed, no provider setting was changed, and no existing release asset was replaced. Hy-MT2 integration and Whisper large-v3 removal remain unconfirmed.
+
 ## 0.12.4 — 2026-10-22 — Multiple chatbox languages
 
 Your microphone and typed Send → Auto now follow every selected **They speak** language, rather than only one destination. With English speech and Chinese + Vietnamese listeners, one microphone chatbox message contains English, Chinese and Vietnamese on separate lines. **Settings → Translation → Chatbox languages** offers Follow 'They speak' (default) or up to three Custom languages. **Translated to** continues to control only panel outputs. An explicit Send language still overrides destinations for typed messages only. Auto-detect follows the last heard language, or English before one is heard. Optional Add Speaker words keeps its existing first-panel-language behavior.

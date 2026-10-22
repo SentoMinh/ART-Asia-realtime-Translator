@@ -11,6 +11,7 @@ import ctypes
 import hashlib
 import importlib.util
 import json
+import logging
 import os
 import shutil
 import time
@@ -255,9 +256,14 @@ def _check_room(todo: list[Part], waiting: Path) -> None:
 
 def _fetch(http, part: Part, file: Path, progress, stop, wait) -> None:
     """Downloads `part` into `file`, continuing after what is already there."""
-    host = part.url.split("/")[2]
+    url = part.url
+    mirror = ("https://hf-mirror.com/" + url.removeprefix("https://huggingface.co/")
+              if url.startswith("https://huggingface.co/") else "")
     failures = 0
     while True:
+        if stop():
+            raise Stopped("stopped")
+        host = url.split("/")[2]
         have = file.stat().st_size if file.exists() else 0
         if have > part.size:
             file.unlink()                       # not this file's beginning: start over
@@ -267,12 +273,21 @@ def _fetch(http, part: Part, file: Path, progress, stop, wait) -> None:
         before, problem = have, "it sent nothing"
         try:
             headers = {"Range": f"bytes={have}-"} if have else {}
-            with http.stream("GET", part.url, headers=headers) as answer:
+            with http.stream("GET", url, headers=headers) as answer:
                 if answer.status_code == 200:
                     have = 0                    # the server sends everything again
                 elif answer.status_code != 206:
+                    if mirror and url != mirror:
+                        logging.getLogger(__name__).warning(
+                            "%s refused %s (HTTP %s); trying hf-mirror.com", host, part.name, answer.status_code)
+                        url = mirror
+                        continue
                     raise DownloadError(f"{host} refused the download (error {answer.status_code})")
-                with open(file, "ab" if have else "wb") as out:
+                try:
+                    out = open(file, "ab" if have else "wb")
+                except OSError as error:
+                    raise DownloadError(f"the files could not be written: {error}") from error
+                with out:
                     for block in answer.iter_bytes(BLOCK):
                         if stop():
                             raise Stopped("stopped")
@@ -282,6 +297,9 @@ def _fetch(http, part: Part, file: Path, progress, stop, wait) -> None:
                             raise DownloadError(f"the files could not be written: {error}") from error
                         have += len(block)
                         progress(have)
+            if have > part.size:
+                file.unlink()
+                raise DownloadError(f"{part.name} arrived with the wrong size and was thrown away; download again")
         except DownloadError:
             raise
         except Exception as error:              # the connection broke: go on from where it was
@@ -289,6 +307,11 @@ def _fetch(http, part: Part, file: Path, progress, stop, wait) -> None:
         if stop():
             raise Stopped("stopped")
         if have >= part.size:
+            continue
+        if mirror and url != mirror:
+            logging.getLogger(__name__).warning(
+                "%s download of %s interrupted; trying hf-mirror.com", host, part.name)
+            url = mirror
             continue
         failures = 0 if have > before else failures + 1
         if failures >= TRIES:

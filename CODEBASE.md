@@ -4,6 +4,8 @@ Updated for source version **0.12.4**. The application has one service registry 
 
 Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
 
+For current release/source differences, open decisions and continuation instructions, read [AGENT_HANDOFF.md](AGENT_HANDOFF.md). The post-0.12.4 source adds HF-Mirror fallback; it is not yet in the published EXE. Current measured performance is in [LATENCY_REPORT.md](LATENCY_REPORT.md).
+
 ## What the app does
 
 A Python 3.12 / PySide6 desktop companion for VRChat. It captures VRChat audio or a selected playback device for translated subtitles, translates your microphone into the OSC chatbox, and translates typed messages into that same chatbox. Conversation languages are English, Mandarin, Cantonese, Vietnamese, Japanese and Korean; interface languages remain English, Chinese and Vietnamese.
@@ -16,7 +18,7 @@ Source commits, local builds and published releases are separate steps. Keep pre
 
 Source version 0.12.4 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
 
-Version [0.11.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.11.10) is published with an EXE, ZIP, installer helper, usage notes and checksums. Its release tag identifies the built source; later documentation commits do not change the published binary. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL.
+Version [0.12.4](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.4) is published with an EXE, ZIP, installer helper, usage notes and checksums. Its release tag identifies the built source; later source/documentation commits do not change the published binary. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL.
 
 ## Current behavior
 

@@ -1,12 +1,14 @@
 # Project priorities
 
-Updated 2026-10-22 at the user's request.
+Updated 2026-10-23 at the user's request. See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for current implementation/release status and outstanding approvals.
 
 ## Current focus
 
 Improve voice recognition accuracy, responsiveness and reliability. Keep recognizing speech from the existing audio sources; identifying which person spoke is outside the current scope.
 
 ## Local translation: latency first
+
+The current approved source change keeps Hugging Face downloads and falls back to HF-Mirror. Its EXE release is pending. A small-file probe redirected back to Hugging Face, so a successful test from the friend's connection in China is still needed. The user prefers an online download flow; retain the offline package as an existing alternative without making it the only proposed solution. Hy-MT2 integration and removal of Whisper large-v3 remain unconfirmed.
 
 The user's preference is **low latency first**, with other model options available as alternatives. Choose the fastest measured local translator that still preserves the meaning; do not select a default by model size, popularity or quality benchmarks alone. Keep translation offline after setup and provide a download/transfer route usable by people in China.
 

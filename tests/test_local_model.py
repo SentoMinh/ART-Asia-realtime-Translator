@@ -171,3 +171,102 @@ def test_what_the_local_model_lacks_is_said_in_plain_words(monkeypatch):
 def test_the_real_download_is_two_gigabytes_from_secure_addresses():
     assert local_model.gb(local_model.size()) == "2.0 GB"
     assert all(len(part.sha256) == 64 and part.url.startswith("https://") for part in local_model.PARTS)
+
+
+@pytest.fixture
+def mirrored(monkeypatch):
+    content = bytes(range(200))
+    original = "https://huggingface.co/example/model/resolve/pinned/model.bin"
+    mirror = original.replace("https://huggingface.co/", "https://hf-mirror.com/", 1)
+    monkeypatch.setattr(local_model, "PARTS", (
+        Part(original, len(content), hashlib.sha256(content).hexdigest(), "whisper/model.bin"),))
+    monkeypatch.setattr(local_model, "BLOCK", 16)
+    return original, mirror, content
+
+
+def test_healthy_hugging_face_never_contacts_mirror(mirrored, tmp_path):
+    original, mirror, content = mirrored
+    http = Http({original: content, mirror: content})
+    local_model.download(http=http, root=tmp_path)
+    assert http.asked == [(original, 0)]
+    assert local_model.ready(tmp_path)
+
+
+@pytest.mark.parametrize("failure", ["http", "connection", "partial"])
+def test_hugging_face_failure_uses_mirror_and_resumes(mirrored, tmp_path, failure):
+    original, mirror, content = mirrored
+    files = {mirror: content}
+    if failure != "http":
+        files[original] = content
+    http = Http(files, breaks=[] if failure == "http" else [32 if failure == "partial" else 0])
+    waits = []
+    local_model.download(http=http, root=tmp_path, wait=waits.append)
+    assert http.asked == [(original, 0), (mirror, 32 if failure == "partial" else 0)]
+    assert waits == [] and local_model.ready(tmp_path)
+    assert (tmp_path / "whisper/model.bin").read_bytes() == content
+
+
+def test_mirror_can_restart_if_it_ignores_range(mirrored, tmp_path):
+    original, mirror, content = mirrored
+    http = Http({original: content, mirror: content}, breaks=[32], ranges=False)
+    local_model.download(http=http, root=tmp_path)
+    assert http.asked == [(original, 0), (mirror, 32)]
+    assert (tmp_path / "whisper/model.bin").read_bytes() == content
+
+
+def test_mirror_corruption_is_rejected_by_original_hash(mirrored, tmp_path):
+    original, mirror, content = mirrored
+    http = Http({mirror: bytes(len(content))})
+    with pytest.raises(DownloadError, match="arrived damaged"):
+        local_model.download(http=http, root=tmp_path)
+    assert http.asked == [(original, 0), (mirror, 0)]
+    assert not (tmp_path / "whisper/model.bin").exists()
+    assert not (tmp_path / local_model.WAITING / "model.bin").exists()
+
+
+def test_both_sources_unavailable_names_mirror(mirrored, tmp_path):
+    original, mirror, content = mirrored
+    http = Http({})
+    with pytest.raises(DownloadError, match=r"hf-mirror\.com refused.*404"):
+        local_model.download(http=http, root=tmp_path)
+    assert http.asked == [(original, 0), (mirror, 0)]
+
+
+def test_mirror_connection_retries_are_bounded(mirrored, tmp_path):
+    original, mirror, content = mirrored
+    http = Http({mirror: content}, breaks=[0] * 99)
+    with pytest.raises(DownloadError, match=r"hf-mirror\.com keeps breaking"):
+        local_model.download(http=http, root=tmp_path, wait=lambda seconds: None)
+    assert len(http.asked) == 1 + local_model.TRIES
+    assert all(url == mirror for url, _ in http.asked[1:])
+
+
+def test_cancel_does_not_contact_mirror(mirrored, tmp_path):
+    original, mirror, content = mirrored
+    http = Http({original: content, mirror: content})
+    seen = []
+    with pytest.raises(Stopped):
+        local_model.download(http=http, root=tmp_path, progress=lambda done, total: seen.append(done),
+                             stop=lambda: bool(seen))
+    assert http.asked == [(original, 0)]
+    assert (tmp_path / local_model.WAITING / "model.bin").stat().st_size == 16
+
+
+def test_disk_error_does_not_contact_mirror(mirrored, tmp_path, monkeypatch):
+    original, mirror, content = mirrored
+    http = Http({original: content, mirror: content})
+    def cannot_write(*args, **kwargs):
+        raise OSError("disk full")
+    monkeypatch.setattr(local_model, "open", cannot_write, raising=False)
+    with pytest.raises(DownloadError, match="files could not be written"):
+        local_model.download(http=http, root=tmp_path, wait=lambda seconds: None)
+    assert http.asked == [(original, 0)]
+
+
+def test_oversized_mirror_response_stops_without_installing(mirrored, tmp_path):
+    original, mirror, content = mirrored
+    http = Http({mirror: content + b"unexpected"})
+    with pytest.raises(DownloadError, match="wrong size"):
+        local_model.download(http=http, root=tmp_path)
+    assert http.asked == [(original, 0), (mirror, 0)]
+    assert not local_model.ready(tmp_path)

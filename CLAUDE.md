@@ -1,5 +1,7 @@
 # Project context
 
+Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 23 October 2026 handoff: published v0.12.4, the newer source-only HF-Mirror fallback, latency evidence, open model decisions and the next release steps. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
+
 Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.4 and the preceding release validation; recheck current code before relying on its findings.
 
 Read `CHANGELOG.md` for the reason behind recent changes, their implementation commits, regression tests and troubleshooting steps.
@@ -14,7 +16,7 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 - `F:\Code\vrchat-translator` is a sibling reference copy. Compare it before porting work; do not synchronize folders automatically.
 - Check both working trees before synchronizing; earlier onboarding found uncommitted local-model changes. Preserve unrelated edits and untracked work.
 - Both copies share AppData settings, provider keys, logs and the local-model cache. Use temporary paths/fakes for checks that change state.
-- Version 0.11.10 has one app and one build. Its EXE/ZIP are published on GitHub, with the built source identified by its release tag. Preserve artifacts under `dist/<version>/`; a source or documentation commit does not rebuild them.
+- Version 0.12.4 is published as one app/build, with the built source identified by its release tag. Preserve artifacts under `dist/<version>/`; source or documentation commits do not rebuild them. The newer download fallback is not yet in that EXE.
 - Follow the user’s current authorization for commits, builds and publication. Use a new version directory for a new binary; preserve prior artifacts. Clarify scope only when authorization is missing or unclear.
 - Synchronize source through reviewed changes and privacy checks. Preserve unrelated local artifacts in destination checkouts.
 
@@ -55,6 +57,6 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 - UI snapshots: `.venv-app\Scripts\python.exe tools\snapshot_ui.py <output-folder>`.
 - Packaged check: `VRChat-Translator.exe --selfcheck`; it can probe devices/network. `--get-local-model` additionally permits a large model download.
 - Unit-test success is separate from live VRChat, GPU, service and packaged-build validation.
-- Version 0.11.10 passed 422 tests, packaged self-checks, runtime/native-DLL checks, source/artifact scans and ZIP/checksum checks. The GitHub download and packaged upgrade from 0.11.9 to 0.11.10 were verified. Live Windows 10 and fresh-machine mixer installation remain outstanding; selected-app music currently requires Windows 11.
+- Version 0.12.4 passed 479 tests, packaged self-checks, runtime/native-DLL checks, source/artifact scans and ZIP/checksum checks. The GitHub download and packaged upgrade from 0.12.3 to 0.12.4 were verified. Read the changelog for later source checks. Live Windows 10 and fresh-machine mixer installation remain outstanding; selected-app music currently requires Windows 11.
 - Provider credentials belong in the existing AppData configuration, not source files or test fixtures.
 - Source updates and packaged updates live in `tools/update.py` and `ui/updater.py`. Releases belong in `SentoMinh/ART-Asia-realtime-Translator`.
