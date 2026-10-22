@@ -2,6 +2,14 @@
 
 ## 0.12.3 — 2026-10-22 — Local translation and microphone setup fixes
 
+### Optional offline NLLB installation package
+
+Added `ART-NLLB-200-CT2-offline.zip` as a separate release asset for PCs unable to download the model from Hugging Face. This does not change the v0.12.3 EXE or its update behavior. Download once on a working connection, transfer/extract the ZIP, and run `Install-NLLB.cmd` on the destination PC. The installer is fully offline, needs no administrator or Python, checks source and copied files with SHA-256, and preserves a previous model folder before replacement. No microphone, API or app preferences are changed.
+
+`tools/package_nllb_offline.py` packages only the four files pinned in `engine/assets/local_models.json`, plus the installer, manifest, instructions and model attribution. `tools/install_nllb_offline.ps1` installs into the current user's model cache. The package contains the original pinned CTranslate2 INT8 files, with the model's CC BY-NC 4.0 notice. `tests/test_nllb_offline.py` covers installation, repeat installation, backups, damaged/missing files, duplicate entries and unsafe filenames. A mirror probe redirected to Hugging Face/CDN hosts on the test connection; mainland-China connectivity has not been verified. The offline package avoids that dependency during installation, but still needs a working download or file-transfer route to reach the PC.
+
+Validation: 44 focused installer, model-download and updater tests passed. The final ZIP passed CRC and checksum verification, installed into an isolated cache using Windows PowerShell, was detected as Ready by ART, and translated the two-sentence VR example with the real model. The current user's installed model was left intact.
+
 ### Local translation repeats or drops a later sentence
 
 **Cause:** replaying the reported text with the installed NLLB/CTranslate2 model reproduced both failures before rendering: a short, stuttered Chinese input expanded into a 256-token English repetition loop, and “Can you wait a bit? I want to move to VR first.” returned only the first Chinese sentence. The overlay and chatbox did not remove the missing sentence.
