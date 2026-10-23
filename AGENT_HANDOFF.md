@@ -10,11 +10,11 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 | Published EXE SHA-256 | `d92af3cf0ef43df5603b6faf41aec13254798a58ba3e56ab15526fbdcd67d541` |
 | Release validation | 479 tests; packaged self-check, runtime/native-DLL integrity, source/asset checks; actual GitHub download and packaged replacement/restart from 0.12.3 to 0.12.4 passed |
 | Later measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| New source change | Automatic Hugging Face → HF-Mirror download fallback, implemented after v0.12.4; **not yet included in a published EXE** |
-| Version constant | Still 0.12.4. Use a new version for the next binary; do not overwrite the existing release assets/tag |
-| Model list | Whisper turbo, Whisper large-v3, SenseVoice, NLLB. No Hy-MT/Qwen integration or model removal in this task |
+| Release being prepared | **0.12.5**: PhoWhisper Small, Qwen3 1.7B INT8, descriptive model cards and HF-Mirror fallback. Check GitHub for completed publication. |
+| Version constant | 0.12.5; preserve the existing 0.12.4 artifacts/tag |
+| Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
 
-The user asked to document the project so another agent can continue. The download fallback is implemented; packaging/publication of that source change remains a separate next step.
+The latest user request explicitly authorizes the model additions/removal and language/strength descriptions. Source tests: **505 passed**. Real pinned new weights loaded and ran; see LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. Build evidence belongs under `.tools/release-0.12.5/`; check its verification and live-update results before reporting completion.
 
 ## User decisions and open choices
 
@@ -22,7 +22,7 @@ The user asked to document the project so another agent can continue. The downlo
 - Prioritize voice recognition reliability and **low latency with preserved meaning**. Speaker identification is deferred; mention the saved idea during future feature planning, not as an implemented feature or scheduled reminder.
 - The user prefers a normal online model download for their friend in China, not an offline-package workflow. They explicitly requested keeping Hugging Face and using `https://hf-mirror.com/` if the first source cannot connect.
 - “Keep both” was interpreted as keeping both download sources. An unanswered clarification asked whether they also want **Hy-MT2 alongside NLLB**. Do not claim the second model was approved, installed or benchmarked.
-- The user questioned the non-turbo Whisper large-v3 entry and asked to be consulted before changes. Removal has **not** been confirmed. Keep it until that choice is settled. Do not silently delete downloaded weights.
+- The latest request confirms removing non-turbo Whisper large-v3 and adding PhoWhisper plus a light Qwen. Removed selections fall back to turbo, but existing large-v3 weights are preserved. PhoWhisper is Vietnamese-focused; Qwen3 1.7B is optional. The tested 0.6B conversion failed basic translation checks and is not offered.
 - Earlier requests authorized commits and release work; honor any newer scope changes. Ask before additional model-list changes or changing the user's selected providers. The Hugging Face → HF-Mirror fallback itself is authorized; do not request permission for it again.
 - Use the user's installed Ponytail skill at full level for coding. Keep changes small and complete, and state verification limits. Temporary UI previews must close automatically or be closed when the check ends.
 
@@ -56,7 +56,7 @@ Modal's first translation took 26.3 seconds, but cold start was not confirmed fr
 
 The earlier progressive-display change improved the first visible result, not inference duration: a controlled three-target test moved first display from 361 to 120 ms while total completion stayed around 361 ms. Local model reuse and Whisper warm-up already existed. The 0.8-second silence threshold remains intentional; do not lower it casually because 0.55 seconds previously cut speakers at breaths.
 
-Next useful measurements are actual game/GPU contention, short conversational and noisy speech, complete multi-language delivery, and quality alongside timing. Qwen and Hy-MT remain candidates in [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md), not proven speed improvements.
+Next useful measurements are actual game/GPU contention, short conversational and noisy speech, complete multi-language delivery, and quality alongside timing. Qwen3 1.7B is now implemented as an alternative; Hy-MT remains a candidate. Neither is a proven speed improvement over NLLB. See [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md).
 
 ## Workspace, commits and release procedure
 
@@ -66,7 +66,7 @@ Next useful measurements are actual game/GPU contention, short conversational an
 - Never bundle AppData settings, API credentials, logs, benchmark recordings, model weights or local infrastructure. Tests isolate AppData through `tests/conftest.py`; direct benchmarks must avoid saving provider changes or opening capture/OSC.
 - For a new release, stage the committed/scanned source in a new `.tools/release-<version>/source` directory. Build with `tools/build.ps1`, the development Python, and validated `.tools/apo-prototype-10` DLLs. Preserve old artifacts. Bundle only `VrctMicApo.dll` and `VrctApoProducer.dll`, never test DLLs.
 - Prior release helpers/evidence are in `.tools/release-0.12.4/`; adapt versions, source commit, notice assertions and test counts rather than copying old expectations blindly. Keep checksums, ZIP, packaged self-check, draft-asset verification, and the GitHub download/replacement/restart check.
-- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. The next unused version is expected to be 0.12.5; check GitHub first.
+- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. Version 0.12.5 is allocated to these model changes; use a new version for subsequent binaries.
 - The optional verified NLLB offline ZIP remains an asset of v0.12.3. Keep existing links valid, but it is not the user's preferred solution for this current request.
 
 Run focused tests with `.venv-app\Scripts\python.exe -m pytest tests/test_local_model.py tests/test_local_choices.py tests/test_nllb_offline.py -q`; run the full suite before packaging. A source test result does not validate a new EXE or mainland-China access.

@@ -1,12 +1,22 @@
 # Change log
 
-## Unreleased — 2026-10-23 — HF-Mirror fallback and agent handoff
+## 0.12.5 — 2026-10-23 — PhoWhisper, Qwen and clearer model choices
+
+Removed the non-turbo Whisper large-v3 chooser entry at the user's request. Existing files remain intact; a saved removed choice resolves to turbo. Added PhoWhisper Small for Vietnamese hearing on CPU INT8 (no NVIDIA download), plus Qwen3 1.7B INT8 as an optional CPU translator. Each model card explains supported app languages, specialization and hardware/speed tradeoffs in English, Vietnamese and Chinese. NLLB stays the low-latency default; merely installing this update does not select a new provider.
+
+`LocalWhisper` loads PhoWhisper's own pinned folder with two CPU threads and Vietnamese warm-up. It rejects explicitly unsupported languages and drops Auto results detected as non-Vietnamese. Turbo's GPU behavior is preserved. `LocalQwenTranslator` uses CTranslate2 Generator and the pinned non-thinking Qwen3 prefix; source and target prompts reuse `chat_messages`. Greedy output is limited to 512 tokens, input to 1,024 tokens. Incomplete EOS, repeated/empty/reasoning or obvious wrong-script output fails through `TranslateError`. `services.translate_models` resolves the local selection and `ServiceChain` routes both typed and speech translation correctly. Both local translators share a lock, releasing the other weights when loading.
+
+Validation: **505 tests passed**, including selection migration, CPU readiness, PhoWhisper routing, translator switching/reuse, non-thinking prompts, truncation/repetition guards and translated model cards. Real downloads passed SHA-256 and both new models ran on CPU. Two Vietnamese recording replays matched reference words. The 0.6B Qwen conversion failed basic translation checks; the selected 1.7B option performed better but remains slower than NLLB. See LATENCY_REPORT.md and LOCAL_TRANSLATION_PLAN.md for evidence and limits. Model wording, broad accent coverage, mixed speech and mainland-China downloads still need real-world checking. Package and updater checks are recorded separately in AGENT_HANDOFF.md after publication.
+
+Repair pointers: compare model IDs across `MODELS`, `local_models.json`, `services.translate_models` and `ServiceChain`; verify CTranslate2 >=4.8.2 and the exact pinned tokenizer before changing Qwen's prompt. Never remove the empty thinking prefix or accept a length-capped answer as complete. NLLB's sentence and loop handling is unchanged. If CPU latency is too high, choose NLLB for translation and GPU turbo for multilingual hearing; do not silently lower decoding quality or activate a different provider.
+
+### HF-Mirror fallback and agent handoff
 
 The user authorized keeping Hugging Face and using `https://hf-mirror.com/` when the original model download cannot connect. `engine/local_model.py::_fetch` now switches to the same pinned file path on HF-Mirror after a connection interruption, short response or refused HTTP response. Partial files retain Range resume; a full 200 response restarts safely. The original size and SHA-256 still gate installation. Cancellation and file-open/write errors do not switch hosts; mirror retries are bounded. Oversized responses are discarded rather than repeatedly downloaded. Non-Hugging-Face hosts are unchanged.
 
 Validation: **490 tests passed**, including 39 focused downloader/local-model/offline-installer tests. Added cases cover primary success, HTTP/network failure, resume across sources, ignored Range, mirror corruption, both sources unavailable, bounded retries, cancellation, disk failure and oversized output. A real pinned NLLB `config.json` download passed SHA-256 after simulated primary failure, but the mirror redirected back to Hugging Face. This does not prove availability in mainland China or a full weights download.
 
-[AGENT_HANDOFF.md](AGENT_HANDOFF.md) records current release/source status, completed behavior, measured latency, open model choices, safe export/build steps and next checks. The current published EXE remains **0.12.4** and does **not** contain this fallback. No model was added/removed, no provider setting was changed, and no existing release asset was replaced. Hy-MT2 integration and Whisper large-v3 removal remain unconfirmed.
+[AGENT_HANDOFF.md](AGENT_HANDOFF.md) records current release/source status, completed behavior, measured latency, open model choices, safe export/build steps and next checks. The fallback was committed after v0.12.4 and is included in v0.12.5. No provider setting or prior release asset was changed. The model additions/removal above were authorized by the later request; Hy-MT2 is still a candidate.
 
 ## 0.12.4 — 2026-10-22 — Multiple chatbox languages
 

@@ -836,9 +836,17 @@ def test_a_pc_without_an_nvidia_card_is_told_so_and_offered_no_download(window, 
     monkeypatch.setattr(local_model, "installed", lambda model=None: True)
     monkeypatch.setattr(local_model, "nvidia_card", lambda: False)
     dialog = LocalModelDialog(window)
-    for model in ("large-v3-turbo", "large-v3"):
+    for model in ("large-v3-turbo",):
         row = dialog.rows[model]
         assert "NVIDIA graphics card" in row["result"].text() and not row["action"].isEnabled()
+    assert "large-v3" not in dialog.rows
+    for model in ("phowhisper-small", "qwen3-1.7b-ct2"):
+        assert dialog.rows[model]["action"].isEnabled()
+        assert not dialog.rows[model]["use"].isVisible()
+    from ui.i18n import TABLES
+    assert set(dialog.rows) == set(local_model.DESCRIPTIONS)
+    for table in TABLES.values():
+        assert all(note in table for note in local_model.DESCRIPTIONS.values())
 
 
 def test_the_download_tells_the_window_how_it_ended(app):

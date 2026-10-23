@@ -20,14 +20,28 @@ def test_selections_preserve_the_other_role_and_reject_old_values():
     assert local_model.selected() == "large-v3-turbo"
 
 
-@pytest.mark.parametrize("model", ["sensevoice", "nllb-200-ct2"])
+def test_removed_large_v3_selection_falls_back_without_deleting_weights():
+    old = local_model.folder() / "whisper-v3" / "model.bin"
+    old.parent.mkdir(parents=True)
+    old.write_bytes(b"existing weights")
+    services.save("local", hear_model="large-v3")
+    assert "large-v3" not in local_model.MODELS
+    assert local_model.selected() == "large-v3-turbo"
+    assert old.read_bytes() == b"existing weights"
+    local_model.select("phowhisper-small")
+    local_model.select("qwen3-1.7b-ct2")
+    assert local_model.selected() == "phowhisper-small"
+    assert services.translate_models("local") == ["qwen3-1.7b-ct2"]
+
+
+@pytest.mark.parametrize("model", ["sensevoice", "phowhisper-small", "nllb-200-ct2", "qwen3-1.7b-ct2"])
 def test_cpu_models_require_their_own_files_but_no_graphics_card(monkeypatch, model):
     monkeypatch.setattr(local_model, "installed", lambda model=None: True)
     monkeypatch.setattr(local_model, "nvidia_card", lambda: False)
     assert "not downloaded" in local_model.missing(model)
-    monkeypatch.setattr(local_model, "ready", lambda root=None, model=None: model != "large-v3")
+    monkeypatch.setattr(local_model, "ready", lambda root=None, model=None: model != "large-v3-turbo")
     assert not local_model.missing(model)
-    assert "NVIDIA" in local_model.missing("large-v3")
+    assert "NVIDIA" in local_model.missing("large-v3-turbo")
 
 
 def test_download_resumes_only_the_chosen_models_partial_file(monkeypatch, tmp_path):
@@ -58,24 +72,38 @@ def test_hearing_switches_saved_models_and_reuses_the_current_engine(monkeypatch
     local_model.select("sensevoice")
     assert hearing.transcribe([], "en") == "sensevoice"
     assert hearing.transcribe([], None) == "sensevoice"
-    local_model.select("large-v3")
-    assert hearing.transcribe([], "vi") == "large-v3"
-    assert made == ["large-v3-turbo", "sensevoice", "large-v3"]
+    local_model.select("phowhisper-small")
+    assert hearing.transcribe([], "vi") == "phowhisper-small"
+    assert made == ["large-v3-turbo", "sensevoice", "phowhisper-small"]
 
 
-def test_whisper_large_v3_loads_its_own_download_not_turbo(monkeypatch):
+def test_phowhisper_loads_its_own_download_on_cpu_not_turbo(monkeypatch):
     from engine import stt
     sources = []
     monkeypatch.setattr(local_model, "missing", lambda model=None: "")
     monkeypatch.setattr(local_model, "ready", lambda root=None, model=None: True)
-    monkeypatch.setattr(stt, "_add_gpu_libraries", lambda: None)
+    monkeypatch.setattr(stt, "_add_gpu_libraries", lambda: pytest.fail("PhoWhisper must not load CUDA"))
     def create(source, **kwargs):
         sources.append(source)
+        assert kwargs == dict(device="cpu", compute_type="int8", cpu_threads=2)
         return SimpleNamespace(transcribe=lambda *a, **kw: ([], None))
     monkeypatch.setattr(stt, "whisper_class", lambda: create)
-    stt.LocalWhisper("large-v3").load()
-    assert sources == [str(local_model.model_folder("large-v3"))]
+    stt.LocalWhisper("phowhisper-small").load()
+    assert sources == [str(local_model.model_folder("phowhisper-small"))]
     assert sources[0] != str(local_model.model_folder("large-v3-turbo"))
+
+
+def test_phowhisper_filters_other_languages_and_keeps_vietnamese(monkeypatch):
+    from engine import stt
+    model = stt.LocalWhisper("phowhisper-small")
+    monkeypatch.setattr(model, "load", lambda: None)
+    monkeypatch.setattr(model, "_run", lambda *args: ("Tôi muốn thử lại.", SimpleNamespace(language="vi")))
+    assert model.transcribe([], "vi").text == "Tôi muốn thử lại."
+    assert model.transcribe([], None).lang == "vi"
+    with pytest.raises(SttError, match="supports Vietnamese"):
+        model.transcribe([], "en")
+    monkeypatch.setattr(model, "_run", lambda *args: ("Hello", SimpleNamespace(language="en")))
+    assert model.transcribe([], None).text == ""
 
 
 def test_sensevoice_reuses_cpu_recognizer_and_rejects_unsupported_language(monkeypatch):
@@ -131,3 +159,16 @@ def test_local_translation_chain_uses_shared_runtime_without_http(monkeypatch):
     assert chain.translate("Hello", "vi", "en") == "Xin chao"
     assert chain.last_used == "local:nllb-200-ct2"
     assert called == [("Hello", "vi", "en")]
+
+
+def test_translation_switch_routes_all_chains_and_keeps_hearing_selection(monkeypatch):
+    monkeypatch.setattr(local_inference.translator, "translate", lambda *a, **kw: "NLLB")
+    monkeypatch.setattr(local_inference.qwen_translator, "translate", lambda *a, **kw: "Qwen")
+    typed, speech = ServiceChain(lambda: "local", addons=[]), ServiceChain(lambda: "local", addons=[])
+    local_model.select("sensevoice")
+    for model, expected in (("nllb-200-ct2", "NLLB"), ("qwen3-1.7b-ct2", "Qwen"), ("nllb-200-ct2", "NLLB")):
+        local_model.select(model)
+        for chain in (typed, speech):
+            assert chain.translate("Hello", "vi", "en") == expected
+            assert chain.last_used == f"local:{model}"
+        assert local_model.selected() == "sensevoice"

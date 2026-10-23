@@ -115,11 +115,13 @@ def selfcheck() -> int:
         from engine.stt import whisper_class
         from ui.settings_window import LocalModelDialog
         whisper_class()
+        if not hasattr(ctranslate2, "Generator"):
+            raise RuntimeError("Qwen's CTranslate2 generator is missing")
         dialog = LocalModelDialog()
         if set(dialog.rows) != set(local_model.MODELS):
             raise RuntimeError("Local model choices are missing")
         dialog.close()
-        return "Whisper, SenseVoice, CTranslate2, tokenizer and model list included"
+        return "Whisper/PhoWhisper, SenseVoice, NLLB/Qwen CTranslate2, tokenizer and model list included"
 
     def local_model():
         import time

@@ -4,6 +4,9 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Local models now include PhoWhisper Small for Vietnamese hearing and Qwen3 1.7B for translation. NLLB remains the low-latency default.": "本地模型新增用于越南语识别的 PhoWhisper Small 和用于翻译的 Qwen3 1.7B。NLLB 仍是低延迟默认选择。",
+    "Whisper large-v3 was removed from the list; turbo remains. Each card explains its languages and strengths.": "列表已移除 Whisper large-v3，保留 turbo。各模型卡片说明支持的语言和特点。",
+    "Model downloads try HF-Mirror when Hugging Face cannot connect.": "无法连接 Hugging Face 时，模型下载会尝试 HF-Mirror。",
     "Follow 'They speak'": "跟随“对方说”",
     "Custom languages": "自选语言",
     "Chatbox languages": "聊天框语言",
@@ -35,9 +38,11 @@ _ZH = {
     "Use model": "使用模型",
     "Choose a hearing or translation model to download and run on this PC. No API key is needed.": "选择语音识别或翻译模型，下载后在本机运行。无需 API 密钥。",
     "Download: {size}. The model becomes active when the download finishes. You can close this window while it continues.": "下载大小：{size}。下载完成后会启用此模型。关闭此窗口后下载仍会继续。",
-    "SenseVoice runs on CPU: Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese.": "SenseVoice 使用 CPU，支持普通话、粤语、英语、日语和韩语。越南语请使用 Whisper。",
-    "NLLB-200 translates locally on CPU using CTranslate2 (INT8).": "NLLB-200 使用 CTranslate2（INT8）在本机 CPU 上翻译。",
-    "Whisper runs on your NVIDIA graphics card. Large-v3 needs more memory than turbo.": "Whisper 使用 NVIDIA 显卡。Large-v3 比 turbo 需要更多显存。",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Fast NVIDIA GPU option for multilingual conversations; mixed-language sentences can still be misheard.": "英语、普通话、粤语、越南语、日语和韩语。适合多语对话的快速 NVIDIA 显卡方案；一句话中混用语言仍可能识别错误。",
+    "Chinese, Cantonese, English, Japanese and Korean; no Vietnamese. Lightweight CPU option with automatic language detection. Mixed-language accuracy varies.": "普通话、粤语、英语、日语和韩语；不支持越南语。轻量 CPU 方案，自动检测语言。混合语言的识别效果因情况而异。",
+    "Vietnamese specialist, trained on diverse Vietnamese accents. Runs on CPU without NVIDIA; may be slower than GPU turbo. Choose turbo for other languages or mixed-language conversations.": "专注越南语，使用多种越南语口音训练。使用 CPU，无需 NVIDIA 显卡；可能比显卡上的 turbo 慢。其他语言或混合语言对话请选择 turbo。",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Translation-focused CPU model; keep this as the low-latency starting choice.": "英语、普通话、粤语、越南语、日语和韩语。专用于翻译的 CPU 模型；建议作为低延迟的首选。",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Small CPU language-model alternative, with thinking disabled. May be slower or less accurate than NLLB; compare your language pair.": "英语、普通话、粤语、越南语、日语和韩语。较小的 CPU 语言模型备选，已关闭思考。可能比 NLLB 慢或准确率更低；请按所需语言对比较效果。",
     "You can switch to your downloaded local hearing model.": "可以切换到已下载的本地语音识别模型。",
     "Choose a local hearing model to download and run on this PC.": "选择本地语音识别模型，下载后在本机运行。",
     "None": "无",
@@ -306,6 +311,9 @@ _ZH = {
 }
 
 _VI = {
+    "Local models now include PhoWhisper Small for Vietnamese hearing and Qwen3 1.7B for translation. NLLB remains the low-latency default.": "Mô hình cục bộ thêm PhoWhisper Small để nhận dạng tiếng Việt và Qwen3 1.7B để dịch. NLLB vẫn là mặc định ưu tiên độ trễ thấp.",
+    "Whisper large-v3 was removed from the list; turbo remains. Each card explains its languages and strengths.": "Đã bỏ Whisper large-v3 khỏi danh sách, vẫn giữ turbo. Mỗi thẻ mô tả ngôn ngữ và thế mạnh của mô hình.",
+    "Model downloads try HF-Mirror when Hugging Face cannot connect.": "Tải mô hình sẽ thử HF-Mirror khi không kết nối được Hugging Face.",
     "Follow 'They speak'": "Theo ‘Họ nói’",
     "Custom languages": "Ngôn ngữ tùy chọn",
     "Chatbox languages": "Ngôn ngữ khung chat",
@@ -337,9 +345,11 @@ _VI = {
     "Use model": "Dùng mô hình",
     "Choose a hearing or translation model to download and run on this PC. No API key is needed.": "Chọn mô hình nhận dạng giọng nói hoặc dịch để tải về và chạy trên máy này. Không cần khóa API.",
     "Download: {size}. The model becomes active when the download finishes. You can close this window while it continues.": "Dung lượng tải: {size}. Mô hình sẽ được dùng khi tải xong. Bạn có thể đóng cửa sổ này trong khi vẫn tiếp tục tải.",
-    "SenseVoice runs on CPU: Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese.": "SenseVoice chạy trên CPU: tiếng Trung, Quảng Đông, Anh, Nhật và Hàn. Hãy dùng Whisper cho tiếng Việt.",
-    "NLLB-200 translates locally on CPU using CTranslate2 (INT8).": "NLLB-200 dịch trên CPU của máy bằng CTranslate2 (INT8).",
-    "Whisper runs on your NVIDIA graphics card. Large-v3 needs more memory than turbo.": "Whisper chạy trên card NVIDIA. Large-v3 cần nhiều bộ nhớ hơn turbo.",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Fast NVIDIA GPU option for multilingual conversations; mixed-language sentences can still be misheard.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Lựa chọn nhanh trên GPU NVIDIA cho hội thoại đa ngôn ngữ; câu trộn nhiều ngôn ngữ vẫn có thể bị nhận sai.",
+    "Chinese, Cantonese, English, Japanese and Korean; no Vietnamese. Lightweight CPU option with automatic language detection. Mixed-language accuracy varies.": "Tiếng Trung, Quảng Đông, Anh, Nhật và Hàn; không có tiếng Việt. Nhẹ, chạy CPU và tự nhận diện ngôn ngữ. Độ chính xác với câu trộn ngôn ngữ tùy trường hợp.",
+    "Vietnamese specialist, trained on diverse Vietnamese accents. Runs on CPU without NVIDIA; may be slower than GPU turbo. Choose turbo for other languages or mixed-language conversations.": "Chuyên tiếng Việt, được huấn luyện với nhiều giọng vùng miền. Chạy CPU, không cần NVIDIA; có thể chậm hơn turbo chạy GPU. Chọn turbo cho ngôn ngữ khác hoặc hội thoại trộn ngôn ngữ.",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Translation-focused CPU model; keep this as the low-latency starting choice.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Mô hình CPU chuyên dịch; nên dùng trước khi ưu tiên độ trễ thấp.",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Small CPU language-model alternative, with thinking disabled. May be slower or less accurate than NLLB; compare your language pair.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Mô hình ngôn ngữ nhỏ chạy CPU để thử thay thế, đã tắt suy luận. Có thể chậm hoặc kém chính xác hơn NLLB; hãy so sánh theo cặp ngôn ngữ bạn dùng.",
     "You can switch to your downloaded local hearing model.": "Bạn có thể chuyển sang mô hình nhận dạng giọng nói cục bộ đã tải.",
     "Choose a local hearing model to download and run on this PC.": "Chọn mô hình nhận dạng giọng nói cục bộ để tải về và chạy trên máy này.",
     "None": "Không",

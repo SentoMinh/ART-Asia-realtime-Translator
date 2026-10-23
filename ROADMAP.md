@@ -8,11 +8,11 @@ Improve voice recognition accuracy, responsiveness and reliability. Keep recogni
 
 ## Local translation: latency first
 
-The current approved source change keeps Hugging Face downloads and falls back to HF-Mirror. Its EXE release is pending. A small-file probe redirected back to Hugging Face, so a successful test from the friend's connection in China is still needed. The user prefers an online download flow; retain the offline package as an existing alternative without making it the only proposed solution. Hy-MT2 integration and removal of Whisper large-v3 remain unconfirmed.
+Version 0.12.5 keeps Hugging Face downloads and falls back to HF-Mirror. A small-file probe redirected back to Hugging Face, so a successful test from the friend's connection in China is still needed. The user prefers an online download flow; retain the offline package as an existing alternative without making it the only proposed solution. The user explicitly approved removing non-turbo Whisper large-v3 and adding PhoWhisper plus a light Qwen. Both additions are implemented; Hy-MT2 remains a future candidate.
 
 The user's preference is **low latency first**, with other model options available as alternatives. Choose the fastest measured local translator that still preserves the meaning; do not select a default by model size, popularity or quality benchmarks alone. Keep translation offline after setup and provide a download/transfer route usable by people in China.
 
-Read [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md) before selecting or integrating another model. Compare small Qwen models with thinking disabled against the existing NLLB/CTranslate2 baseline; include Tencent Hy-MT2-1.8B as the translation-specialized alternative. Larger models are optional comparisons if smaller models fail the quality checks. These are candidates, not a verified speed ranking or installed features.
+Read [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md) before selecting or integrating another model. Compare small Qwen models with thinking disabled against the existing NLLB/CTranslate2 baseline; include Tencent Hy-MT2-1.8B as the translation-specialized alternative. Larger models are optional comparisons if smaller models fail the quality checks. Qwen3 1.7B INT8 is now an optional implemented choice; NLLB remains the default after faster replay results. Other Qwen sizes and Hy-MT remain candidates.
 
 ## Deferred: speaker identification
 

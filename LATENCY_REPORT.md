@@ -1,4 +1,4 @@
-# Modal and local latency — 22 October 2026
+# ART latency measurements — 22–23 October 2026
 
 Measured with ART **0.12.4**, source commit `9c5a96c` in the release repository, starting at 15:27:58 UTC. **Local execution was faster in this run.** These are current component timings, not a measured speedup over an older app version.
 
@@ -84,3 +84,21 @@ The sentence-end detector still waits **0.8 seconds of quiet**. This was intenti
 The development workspace retains the bounded harness and raw samples in `.tools/latency-2026-10-22/measure.py`, `results.json`, `progress.log`, and `panel-current.json`; those local artifacts contain no API credentials or endpoint URLs. Audio comes from the existing FLEURS benchmark described in [BENCHMARK.md](BENCHMARK.md): `en_1555`, `en_1537`, `zh_1555`, `zh_1537`, and local-only `vi_1559`, `vi_1607`.
 
 No application behavior or selected providers changed during this measurement. The published v0.12.4 EXE is unchanged. Real VRChat contention, noisy live speech, remote reception, sustained traffic, server cold-start frequency and a broad translation-quality comparison remain unmeasured. Keep the latency-first decision rule and quality checks in [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md).
+
+
+## 23 October: NLLB versus the new Qwen3 1.7B option
+
+The same six EN/ZH/VI conversational inputs above were replayed through the production local adapters, with `heard=True`, in three rounds per model. The first full round was excluded from warm statistics; the remaining 12 calls per model form this small sample. Models ran sequentially in blocks, on CPU INT8 with two intra-op threads and one worker, using CTranslate2 4.8.2 and tokenizers 0.23.2. **VRChat was running**, but game scene/load was not controlled; this is not a controlled contention benchmark or end-to-end speech latency test. No microphone capture, OSC or remote inference was used, and provider settings were unchanged.
+
+| Translator | First call including load | Warm median | Warm range |
+| --- | ---: | ---: | ---: |
+| Existing NLLB-200 CT2 | 2,141 ms | **294 ms** | 252–393 ms |
+| Qwen3 1.7B CT2 INT8 | 4,358 ms | **2,218 ms** | 1,603–2,758 ms |
+
+NLLB stays the default for low latency. Qwen is an optional alternative, not a speed improvement. Qwen uses the same translation-only chat prompt as the online adapter, the pinned non-thinking assistant prefix, greedy generation, a 1,024-token input limit and 512-token output limit. This replay preceded the final Chinese script normalization (Traditional output converted to Simplified for `zh`); normalization does not alter generation settings. No statistically meaningful p95 or quality win is claimed from this sample.
+
+All replay calls completed, but meaning is not perfect: the English “move to VR first” became Vietnamese “try VR first” with Qwen, and “first” was omitted in one Chinese-to-English example. Basic Japanese/Korean/Cantonese output was also exercised separately; naturalness and Cantonese correctness need language-competent review. The tested Qwen3 0.6B community conversion copied source text or altered meaning on basic checks and was rejected. These observations concern the tested files/template, not every quantization or deployment of that model.
+
+PhoWhisper Small CPU INT8/two threads loaded and warmed in 4,877 ms. Two Vietnamese recordings matched reference words, ignoring case. Forced Vietnamese decoding took 2,428 and 2,081 ms; Auto took 4,209 and 3,621 ms. This supports offering PhoWhisper as a Vietnamese CPU specialist, not claiming it is faster than GPU Whisper turbo or validated for mixed speech.
+
+Exact revisions/download hashes are in `engine/assets/local_models.json`; attribution and limits are in [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md). Ignored local evidence: `.tools/model-additions/comparison.json`, `pho-smoke.json`, `qwen-1.7-smoke.json`. The new weights and existing benchmark recordings are not included in source exports or the EXE.

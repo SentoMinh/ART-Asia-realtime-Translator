@@ -1,8 +1,8 @@
 # Project context
 
-Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 23 October 2026 handoff: published v0.12.4, the newer source-only HF-Mirror fallback, latency evidence, open model decisions and the next release steps. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
+Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 23 October 2026 handoff: the 0.12.5 PhoWhisper/Qwen integration, HF-Mirror fallback, latency evidence and release checks. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.4 and the preceding release validation; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.5 and the preceding release validation; recheck current code before relying on its findings.
 
 Read `CHANGELOG.md` for the reason behind recent changes, their implementation commits, regression tests and troubleshooting steps.
 
@@ -16,7 +16,7 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 - `F:\Code\vrchat-translator` is a sibling reference copy. Compare it before porting work; do not synchronize folders automatically.
 - Check both working trees before synchronizing; earlier onboarding found uncommitted local-model changes. Preserve unrelated edits and untracked work.
 - Both copies share AppData settings, provider keys, logs and the local-model cache. Use temporary paths/fakes for checks that change state.
-- Version 0.12.4 is published as one app/build, with the built source identified by its release tag. Preserve artifacts under `dist/<version>/`; source or documentation commits do not rebuild them. The newer download fallback is not yet in that EXE.
+- Version 0.12.5 includes PhoWhisper Small, Qwen3 1.7B INT8 and HF-Mirror fallback. Preserve artifacts under `dist/<version>/`; source or documentation commits do not rebuild them. Confirm release status and hashes from GitHub and the handoff before assuming a binary is published.
 - Follow the user’s current authorization for commits, builds and publication. Use a new version directory for a new binary; preserve prior artifacts. Clarify scope only when authorization is missing or unclear.
 - Synchronize source through reviewed changes and privacy checks. Preserve unrelated local artifacts in destination checkouts.
 

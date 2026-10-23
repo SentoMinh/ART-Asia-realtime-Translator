@@ -982,10 +982,7 @@ class LocalModelDialog(QDialog):
             heading = QLabel(f"{tr('Hearing' if category == 'hearing' else 'Translating')} — {title}")
             heading.setWordWrap(True)
             details.addWidget(heading)
-            description = ("SenseVoice runs on CPU: Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese."
-                           if model == "sensevoice" else "NLLB-200 translates locally on CPU using CTranslate2 (INT8)."
-                           if model == "nllb-200-ct2" else "Whisper runs on your NVIDIA graphics card. Large-v3 needs more memory than turbo.")
-            model_note = QLabel(tr(description))
+            model_note = QLabel(tr(local_model.DESCRIPTIONS[model]))
             model_note.setObjectName("dim")
             model_note.setWordWrap(True)
             details.addWidget(model_note)
@@ -1031,7 +1028,7 @@ class LocalModelDialog(QDialog):
             active = self._download.active and self._download.model == model
             missing = local_model.missing(model)
             can_download = (local_model.installed(model)
-                            and (not model.startswith("large-v3") or local_model.nvidia_card()))
+                            and (model != "large-v3-turbo" or local_model.nvidia_card()))
             needs_download = not local_model.ready(model=model)
             row["action"].setText(tr("Stop") if active else tr("Download"))
             row["action"].setEnabled(not self._stopping if active else
