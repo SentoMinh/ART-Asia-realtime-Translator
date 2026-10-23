@@ -699,6 +699,7 @@ class SettingsWindow(QDialog):
             text.setSpacing(1)
             title_label = QLabel(tr(title))
             title_label.setObjectName("title")
+            title_label.setWordWrap(True)
             if isinstance(description, QLabel):
                 description_label = description
             else:

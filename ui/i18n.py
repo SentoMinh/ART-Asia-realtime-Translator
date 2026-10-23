@@ -595,7 +595,7 @@ _VI = {
     "Cancel": "Hủy", "Save": "Lưu", "Could not save": "Không lưu được",
     "Detector strictness changes now wait until the current sentence ends, protecting speech already in progress.": "Thay đổi độ nghiêm ngặt sẽ chờ câu hiện tại kết thúc để giữ nguyên lời đang nói.",
     "Settings > Sound has Restore detector defaults: detection on, microphone 50%, other players 70%.": "Cài đặt > Âm thanh có nút khôi phục mặc định: bật nhận giọng, micro 50%, người khác 70%.",
-    "Restore detector defaults": "Khôi phục mặc định nhận giọng",
+    "Restore detector defaults": "Khôi phục mặc định",
     "Higher strictness is not higher recognition accuracy. Restore detection on, microphone 50% and other players 70%. Strictness changes apply after the current sentence.": "Độ nghiêm ngặt cao hơn không có nghĩa là nhận giọng chính xác hơn. Khôi phục nhận giọng bật, micro 50% và người khác 70%. Thay đổi áp dụng sau câu hiện tại.",
     "Sound": "Âm thanh", "Microphone": "Micro", "Windows default": "Mặc định của Windows",
     "Detector strictness: other players": "Độ chặt nhận biết giọng nói: người chơi khác",
