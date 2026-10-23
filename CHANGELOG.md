@@ -1,5 +1,13 @@
 # Change log
 
+## 0.12.7 — 2026-10-24 — Keep local translation local
+
+An installed Gemini add-on could run after NLLB or Qwen failed, even with **Local Model** selected. Its error replaced the local error, so the overlay could report Gemini while Settings still showed NLLB. `ServiceChain` now includes add-on fallbacks only for online services and loads add-ons only when an online chain is first needed. Local failures retain the original model error, including during the existing cooldown. Switching from an online service back to local also excludes add-ons.
+
+This shared fix covers typed messages and both speech queues. It preserves selected providers, installed models, local inference parameters, cooldowns and online-service fallback behavior. It does not fix every possible local inference error; those errors are now visible instead of being hidden by a later Gemini failure.
+
+Regression checks reproduce the old Gemini error for both local translators, verify zero add-on calls after local success/failure/cooldown/recovery, and cover lazy loading plus online → local switching. All three new cases failed before the routing fix; the full suite passed **521 tests** after it. Packaging and release validation are recorded in the handoff after completion.
+
 ## 0.12.6 — 2026-10-23 — Delete local models and Obsidian project guide
 
 Local model cards now show **Delete** when app-managed weights or partial downloads exist. The first click offers **Confirm delete / Cancel** in the same card. Deletion is disabled while any model download is active. A cleanup-only card offers deletion of retired non-turbo Whisper large-v3 files without restoring its download option. Successful deletion refreshes Settings and allows available models to be downloaded again.

@@ -1,8 +1,8 @@
-# ART agent handoff — 23 October 2026
+# ART agent handoff — 24 October 2026
 
 Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and the relevant entries in [CHANGELOG.md](CHANGELOG.md). This describes the current handoff; recheck Git and release state before making changes.
 
-**0.12.6 source update:** model cards support Delete → Confirm delete / Cancel, including partial downloads. Leftover non-turbo large-v3 gets a cleanup-only card. Deletion validates every target before unlinking, preserves other models/shared libraries/settings, and is blocked during downloads. `whisper.deleted` prevents automatic cache downloading after explicit turbo removal. See `tests/test_local_delete.py` and the UI regressions. The new [ART Project Guide](ART%20Project%20Guide.md) is a self-contained Obsidian-ready architecture/user guide. Check the release table below for packaging/publication status.
+**0.12.7 source update:** local translation excludes all add-on fallbacks. Previously a local failure could call an installed Gemini add-on and hide the real error. Add-ons now load only when an online translation chain is needed; switching back to local excludes them. Keep this boundary for typed text and both speech queues. Three regressions in `tests/test_engine.py` failed before the fix. The user's settings/add-ons are preserved. Check the release table below for packaging/publication status.
 
 ## Current state
 
@@ -13,7 +13,7 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 | Release validation | 518 tests; packaged self-check, inline confirm/cancel/delete and retired cleanup; native DLLs/runtime/manifest/source/asset checks; actual GitHub upgrade 0.12.5 → 0.12.6 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
 | Current release features | Local-model deletion, partial/retired-model cleanup, and Obsidian-ready ART Project Guide (also in the ZIP). Prior PhoWhisper/Qwen and HF-Mirror features retained. |
-| Version constant | 0.12.6; preserve earlier versions and use a new version for subsequent binaries |
+| Version constant | 0.12.7; 521 tests passed; packaging/publication pending |
 | Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
 
 The preceding 0.12.5 work added the models and descriptions with **505 tests passed**. Real pinned new weights loaded and ran; see LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. Release evidence is under `.tools/release-0.12.5/`: `verification.json`, `packaged-inference.json`, `github-draft.json` and `live-update-result.json`. The final package includes production native DLLs and both new adapters. Real GitHub download, SHA-256 verification, packaged replacement/restart and new-version self-check passed. All five uploaded assets matched local digests. This documentation follow-up does not rebuild the tagged EXE.

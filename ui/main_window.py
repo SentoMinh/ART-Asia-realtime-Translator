@@ -663,8 +663,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Local model cards now have Delete with inline confirmation to free disk space, including unfinished downloads.",
-            "Leftover Whisper large-v3 files can also be deleted. Other models, shared NVIDIA libraries and settings are kept.",
+            "Local translation now stays on your selected local model, even if translation fails.",
+            "Local Model no longer falls back to Gemini or other online add-ons. Errors now show the local model's reason.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))

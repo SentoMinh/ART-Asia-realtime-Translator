@@ -442,6 +442,56 @@ def test_selected_custom_model_takes_priority_over_gemini_addon(models, monkeypa
     assert chain.last_used == "custom:qwen/qwen3.8-27b"
 
 
+@pytest.mark.parametrize("model, runtime", [
+    ("nllb-200-ct2", "translator"), ("qwen3-1.7b-ct2", "qwen_translator")])
+def test_local_failure_never_calls_addons_and_keeps_the_local_error(models, monkeypatch, model, runtime):
+    from engine import local_inference, local_model
+    local_model.select(model)
+    local = Fixed("local answer")
+    addon = Fixed(error="Gemini can't be reached (no internet?)")
+    monkeypatch.setattr(local_inference, runtime, local)
+    clock = Clock()
+    chain = ServiceChain(lambda: "local", addons=[("gemini", addon)], clock=clock)
+    assert chain.translate("hello", "zh", "en") == "local answer"
+    local.error = "Local model could not translate this sentence"
+    for target in ("vi", "zh"):
+        with pytest.raises(TranslateError, match="^Local model could not translate this sentence$"):
+            chain.translate("hello", target, "en", heard=True)
+    assert local.calls == 2  # The second failure preserves the error during cooldown.
+    assert addon.calls == 0
+    local.error = None
+    clock.now += 61
+    assert chain.translate("hello", "vi", "en") == "local answer"
+    assert chain.names() == [f"local:{model}"]
+    assert chain.last_used == f"local:{model}"
+
+
+def test_addons_load_only_for_online_service_and_stay_out_of_local_chain(models, monkeypatch):
+    from engine import translators, local_inference
+    loaded = []
+    addon = Fixed("addon answer")
+    def load():
+        loaded.append(True)
+        return [("gemini", addon)]
+    monkeypatch.setattr(translators, "addon_translators", load)
+    monkeypatch.setattr(local_inference, "translator", Fixed("local answer"))
+    def offline(*args, **kwargs):
+        raise TranslateError("offline")
+    monkeypatch.setattr(ServiceTranslator, "translate", offline)
+    selected = ["local"]
+    chain = ServiceChain(lambda: selected[0])
+    chain.prepare()
+    assert chain.translate("hello", "vi", "en") == "local answer"
+    assert loaded == []
+    selected[0] = "custom"
+    assert chain.translate("hello", "vi", "en") == "addon answer"
+    assert loaded == [True] and addon.calls == 1
+    selected[0] = "local"
+    assert chain.translate("hello", "vi", "en") == "local answer"
+    assert chain.names() == ["local:nllb-200-ct2"]
+    assert addon.calls == 1
+
+
 def test_chain_skips_a_translator_that_hit_its_limit_until_it_rested():
     clock = Clock()
     first, second = Fixed(error="the service's limit was reached"), Fixed("ok")

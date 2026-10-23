@@ -140,7 +140,8 @@ def addon_folder() -> Path:
 def addon_translators(folder: Path | None = None) -> list[tuple[str, object]]:
     """Translators that exist only on this PC. Every .py file in the add-on folder that has a
     translators() function returning (name, translator) pairs is loaded, and its translators
-    are tried after the selected service's models. The program ships with that folder empty.
+    are tried after the selected online service's models. Local Model never uses add-ons.
+    The program ships with that folder empty.
     A broken add-on is skipped and logged."""
     found: list[tuple[str, object]] = []
     for path in sorted((folder or addon_folder()).glob("*.py")):
@@ -158,13 +159,13 @@ def addon_translators(folder: Path | None = None) -> list[tuple[str, object]]:
 
 
 class ServiceChain:
-    """The models picked in Settings → Models first, then this PC's add-ons as fallback.
+    """The selected model(s), with this PC's add-ons as fallback only for online services.
     `pick()` says which service that is right now; it can change while the program runs."""
 
     def __init__(self, pick=lambda: "", clock=time.monotonic, addons: list | None = None, on_switch=None):
         self._pick = pick
         self._clock = clock
-        self._addons = addon_translators() if addons is None else addons
+        self._addons = addons  # Load add-ons only when an online service is selected.
         self._chains: dict[tuple, Chain] = {}     # one per provider configuration, keeping its rests
         self.last_used = ""
         self.on_switch = on_switch
@@ -180,8 +181,11 @@ class ServiceChain:
                 choices = [(f"local:{model}", qwen_translator if model == "qwen3-1.7b-ct2" else translator)]
             else:
                 choices = [(f"{service}:{model}", ServiceTranslator(service, model)) for model in models]
+                if self._addons is None:
+                    self._addons = addon_translators()
+                choices += self._addons
             self._chains[key] = Chain(
-                choices + self._addons,
+                choices,
                 self._clock,
                 on_switch=self._on_model_switch)
         return self._chains[key]
