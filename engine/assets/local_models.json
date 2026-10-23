@@ -1,36 +1,4 @@
 {
-  "large-v3": [
-    {
-      "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/config.json",
-      "size": 2394,
-      "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
-      "place": "whisper-v3/config.json"
-    },
-    {
-      "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/preprocessor_config.json",
-      "size": 340,
-      "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
-      "place": "whisper-v3/preprocessor_config.json"
-    },
-    {
-      "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/tokenizer.json",
-      "size": 2480617,
-      "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
-      "place": "whisper-v3/tokenizer.json"
-    },
-    {
-      "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/vocabulary.json",
-      "size": 1068114,
-      "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
-      "place": "whisper-v3/vocabulary.json"
-    },
-    {
-      "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/model.bin",
-      "size": 3087284237,
-      "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
-      "place": "whisper-v3/model.bin"
-    }
-  ],
   "sensevoice": [
     {
       "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/model.int8.onnx",
@@ -69,6 +37,58 @@
       "size": 622596105,
       "sha256": "398726640cc2a02cc6a35277fa3cf2159ce8a1a66b48aa1b6c8837a47e3dd00c",
       "place": "nllb/model.bin"
+    }
+  ],
+  "phowhisper-small": [
+    {
+      "url": "https://huggingface.co/qbsmlabs/PhoWhisper-small/resolve/644a8705b6981de92b10659b105763bdb39b61ef/config.json",
+      "size": 2370,
+      "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828",
+      "place": "phowhisper-small/config.json"
+    },
+    {
+      "url": "https://huggingface.co/qbsmlabs/PhoWhisper-small/resolve/644a8705b6981de92b10659b105763bdb39b61ef/tokenizer.json",
+      "size": 2204003,
+      "sha256": "c218b12acbc2168cad951ae8a8c8d345df09dfa63b787214d4ac27762170fd7b",
+      "place": "phowhisper-small/tokenizer.json"
+    },
+    {
+      "url": "https://huggingface.co/qbsmlabs/PhoWhisper-small/resolve/644a8705b6981de92b10659b105763bdb39b61ef/vocabulary.json",
+      "size": 1068103,
+      "sha256": "5ad28279db5e546349708b9a74736e2c018737ac5a600f1048f1f26c99b85b47",
+      "place": "phowhisper-small/vocabulary.json"
+    },
+    {
+      "url": "https://huggingface.co/qbsmlabs/PhoWhisper-small/resolve/644a8705b6981de92b10659b105763bdb39b61ef/model.bin",
+      "size": 967072097,
+      "sha256": "15653eafd41a1dc06bd3db01dba0c6678818d325ecf4ff35f717c49b629c8403",
+      "place": "phowhisper-small/model.bin"
+    }
+  ],
+  "qwen3-1.7b-ct2": [
+    {
+      "url": "https://huggingface.co/keisuke-miyako/Qwen3-1.7B-ct2-int8/resolve/57df87372886c747d55f2f4d55a4144a7e7893e0/config.json",
+      "size": 870,
+      "sha256": "45d3f4a9ca00e9ea25438e06d435d0e0470d9c7dcd546c138cf861dbbc96d0d9",
+      "place": "qwen3-1.7b/config.json"
+    },
+    {
+      "url": "https://huggingface.co/keisuke-miyako/Qwen3-1.7B-ct2-int8/resolve/57df87372886c747d55f2f4d55a4144a7e7893e0/tokenizer.json",
+      "size": 11422654,
+      "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "place": "qwen3-1.7b/tokenizer.json"
+    },
+    {
+      "url": "https://huggingface.co/keisuke-miyako/Qwen3-1.7B-ct2-int8/resolve/57df87372886c747d55f2f4d55a4144a7e7893e0/vocabulary.json",
+      "size": 3861154,
+      "sha256": "bc2e9b64c2cacad6982f9fe1a13f947e145889d19119ad0ccd3f72e809cedd10",
+      "place": "qwen3-1.7b/vocabulary.json"
+    },
+    {
+      "url": "https://huggingface.co/keisuke-miyako/Qwen3-1.7B-ct2-int8/resolve/57df87372886c747d55f2f4d55a4144a7e7893e0/model.bin",
+      "size": 1723631567,
+      "sha256": "d29d3e99d421082bd6b699394b39b654918000b69f499fdcb1c1492255e38bbd",
+      "place": "qwen3-1.7b/model.bin"
     }
   ]
 }

@@ -1,8 +1,8 @@
 """Download and check local hearing/translation models in the user's local app-data cache.
 
 The app carries runtimes, while Settings downloads each model separately. Pinned files are
-checked against SHA-256 before use and interrupted downloads resume. Whisper models share
-cuBLAS; SenseVoice and NLLB run on CPU. Existing source installs can also use faster-whisper's
+checked against SHA-256 before use and interrupted downloads resume. Whisper turbo uses
+cuBLAS; PhoWhisper, SenseVoice, NLLB and Qwen run on CPU. Source installs can use faster-whisper's
 own turbo cache with the NVIDIA packages installed through requirements.txt.
 """
 from __future__ import annotations
@@ -76,9 +76,17 @@ PARTS = (
 # id: (display name, role, directory, runtime)
 MODELS = {
     "large-v3-turbo": ("Whisper large-v3-turbo", "hearing", "whisper", "faster_whisper"),
-    "large-v3": ("Whisper large-v3", "hearing", "whisper-v3", "faster_whisper"),
     "sensevoice": ("SenseVoice Small", "hearing", "sensevoice", "sherpa_onnx"),
+    "phowhisper-small": ("PhoWhisper Small", "hearing", "phowhisper-small", "faster_whisper"),
     "nllb-200-ct2": ("NLLB-200 · CTranslate2", "translating", "nllb", "ctranslate2"),
+    "qwen3-1.7b-ct2": ("Qwen3 1.7B · INT8", "translating", "qwen3-1.7b", "ctranslate2"),
+}
+DESCRIPTIONS = {
+    "large-v3-turbo": "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Fast NVIDIA GPU option for multilingual conversations; mixed-language sentences can still be misheard.",
+    "sensevoice": "Chinese, Cantonese, English, Japanese and Korean; no Vietnamese. Lightweight CPU option with automatic language detection. Mixed-language accuracy varies.",
+    "phowhisper-small": "Vietnamese specialist, trained on diverse Vietnamese accents. Runs on CPU without NVIDIA; may be slower than GPU turbo. Choose turbo for other languages or mixed-language conversations.",
+    "nllb-200-ct2": "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Translation-focused CPU model; keep this as the low-latency starting choice.",
+    "qwen3-1.7b-ct2": "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Small CPU language-model alternative, with thinking disabled. May be slower or less accurate than NLLB; compare your language pair.",
 }
 _MODEL_FILES = json.loads((Path(__file__).parent / "assets" / "local_models.json").read_text(encoding="utf-8"))
 
@@ -101,8 +109,7 @@ def parts(model: str | None = None) -> tuple[Part, ...]:
     model = model or selected()
     if model == "large-v3-turbo":
         return PARTS
-    found = tuple(Part(**part) for part in _MODEL_FILES[model])
-    return (PARTS[0], *found) if model == "large-v3" else found
+    return tuple(Part(**part) for part in _MODEL_FILES[model])
 
 
 def model_folder(model: str | None = None) -> Path:
@@ -193,7 +200,7 @@ def missing(model: str | None = None) -> str:
     model = model or selected()
     if not installed(model):
         return "this copy has no Local Model runtime: install its dependencies or choose an online service in Settings → Models"
-    if MODELS[model][3] == "faster_whisper":
+    if model == "large-v3-turbo":
         if not nvidia_card():
             return "the Local Model needs an NVIDIA graphics card, and this PC has none"
         if model == "large-v3-turbo" and gpu_folders():

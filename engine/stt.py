@@ -182,7 +182,9 @@ class LocalWhisper:
         if problem:
             raise SttError(problem)
         try:
-            _add_gpu_libraries()
+            vietnamese = self._model_id == "phowhisper-small"
+            if not vietnamese:
+                _add_gpu_libraries()
             if local_model.ready(model=self._model_id):
                 source = str(local_model.model_folder(self._model_id))     # the program's own download
             else:
@@ -191,15 +193,19 @@ class LocalWhisper:
                 # library's own check for that is not thread-safe: always copy instead.
                 download.are_symlinks_supported = lambda cache_dir=None: False
                 source = self._model_id                            # faster-whisper fetches it
-            model = whisper_class()(source, device="cuda", compute_type="float16")
+            options = dict(device="cpu", compute_type="int8", cpu_threads=2) if vietnamese else dict(device="cuda", compute_type="float16")
+            model = whisper_class()(source, **options)
             # the first run on a GPU is slow (2 s instead of 0.6 s): spend it on silence now
-            list(model.transcribe(np.zeros(RATE, dtype="float32"), language="en", beam_size=1)[0])
+            list(model.transcribe(np.zeros(RATE, dtype="float32"), language="vi" if vietnamese else "en", beam_size=1)[0])
             self._model = model
         except Exception as error:
             raise SttError(f"the speech model could not be loaded: {error}") from error
 
     def transcribe(self, samples: np.ndarray, lang: str | None, prefer: tuple = ()) -> Heard:
         """`prefer` is not needed here: the model says how likely each language is."""
+        vietnamese = self._model_id == "phowhisper-small"
+        if vietnamese and lang not in (None, "vi"):
+            raise SttError("PhoWhisper supports Vietnamese; choose Whisper turbo for other languages")
         self.load()
         try:
             if lang == "zh":
@@ -209,7 +215,9 @@ class LocalWhisper:
                     text, info = self._run(samples, "zh")
             else:
                 text, info = self._run(samples, lang)
-            if lang is None and info.language not in MAIN_LANGS and info.language_probability < SURE:
+            if vietnamese and info.language != "vi":
+                return Heard("", info.language)
+            if not vietnamese and lang is None and info.language not in MAIN_LANGS and info.language_probability < SURE:
                 # under 80% sure of a language that isn't ours: it is one of ours, heard badly
                 best = max(MAIN_LANGS, key=lambda code: dict(info.all_language_probs or []).get(code, 0))
                 text, info = self._run(samples, best)

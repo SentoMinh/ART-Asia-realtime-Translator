@@ -175,8 +175,9 @@ class ServiceChain:
         key = (service, models, services.setting(service, "url"), services.setting(service, "key"))
         if key not in self._chains:
             if service == "local":
-                from .local_inference import translator
-                choices = [("local:nllb-200-ct2", translator)]
+                from .local_inference import translator, qwen_translator
+                model = models[0]
+                choices = [(f"local:{model}", qwen_translator if model == "qwen3-1.7b-ct2" else translator)]
             else:
                 choices = [(f"{service}:{model}", ServiceTranslator(service, model)) for model in models]
             self._chains[key] = Chain(

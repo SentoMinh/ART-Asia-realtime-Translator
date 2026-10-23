@@ -7,8 +7,8 @@ import re
 import threading
 
 from . import local_model
-from .stt import Heard, LocalWhisper, SttError, guess_language, tidy
-from vrc.translate import TranslateError
+from .stt import Heard, LocalWhisper, SttError, guess_language, in_own_script, mostly_chinese, tidy
+from vrc.translate import TranslateError, chat_messages
 
 
 class LocalHearing:
@@ -69,6 +69,14 @@ class LocalSenseVoice:
 
 LANGUAGES = {"en": "eng_Latn", "vi": "vie_Latn", "zh": "zho_Hans", "yue": "yue_Hant",
              "ja": "jpn_Jpan", "ko": "kor_Hang"}
+_translation_lock = threading.Lock()
+
+
+def _release_other_translator(current):
+    # Both runtimes share the lock: switching releases weights without interrupting a call.
+    for engine in (translator, qwen_translator):
+        if engine is not current:
+            engine._model = engine._tokenizer = None
 
 
 def translation_sentences(text):
@@ -102,7 +110,7 @@ def translation_loop(tokens, source_tokens):
 class LocalTranslator:
     def __init__(self):
         self._model = self._tokenizer = None
-        self._lock = threading.Lock()
+        self._lock = _translation_lock
 
     def prepare(self):
         pass  # Load on the translation worker, never on the UI thread.
@@ -121,6 +129,7 @@ class LocalTranslator:
         with self._lock:
             try:
                 if self._model is None:
+                    _release_other_translator(self)
                     import ctranslate2
                     from tokenizers import Tokenizer
                     root = local_model.model_folder("nllb-200-ct2")
@@ -156,4 +165,62 @@ class LocalTranslator:
                 raise TranslateError(f"Local NLLB could not translate: {error}") from error
 
 
-translator = LocalTranslator()  # Share one model between typed text and both speech queues.
+class LocalQwenTranslator(LocalTranslator):
+    def translate(self, text, target, likely_source="", heard=False):
+        source = likely_source or guess_language(text)
+        if source not in LANGUAGES or target not in LANGUAGES:
+            raise TranslateError("Local Qwen does not support this language in the app")
+        if source == target:
+            return text
+        problem = local_model.missing("qwen3-1.7b-ct2")
+        if problem:
+            error = TranslateError(problem)
+            error.wait = 0
+            raise error
+        with self._lock:
+            try:
+                if self._model is None:
+                    _release_other_translator(self)
+                    import ctranslate2
+                    from tokenizers import Tokenizer
+                    root = local_model.model_folder("qwen3-1.7b-ct2")
+                    tokenizer = Tokenizer.from_file(str(root / "tokenizer.json"))
+                    model = ctranslate2.Generator(str(root), device="cpu", compute_type="int8",
+                                                 inter_threads=1, intra_threads=2)
+                    self._model, self._tokenizer = model, tokenizer
+                messages = chat_messages(text, target, source, heard=heard)
+                prompt = "".join(f"<|im_start|>{message['role']}\n{message['content']}<|im_end|>\n" for message in messages)
+                # Pinned Qwen3 chat template's enable_thinking=False generation prefix.
+                prompt += "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+                tokens = self._tokenizer.encode(prompt, add_special_tokens=False).tokens
+                if len(tokens) > 1024:
+                    raise ValueError("message too long for local Qwen; split it into shorter messages")
+                result = self._model.generate_batch(
+                    [tokens], beam_size=1, sampling_topk=1, max_length=512,
+                    end_token=["<|im_end|>", "<|endoftext|>"], return_end_token=True,
+                    include_prompt_in_result=False)[0]
+                output = result.sequences[0]
+                if not output or output[-1] not in ("<|im_end|>", "<|endoftext|>"):
+                    raise ValueError("translation did not finish; try a shorter message")
+                output = output[:-1]
+                original = self._tokenizer.encode(text, add_special_tokens=False).tokens
+                if translation_loop(output, original):
+                    raise ValueError("the translation kept repeating")
+                ids = [self._tokenizer.token_to_id(token) for token in output]
+                answer = self._tokenizer.decode(ids, skip_special_tokens=True).strip()
+                if not answer or "<think>" in answer or "</think>" in answer:
+                    raise ValueError("the model did not return a translation")
+                if target in ("en", "vi") and mostly_chinese(answer):
+                    raise ValueError("the model answered in Chinese instead of translating")
+                if not in_own_script(answer, target):
+                    raise ValueError("the model did not use the requested language")
+                if target in ("zh", "yue"):
+                    import zhconv
+                    answer = zhconv.convert(answer, "zh-cn" if target == "zh" else "zh-hk")
+                return " ".join(answer.split())
+            except Exception as error:
+                raise TranslateError(f"Local Qwen could not translate: {error}") from error
+
+
+translator = LocalTranslator()  # Share weights between typed text and both speech queues.
+qwen_translator = LocalQwenTranslator()

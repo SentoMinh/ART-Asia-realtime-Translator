@@ -7,13 +7,13 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **[0.12.4](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.4)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **[0.12.5](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.5)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 See the [change log](CHANGELOG.md) for implementation details, measurements and troubleshooting notes.
 
-Planned local translation model comparisons prioritize low latency. See [the Qwen and alternative-model plan](LOCAL_TRANSLATION_PLAN.md); listed candidates are not yet added to the app.
+Local models now include PhoWhisper Small for Vietnamese hearing and Qwen3 1.7B INT8 for translation. NLLB remains the low-latency default. See [the model plan and checks](LOCAL_TRANSLATION_PLAN.md).
 
-Version 0.12.4 sends your chatbox messages in all selected **They speak** languages. Choose **Custom languages** under Settings → Translation → Chatbox languages to use separate destinations.
+Since version 0.12.4, ART sends your chatbox messages in all selected **They speak** languages. Choose **Custom languages** under Settings → Translation → Chatbox languages to use separate destinations.
 
 Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
 
@@ -23,7 +23,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.12.4](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.4). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.12.5](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.5). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -58,16 +58,17 @@ Open **Settings → Models → Local Model → Set up…** and choose a model:
 
 | Model | Job | Hardware and languages |
 |---|---|---|
-| Whisper large-v3-turbo | Hearing | NVIDIA GPU; includes Vietnamese. |
-| Whisper large-v3 | Hearing | NVIDIA GPU; needs more memory than turbo. |
-| SenseVoice Small | Hearing | CPU; Chinese, Cantonese, English, Japanese and Korean. Use Whisper for Vietnamese. |
-| NLLB-200 · CTranslate2 | Translation | CPU, INT8; English, Vietnamese, Chinese, Cantonese, Japanese and Korean. |
+| Whisper large-v3-turbo | Hearing | Fast NVIDIA GPU option; English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Multilingual conversations; mixed sentences can still be misheard. |
+| SenseVoice Small | Hearing | Lightweight CPU option; Chinese, Cantonese, English, Japanese and Korean. Automatic detection; no Vietnamese. Mixed-language accuracy varies. |
+| PhoWhisper Small | Hearing | Vietnamese specialist trained on diverse accents. CPU INT8, no NVIDIA needed; may be slower than GPU turbo. About 0.9 GiB download. |
+| NLLB-200 · CTranslate2 | Translation | CPU INT8; all six app languages. Default for low latency. |
+| Qwen3 1.7B · INT8 | Translation | Optional CPU language model for all six app languages, thinking disabled. About 1.6 GiB download. Slower than NLLB in our replay; wording and Cantonese quality need comparison. |
 
-The download panel opens inside Settings and moves with it. Its model list has one scrollbar; the title and single Close button stay at the top. All models are listed directly, each with a **Download** button, download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. Whisper shares the downloaded NVIDIA cuBLAS library between its two choices.
+The download panel opens inside Settings and moves with it. Its model list has one scrollbar; the title and single Close button stay at the top. All models are listed directly, each with a **Download** button, download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. Only Whisper turbo requires NVIDIA libraries. Non-turbo Whisper large-v3 is removed from the list; an old selection falls back to turbo without deleting its downloaded files. Existing hearing and translation choices otherwise stay unchanged. Switching translators releases the previous model before loading the next.
 
 Local inference needs no API key. Select Local Model for both Hearing and Translating to run both steps on your PC. The first download needs internet access. Optional translation add-ons retain their existing fallback behavior.
 
-**New source change, not yet in the v0.12.4 EXE:** Hugging Face model downloads automatically try [HF-Mirror](https://hf-mirror.com/) if the original connection fails or refuses the file. Resume and the original SHA-256 checks remain enabled. Other download hosts are unchanged. A small-file test redirected back to Hugging Face; availability from mainland China is not guaranteed. See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for release status and remaining checks.
+**Since 0.12.5:** Hugging Face model downloads automatically try [HF-Mirror](https://hf-mirror.com/) if the original connection fails or refuses the file. Resume and the original SHA-256 checks remain enabled. Other download hosts are unchanged. A small-file test redirected back to Hugging Face; availability from mainland China is not guaranteed. See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for release status and remaining checks.
 
 **Cannot download NLLB from China or another restricted network?** Use the [offline NLLB package](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/download/v0.12.3/ART-NLLB-200-CT2-offline.zip) (about 558 MiB; [SHA-256](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/download/v0.12.3/ART-NLLB-200-CT2-offline.zip.sha256)). Download it on a working connection or transfer the ZIP by USB or a file-sharing service. Close ART, extract the ZIP, and double-click **Install-NLLB.cmd**. Then open Settings → Models, select **Local Model** for Translating, and choose **Use model** for NLLB. No administrator, Python, Hugging Face connection or API key is needed during installation. The installer checks the four pinned model files and preserves any replaced folder as a backup. It works with v0.12.3; the app EXE is unchanged. GitHub access from mainland China is not verified, so file transfer is the fallback if that download is also unavailable. The model remains [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/); attribution is included in the ZIP.
 
@@ -131,7 +132,7 @@ run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
 
 Release validation for 0.11.10: **422 tests passed**, including the 30% click-through threshold, top-only resize edges, embedded setup panels and once-per-version update notices. Windows checks also verified actual mouse-drag resizing with the top grip, cross-process click-through, retained text/input interaction and subtitle copying, and window detection/placement against a separate test application. The EXE passed its packaged self-check, bundled-runtime and native-DLL checks, source/artifact scans, ZIP checks and SHA-256 verification. The GitHub download, replacement and restart from 0.11.9 to 0.11.10 were verified, followed by a no-update check on the current version.
 
-Earlier source checks ran SenseVoice on a sample recording and NLLB translating English to Vietnamese. Fresh-PC installation, live Windows 10 behavior, Whisper large-v3 GPU inference and Japanese/Korean recognition accuracy with real services remain unverified. These inference checks were not repeated for this UI update.
+The 0.12.5 source passed 505 tests. Real pinned PhoWhisper and Qwen files loaded and ran on CPU; two Vietnamese recording replays and short multilingual translation checks are recorded in LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. This is not a broad quality evaluation. Fresh-PC installation, Windows 10 behavior and mainland-China download access remain unverified.
 
 ## Layout
 

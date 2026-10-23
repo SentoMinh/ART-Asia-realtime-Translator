@@ -12,7 +12,7 @@ zhconv>=1.4              # simplified / traditional Chinese
 # Local speech recognition and translation:
 faster-whisper>=1.2
 sherpa-onnx>=1.12       # SenseVoice on CPU
-ctranslate2>=4.6        # local NLLB translation
+ctranslate2>=4.8.2      # local NLLB and Qwen3 translation
 tokenizers>=0.21        # NLLB tokenizer, without a PyTorch runtime
 nvidia-cublas-cu12
 nvidia-cudnn-cu12

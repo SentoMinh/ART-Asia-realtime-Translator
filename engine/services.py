@@ -220,6 +220,9 @@ def ready(service: str) -> bool:
 
 
 def translate_models(service: str) -> list[str]:
+    if service == "local":
+        from . import local_model
+        return [local_model.selected("translating")]
     return [m.strip() for m in setting(service, "translate_model").split(",") if m.strip()]
 
 

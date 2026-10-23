@@ -663,8 +663,9 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Chatbox messages now follow all languages in They speak. Choose custom languages in Settings → Translation.",
-            "Translated to controls the panel. Shared translations are reused for the chatbox.",
+            "Local models now include PhoWhisper Small for Vietnamese hearing and Qwen3 1.7B for translation. NLLB remains the low-latency default.",
+            "Whisper large-v3 was removed from the list; turbo remains. Each card explains its languages and strengths.",
+            "Model downloads try HF-Mirror when Hugging Face cannot connect.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))

@@ -6,11 +6,11 @@ Saved 2026-10-22 at the user's request. Scope: text translation after speech rec
 
 **Low latency first; other models remain alternatives.** Choose the lowest measured delay among models that preserve meaning, retain every sentence, use the requested language and avoid repeated or explanatory output. Keep the existing translator available while comparing candidates. A smaller model or faster token rate does not automatically produce a usable complete translation sooner.
 
-Translation must work offline after setup. Download accessibility from China is a requirement for installation: prefer verified ModelScope files or a transferable offline package, with pinned revisions and hashes. No mainland-China connection has been tested. Download size is not runtime RAM/VRAM usage.
+Translation must work offline after setup. Download accessibility from China is a requirement for installation. The user prefers in-app online downloads: Hugging Face first, HF-Mirror on failure, with pinned revisions and hashes. Keep the existing offline package as an optional fallback. No mainland-China connection has been tested. Download size is not runtime RAM/VRAM usage.
 
 ## Shortlist and proposed evaluation order
 
-This is an order for experiments, **not a measured speed ranking**. No Qwen or Hy-MT model has been benchmarked on this PC or integrated into ART's Local Model list.
+The shortlist below is historical evaluation order, **not a speed ranking**. Update 2026-10-23: Qwen3 1.7B INT8 is implemented as an optional choice; NLLB remains default. The tested 0.6B conversion copied source text or changed meaning, so it is not offered. Hy-MT is still a candidate.
 
 | Candidate | Role in the comparison | Format and implementation considerations |
 | --- | --- | --- |
@@ -42,7 +42,16 @@ The original Hy-MT recommendation was a translation-focused candidate. The user'
 
 ## Current status
 
-- Saved preference and shortlist only; no new inference runtime installed, no model downloaded for these comparisons, and no default changed in this task.
-- NLLB is the implemented local translator. Its offline installer was previously tested with actual model files and published with v0.12.3.
-- Qwen and Hy-MT performance, mainland-China connectivity, runtime integration and translation quality remain to be tested.
+- Qwen3 1.7B INT8 is implemented using the bundled CTranslate2 4.8.2 Generator and tokenizers; no torch, transformers or inference server is needed. It shares the existing translation-only prompt, uses the official non-thinking assistant prefix, greedy decoding, 2 CPU threads, a 1,024-token input limit and 512 output tokens. It rejects missing EOS, runaway repetition, empty/reasoning output and obvious wrong-script output. These checks do not prove semantic accuracy.
+- NLLB remains the default and its sentence/repetition handling is preserved. Switching models releases the previous weights; one shared lock serializes local translation across typed text and speech queues. No provider choices are changed during validation.
+- Both new downloads passed full SHA-256 checks and real CPU inference. Qwen translated the short EN/ZH/VI examples and basic EN→JA/KO/YUE samples, but wording and Cantonese naturalness still need human review. The selected 1.7B model is an alternative, not a latency improvement. See LATENCY_REPORT.md.
+- PhoWhisper Small is also integrated for Vietnamese hearing, with CPU INT8/two threads. Two existing Vietnamese recordings matched their reference words (case aside) in forced-Vietnamese and Auto modes. Forced decoding took about 2.1–2.4 seconds and Auto 3.6–4.2 seconds in this small replay. Other accents, mixed-language speech and live microphone conditions are unverified.
+- Mainland-China connectivity, fresh-machine installation, broad translation quality and controlled game-contention testing remain outstanding.
 - Speaker identification remains deferred as recorded in [ROADMAP.md](ROADMAP.md).
+
+## Pinned models and attribution (0.12.5)
+
+- PhoWhisper Small: [VinAI model card](https://huggingface.co/vinai/PhoWhisper-small), BSD-3-Clause; Le, Nguyen and Nguyen, *PhoWhisper: Automatic Speech Recognition for Vietnamese*, ICLR 2024 Tiny Papers. Uses the [qbsmlabs CTranslate2 conversion](https://huggingface.co/qbsmlabs/PhoWhisper-small) at `644a8705b6981de92b10659b105763bdb39b61ef` (970,346,573 download bytes).
+- Qwen3 1.7B: [official model card](https://huggingface.co/Qwen/Qwen3-1.7B), Apache-2.0. Uses the [keisuke-miyako CTranslate2 INT8 conversion](https://huggingface.co/keisuke-miyako/Qwen3-1.7B-ct2-int8) at `57df87372886c747d55f2f4d55a4144a7e7893e0` (1,738,916,245 download bytes).
+- Exact file sizes, SHA-256 hashes and destinations are in `engine/assets/local_models.json`. These are community conversions of the linked original models. Download size is not runtime memory use. Tests download into `.tools/model-additions/models`, not the user's cache; those weights and audio are never exported or bundled.
+- Local evidence: `.tools/model-additions/pho-smoke.json`, `qwen-smoke.json` (rejected 0.6B conversion), `qwen-1.7-smoke.json`, and `comparison.json`. The last file replays the final production prompt, including the heard-speech instruction, against NLLB.
