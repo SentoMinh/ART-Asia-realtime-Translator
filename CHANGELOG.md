@@ -8,7 +8,7 @@ Local model cards now show **Delete** when app-managed weights or partial downlo
 
 Added [ART Project Guide](ART%20Project%20Guide.md), a self-contained Obsidian-ready note with YAML metadata, diagrams, architecture and folder maps, language controls, storage paths, model tradeoffs, release workflow and troubleshooting. It contains no API credentials. Companion links work when the repository's Markdown notes are also in the vault.
 
-Validation for 0.12.6: 518 tests passed, including all model deletion targets, incomplete downloads, preserved shared files/settings, validation before mutation, redirected paths, file-in-use errors, cache redownload suppression, inline confirmation/cancel, download blocking and retired-model cleanup. Package validation is recorded in the handoff after publication.
+Validation for 0.12.6: 518 tests passed, including all model deletion targets, incomplete downloads, preserved shared files/settings, validation before mutation, redirected paths, file-in-use errors, cache redownload suppression, inline confirmation/cancel, download blocking and retired-model cleanup. Published from release source `ce06fb9`. Packaged self-check and isolated UI deletion/cancel/retired-cleanup checks passed; native DLL/runtime/manifest/source checks, ZIP integrity and all five uploaded asset digests passed. The ZIP includes the Obsidian guide. Actual GitHub upgrade 0.12.5 → 0.12.6, restart, self-check and no-update check passed. See AGENT_HANDOFF.md for hashes/evidence.
 
 ## 0.12.5 — 2026-10-23 — PhoWhisper, Qwen and clearer model choices
 

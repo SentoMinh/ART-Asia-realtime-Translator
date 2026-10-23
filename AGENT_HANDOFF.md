@@ -8,15 +8,15 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 
 | Item | State |
 | --- | --- |
-| Published app | **v0.12.5**, release source `11a5a1693d93dc07f01e4a6dce3ea8fdf488a37c` |
-| Published EXE SHA-256 | `333d7acd2c73173801614e04be73881183e2ff3396261787a24fb55c2fd4967d` |
-| Release validation | 505 tests; packaged self-check and real PhoWhisper/Qwen inference; native DLLs, model manifest, source/asset checks; actual GitHub upgrade 0.12.4 → 0.12.5 and up-to-date check passed |
+| Published app | **v0.12.6**, release source `ce06fb9c57033c5a69cc43437afbe63beb063091` |
+| Published EXE SHA-256 | `105ebacc8c5eb7655641dcd267cd01c2ced12dde58b83b1f97c2cb54a3d2e8c5` |
+| Release validation | 518 tests; packaged self-check, inline confirm/cancel/delete and retired cleanup; native DLLs/runtime/manifest/source/asset checks; actual GitHub upgrade 0.12.5 → 0.12.6 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| Current release features | PhoWhisper Small, Qwen3 1.7B INT8, descriptive model cards and HF-Mirror fallback are included in 0.12.5. |
-| Version constant | 0.12.5; preserve the existing 0.12.4 artifacts/tag |
+| Current release features | Local-model deletion, partial/retired-model cleanup, and Obsidian-ready ART Project Guide (also in the ZIP). Prior PhoWhisper/Qwen and HF-Mirror features retained. |
+| Version constant | 0.12.6; preserve earlier versions and use a new version for subsequent binaries |
 | Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
 
-The latest user request explicitly authorizes the model additions/removal and language/strength descriptions. Source tests: **505 passed**. Real pinned new weights loaded and ran; see LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. Release evidence is under `.tools/release-0.12.5/`: `verification.json`, `packaged-inference.json`, `github-draft.json` and `live-update-result.json`. The final package includes production native DLLs and both new adapters. Real GitHub download, SHA-256 verification, packaged replacement/restart and new-version self-check passed. All five uploaded assets matched local digests. This documentation follow-up does not rebuild the tagged EXE.
+The preceding 0.12.5 work added the models and descriptions with **505 tests passed**. Real pinned new weights loaded and ran; see LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. Release evidence is under `.tools/release-0.12.5/`: `verification.json`, `packaged-inference.json`, `github-draft.json` and `live-update-result.json`. The final package includes production native DLLs and both new adapters. Real GitHub download, SHA-256 verification, packaged replacement/restart and new-version self-check passed. All five uploaded assets matched local digests. This documentation follow-up does not rebuild the tagged EXE.
 
 ## User decisions and open choices
 
@@ -68,7 +68,14 @@ Next useful measurements are actual game/GPU contention, short conversational an
 - Never bundle AppData settings, API credentials, logs, benchmark recordings, model weights or local infrastructure. Tests isolate AppData through `tests/conftest.py`; direct benchmarks must avoid saving provider changes or opening capture/OSC.
 - For a new release, stage the committed/scanned source in a new `.tools/release-<version>/source` directory. Build with `tools/build.ps1`, the development Python, and validated `.tools/apo-prototype-10` DLLs. Preserve old artifacts. Bundle only `VrctMicApo.dll` and `VrctApoProducer.dll`, never test DLLs.
 - Prior release helpers/evidence are in `.tools/release-0.12.4/`; adapt versions, source commit, notice assertions and test counts rather than copying old expectations blindly. Keep checksums, ZIP, packaged self-check, draft-asset verification, and the GitHub download/replacement/restart check.
-- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. Version 0.12.5 is allocated to these model changes; use a new version for subsequent binaries.
+- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. Version 0.12.6 is published; use a new version for subsequent binaries.
 - The optional verified NLLB offline ZIP remains an asset of v0.12.3. Keep existing links valid, but it is not the user's preferred solution for this current request.
 
 Run focused tests with `.venv-app\Scripts\python.exe -m pytest tests/test_local_model.py tests/test_local_choices.py tests/test_nllb_offline.py -q`; run the full suite before packaging. A source test result does not validate a new EXE or mainland-China access.
+
+
+## 0.12.6 release evidence
+
+The latest requests added model deletion and an Obsidian-ready project-structure note. Published source is `ce06fb9`; the documentation follow-up does not rebuild that binary. All 518 tests passed. Native Windows previews verified inline confirmation/cancel and the legacy cleanup card, then closed automatically. The EXE self-check and an isolated packaged UI deletion probe passed, including cancellation, model and partial deletion, retired cleanup and preservation of other model/shared files. No real user model was deleted during validation.
+
+Evidence: `.tools/release-0.12.6/verification.json`, `packaged-delete.json`, `github-draft.json` and `live-update-result.json`. The ZIP includes `ART Project Guide.md`; all five uploaded release assets matched local sizes/digests. Actual GitHub download, SHA-256 verification, packaged replacement/restart from 0.12.5, new-version self-check and no-update check passed. The new deletion behavior does not remove external caches or unload already-resident weights. Windows file locks, other running ART instances and fresh-PC installation remain practical limits.

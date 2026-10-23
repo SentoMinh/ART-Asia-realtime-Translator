@@ -136,3 +136,8 @@ Local NLLB translation in 0.12.3 batches punctuated sentences separately to avoi
 ## 0.12.5 release validation
 
 Published source `11a5a16` passed 505 tests. Both new model adapters ran with real pinned weights inside the EXE through an isolated diagnostic add-on; PhoWhisper matched the Vietnamese reference and Qwen translated the English test to Simplified Chinese. The package self-check, production native DLLs, bundled model manifest and runtime extensions, source scans, ZIP integrity and five uploaded asset digests passed. Actual GitHub download and packaged replacement/restart from 0.12.4 to 0.12.5 passed, followed by the new self-check and no-update check. Model-card and notice previews closed automatically. The main-branch documentation follow-up does not alter the tagged binary.
+
+
+## 0.12.6 release validation
+
+Source `ce06fb9` passed 518 tests and was published with the Obsidian guide included in its ZIP. An isolated packaged UI probe exercised confirmation, cancellation, current-model deletion, retired large-v3 partial cleanup and preservation of other models/shared libraries. EXE self-check, native DLL/runtime/manifest/source verification, ZIP integrity and uploaded asset digests passed. The actual GitHub upgrade from 0.12.5 to 0.12.6 passed download/checksum, replacement/restart, self-check and no-update checks. No real user model files were deleted by the checks.
