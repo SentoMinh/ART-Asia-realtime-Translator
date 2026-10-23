@@ -16,7 +16,7 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 - `F:\Code\vrchat-translator` is a sibling reference copy. Compare it before porting work; do not synchronize folders automatically.
 - Check both working trees before synchronizing; earlier onboarding found uncommitted local-model changes. Preserve unrelated edits and untracked work.
 - Both copies share AppData settings, provider keys, logs and the local-model cache. Use temporary paths/fakes for checks that change state.
-- Version 0.12.5 includes PhoWhisper Small, Qwen3 1.7B INT8 and HF-Mirror fallback. Preserve artifacts under `dist/<version>/`; source or documentation commits do not rebuild them. Confirm release status and hashes from GitHub and the handoff before assuming a binary is published.
+- Version 0.12.5 includes PhoWhisper Small, Qwen3 1.7B INT8 and HF-Mirror fallback. Preserve artifacts under `dist/<version>/`; source or documentation commits do not rebuild them. The 0.12.5 package passed real PhoWhisper/Qwen inference and the actual GitHub upgrade from 0.12.4; the source tag and hashes are recorded in the handoff. Recheck GitHub for later updates.
 - Follow the user’s current authorization for commits, builds and publication. Use a new version directory for a new binary; preserve prior artifacts. Clarify scope only when authorization is missing or unclear.
 - Synchronize source through reviewed changes and privacy checks. Preserve unrelated local artifacts in destination checkouts.
 

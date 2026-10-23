@@ -6,15 +6,15 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 
 | Item | State |
 | --- | --- |
-| Published app | **v0.12.4**, release source `9c5a96c2ca71b9756b4423f881ea1f0a34d5b18e` |
-| Published EXE SHA-256 | `d92af3cf0ef43df5603b6faf41aec13254798a58ba3e56ab15526fbdcd67d541` |
-| Release validation | 479 tests; packaged self-check, runtime/native-DLL integrity, source/asset checks; actual GitHub download and packaged replacement/restart from 0.12.3 to 0.12.4 passed |
-| Later measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| Release being prepared | **0.12.5**: PhoWhisper Small, Qwen3 1.7B INT8, descriptive model cards and HF-Mirror fallback. Check GitHub for completed publication. |
+| Published app | **v0.12.5**, release source `11a5a1693d93dc07f01e4a6dce3ea8fdf488a37c` |
+| Published EXE SHA-256 | `333d7acd2c73173801614e04be73881183e2ff3396261787a24fb55c2fd4967d` |
+| Release validation | 505 tests; packaged self-check and real PhoWhisper/Qwen inference; native DLLs, model manifest, source/asset checks; actual GitHub upgrade 0.12.4 → 0.12.5 and up-to-date check passed |
+| Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
+| Current release features | PhoWhisper Small, Qwen3 1.7B INT8, descriptive model cards and HF-Mirror fallback are included in 0.12.5. |
 | Version constant | 0.12.5; preserve the existing 0.12.4 artifacts/tag |
 | Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
 
-The latest user request explicitly authorizes the model additions/removal and language/strength descriptions. Source tests: **505 passed**. Real pinned new weights loaded and ran; see LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. Build evidence belongs under `.tools/release-0.12.5/`; check its verification and live-update results before reporting completion.
+The latest user request explicitly authorizes the model additions/removal and language/strength descriptions. Source tests: **505 passed**. Real pinned new weights loaded and ran; see LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. Release evidence is under `.tools/release-0.12.5/`: `verification.json`, `packaged-inference.json`, `github-draft.json` and `live-update-result.json`. The final package includes production native DLLs and both new adapters. Real GitHub download, SHA-256 verification, packaged replacement/restart and new-version self-check passed. All five uploaded assets matched local digests. This documentation follow-up does not rebuild the tagged EXE.
 
 ## User decisions and open choices
 
