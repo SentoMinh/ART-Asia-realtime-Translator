@@ -1,6 +1,6 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.6**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.7**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
 
@@ -141,3 +141,7 @@ Published source `11a5a16` passed 505 tests. Both new model adapters ran with re
 ## 0.12.6 release validation
 
 Source `ce06fb9` passed 518 tests and was published with the Obsidian guide included in its ZIP. An isolated packaged UI probe exercised confirmation, cancellation, current-model deletion, retired large-v3 partial cleanup and preservation of other models/shared libraries. EXE self-check, native DLL/runtime/manifest/source verification, ZIP integrity and uploaded asset digests passed. The actual GitHub upgrade from 0.12.5 to 0.12.6 passed download/checksum, replacement/restart, self-check and no-update checks. No real user model files were deleted by the checks.
+
+## 0.12.7 local translation boundary
+
+`ServiceChain` loads and appends add-ons only for online services. Local NLLB/Qwen failures retain the local error and cannot call Gemini or other add-ons, including after online-to-local switching. Typed and speech translation share this routing. See CHANGELOG.md and AGENT_HANDOFF.md for regression and release evidence.

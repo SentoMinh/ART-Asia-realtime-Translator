@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **[0.12.6](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.6)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **[0.12.7](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.7)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 See the [change log](CHANGELOG.md) for implementation details, measurements and troubleshooting notes.
 
@@ -25,7 +25,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.12.6](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.6). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.12.7](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.7). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -70,7 +70,7 @@ The download panel opens inside Settings and moves with it. Its model list has o
 
 **Free disk space:** click **Delete → Confirm delete** on a model card, or Cancel to keep it. This removes app-managed weights and partial downloads; shared NVIDIA libraries, other models and your settings stay intact. Deletion is disabled during downloads. Leftover non-turbo large-v3 files get a cleanup-only card. External Hugging Face caches and loaded model memory are not removed. If a file is in use, stop using the model/restart ART and retry. Available models can be downloaded again.
 
-Local inference needs no API key. Select Local Model for both Hearing and Translating to run both steps on your PC. The first download needs internet access. Optional translation add-ons retain their existing fallback behavior.
+Local inference needs no API key. Select Local Model for both Hearing and Translating to run both steps on your PC. The first download needs internet access. Local translation uses only your selected local model; if it fails, the local error is shown without trying online add-ons.
 
 **Since 0.12.5:** Hugging Face model downloads automatically try [HF-Mirror](https://hf-mirror.com/) if the original connection fails or refuses the file. Resume and the original SHA-256 checks remain enabled. Other download hosts are unchanged. A small-file test redirected back to Hugging Face; availability from mainland China is not guaranteed. See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for release status and remaining checks.
 
@@ -117,7 +117,7 @@ What you type or say, and what other players say, is sent to the service picked 
 
 ### Your own translator (optional)
 
-Any `.py` file in `%APPDATA%\VRChat-Translator\addons\` that defines `translators()` returning `(name, translator)` pairs is loaded at start. The chosen service's models are tried first, in their configured order; add-ons are fallback only if those models cannot answer. A translator has `prepare()` and `translate(text, target, likely_source="", heard=False) -> str`, and raises `vrc.translate.TranslateError` when it can't answer (the next one then takes over). Only put files there that you wrote or trust: they run as part of the program.
+Any `.py` file in `%APPDATA%\VRChat-Translator\addons\` that defines `translators()` returning `(name, translator)` pairs is loaded when an online translation service is first used. The chosen online service's models are tried first, in their configured order; add-ons are fallback only if those models cannot answer. **Local Model never uses this fallback**, including after switching back from an online service. A translator has `prepare()` and `translate(text, target, likely_source="", heard=False) -> str`, and raises `vrc.translate.TranslateError` when it can't answer (the next one then takes over). Only put files there that you wrote or trust: they run as part of the program.
 
 ## Run from source
 

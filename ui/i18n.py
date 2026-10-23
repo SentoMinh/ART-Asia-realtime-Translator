@@ -4,8 +4,8 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
-    "Local model cards now have Delete with inline confirmation to free disk space, including unfinished downloads.": "本地模型卡片新增删除按钮，在卡片内确认后释放磁盘空间，也可删除未完成的下载。",
-    "Leftover Whisper large-v3 files can also be deleted. Other models, shared NVIDIA libraries and settings are kept.": "也可删除遗留的 Whisper large-v3 文件。保留其他模型、共享 NVIDIA 库和设置。",
+    "Local translation now stays on your selected local model, even if translation fails.": "本地翻译现在始终使用您选择的本地模型，即使翻译失败也不会切换。",
+    "Local Model no longer falls back to Gemini or other online add-ons. Errors now show the local model's reason.": "本地模型不再回退到 Gemini 或其他在线插件。错误提示现在会显示本地模型的失败原因。",
     "Delete": "删除",
     "Delete model": "删除模型",
     "Confirm delete": "确认删除",
@@ -320,8 +320,8 @@ _ZH = {
 }
 
 _VI = {
-    "Local model cards now have Delete with inline confirmation to free disk space, including unfinished downloads.": "Thẻ mô hình có nút Xóa và xác nhận ngay trong thẻ để giải phóng dung lượng, kể cả phần tải dở.",
-    "Leftover Whisper large-v3 files can also be deleted. Other models, shared NVIDIA libraries and settings are kept.": "Có thể xóa tệp Whisper large-v3 còn sót. Giữ lại mô hình khác, thư viện NVIDIA dùng chung và cài đặt.",
+    "Local translation now stays on your selected local model, even if translation fails.": "Dịch cục bộ luôn dùng mô hình bạn đã chọn, kể cả khi dịch thất bại.",
+    "Local Model no longer falls back to Gemini or other online add-ons. Errors now show the local model's reason.": "Mô hình cục bộ không còn chuyển sang Gemini hoặc tiện ích trực tuyến khác. Thông báo lỗi sẽ hiển thị nguyên nhân từ mô hình cục bộ.",
     "Delete": "Xóa",
     "Delete model": "Xóa mô hình",
     "Confirm delete": "Xác nhận xóa",
