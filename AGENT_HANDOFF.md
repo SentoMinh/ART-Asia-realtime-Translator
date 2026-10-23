@@ -8,15 +8,19 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 
 | Item | State |
 | --- | --- |
-| Published app | **v0.12.6**, release source `ce06fb9c57033c5a69cc43437afbe63beb063091` |
-| Published EXE SHA-256 | `105ebacc8c5eb7655641dcd267cd01c2ced12dde58b83b1f97c2cb54a3d2e8c5` |
-| Release validation | 518 tests; packaged self-check, inline confirm/cancel/delete and retired cleanup; native DLLs/runtime/manifest/source/asset checks; actual GitHub upgrade 0.12.5 → 0.12.6 and no-update check passed |
+| Published app | **v0.12.7**, release source `f06758eca99dbfe2ffc296bcd5ab0e807e8e9ee3` |
+| Published EXE SHA-256 | `c9bf87c2b3851b4dceab3209f9c4c3be49730c4870fc15c870b184d0ffbd363c` |
+| Release validation | 521 tests; packaged local-only routing/error/cooldown/recovery/service-switch checks; EXE self-check, source/runtime/native DLL/asset checks; actual GitHub upgrade 0.12.6 → 0.12.7 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| Current release features | Local-model deletion, partial/retired-model cleanup, and Obsidian-ready ART Project Guide (also in the ZIP). Prior PhoWhisper/Qwen and HF-Mirror features retained. |
-| Version constant | 0.12.7; 521 tests passed; packaging/publication pending |
+| Current release features | Local translation never falls back to online add-ons; the original local error stays visible. Prior model deletion, Obsidian guide and local models retained. |
+| Version constant | 0.12.7; preserve earlier versions and use a new version for subsequent binaries |
 | Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
 
-The preceding 0.12.5 work added the models and descriptions with **505 tests passed**. Real pinned new weights loaded and ran; see LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. Release evidence is under `.tools/release-0.12.5/`: `verification.json`, `packaged-inference.json`, `github-draft.json` and `live-update-result.json`. The final package includes production native DLLs and both new adapters. Real GitHub download, SHA-256 verification, packaged replacement/restart and new-version self-check passed. All five uploaded assets matched local digests. This documentation follow-up does not rebuild the tagged EXE.
+The 0.12.7 fix is source commit `f06758e` in the release repository (`ad4891a` in the development checkout). Evidence: `.tools/release-0.12.7/verification.json`, `packaged-routing.json`, `github-draft.json` and `live-update-result.json`. All five GitHub assets matched their local SHA-256 digests before publication. Isolated packaged checks used fake local translators and an add-on to verify failures never fall through while Local Model is selected; user settings/model files were untouched. Live VRChat audio and the original NLLB failure were not reproduced; this release fixes routing and error visibility, not inference accuracy.
+
+The first update probe immediately after 0.12.7 publication returned no update. A subsequent anonymous API/asset probe returned the correct tag and HTTP 200; repeating the unchanged updater check passed. The initial empty result's exact cause was not captured. This documentation follow-up does not rebuild the tagged EXE.
+
+The preceding 0.12.5 work added the models and descriptions with **505 tests passed**. Real pinned new weights loaded and ran; see LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. Release evidence is under `.tools/release-0.12.5/`: `verification.json`, `packaged-inference.json`, `github-draft.json` and `live-update-result.json`. The final package includes production native DLLs and both new adapters. Real GitHub download, SHA-256 verification, packaged replacement/restart and new-version self-check passed. All five uploaded assets matched local digests.
 
 ## User decisions and open choices
 
