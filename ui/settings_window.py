@@ -596,6 +596,7 @@ class SettingsWindow(QDialog):
     def set_up_local(self, role="hearing") -> None:
         dialog = LocalModelDialog(self, role=role)
         dialog.selected.connect(self._activate_local)
+        dialog.removed.connect(lambda _: (self.show_local_status(), self.sync()))
         dialog.close_button.hide()
         self._open_panel(dialog)
 
@@ -950,11 +951,13 @@ class ServiceDialog(QDialog):
 class LocalModelDialog(QDialog):
     """Every local model has its own download, progress and activation controls."""
     selected = Signal(str)
+    removed = Signal(str)
 
     def __init__(self, parent=None, download: local_download.LocalDownload | None = None, role="hearing"):
         super().__init__(parent)
         self._download = download or local_download.shared()
         self._stopping = False
+        self._delete_pending = None
         self.rows = {}
         self.setAttribute(Qt.WA_DeleteOnClose)
         self.setObjectName("settings")
@@ -1004,10 +1007,38 @@ class LocalModelDialog(QDialog):
             use.clicked.connect(lambda checked=False, model=model: self.use_model(model))
             buttons.addWidget(action)
             buttons.addWidget(use)
+            delete = QPushButton(tr("Delete"))
+            delete.setObjectName("plain")
+            delete.setAccessibleName(f"{tr('Delete model')} {title}")
+            delete.setToolTip(tr("Delete this model's downloaded files and unfinished download. Shared NVIDIA libraries are kept."))
+            delete.clicked.connect(lambda checked=False, model=model: self.delete_model(model))
+            cancel = QPushButton(tr("Cancel"))
+            cancel.setObjectName("plain")
+            cancel.clicked.connect(self.cancel_delete)
+            buttons.addWidget(delete)
+            buttons.addWidget(cancel)
             buttons.addStretch(1)
             row.addLayout(buttons)
             listing.addWidget(panel)
-            self.rows[model] = dict(action=action, use=use, result=result, bar=bar)
+            self.rows[model] = dict(action=action, use=use, result=result, bar=bar, delete=delete, cancel=cancel)
+        for model, (title, _) in local_model.REMOVED_MODELS.items():
+            if not local_model.has_files(model):
+                continue
+            panel = QFrame()
+            panel.setObjectName("card")
+            row = QHBoxLayout(panel)
+            result = QLabel(f"{title}\n{tr('Removed model — files still on this PC')}")
+            result.setWordWrap(True)
+            row.addWidget(result, 1)
+            delete = QPushButton(tr("Delete"))
+            delete.setAccessibleName(f"{tr('Delete model')} {title}")
+            delete.clicked.connect(lambda checked=False, model=model: self.delete_model(model))
+            cancel = QPushButton(tr("Cancel"))
+            cancel.clicked.connect(self.cancel_delete)
+            row.addWidget(delete)
+            row.addWidget(cancel)
+            listing.addWidget(panel)
+            self.rows[model] = dict(delete=delete, cancel=cancel, result=result)
         listing.addStretch(1)
         scroll.setWidget(content)
         layout.addWidget(scroll, 1)
@@ -1025,6 +1056,16 @@ class LocalModelDialog(QDialog):
         if not self._download.active:
             self._stopping = False
         for model, row in self.rows.items():
+            pending = self._delete_pending == model
+            row["delete"].setVisible(local_model.has_files(model))
+            row["delete"].setEnabled(not self._download.active)
+            row["delete"].setText(tr("Confirm delete") if pending else tr("Delete"))
+            row["cancel"].setVisible(pending)
+            if model in local_model.REMOVED_MODELS:
+                row["result"].setText(f"{local_model.REMOVED_MODELS[model][0]}\n" + tr(
+                    "Delete downloaded files? You can download available models again." if pending else
+                    "Removed model — files still on this PC" if local_model.has_files(model) else "Model deleted"))
+                continue
             active = self._download.active and self._download.model == model
             missing = local_model.missing(model)
             can_download = (local_model.installed(model)
@@ -1042,6 +1083,8 @@ class LocalModelDialog(QDialog):
                       missing if not can_download else
                       tr("{done} of {size}").format(done=local_model.gb(done), size=local_model.gb(total)))
             row["result"].setText(status)
+            if pending:
+                row["result"].setText(tr("Delete downloaded files? You can download available models again."))
             if problem and problem != local_download.STOPPED and model == self._download.model:
                 row["result"].setText("✗ " + problem)
 
@@ -1053,6 +1096,7 @@ class LocalModelDialog(QDialog):
                                                           size=local_model.gb(total)))
 
     def start_or_stop(self, model: str) -> None:
+        self._delete_pending = None
         if self._download.active:
             if self._download.model == model:
                 self._stopping = True
@@ -1060,6 +1104,28 @@ class LocalModelDialog(QDialog):
         else:
             self._download.start(model)
         self.show_state()
+
+    def cancel_delete(self) -> None:
+        self._delete_pending = None
+        self.show_state()
+
+    def delete_model(self, model: str) -> None:
+        if self._download.active:
+            return
+        if self._delete_pending != model:
+            self._delete_pending = model
+            self.show_state()
+            return
+        self._delete_pending = None
+        try:
+            local_model.delete(model)
+        except local_model.DownloadError as error:
+            self.show_state()
+            self.rows[model]["result"].setText(f"✗ {error}")
+            return
+        self.show_state()
+        self.rows[model]["result"].setText(tr("Model deleted"))
+        self.removed.emit(model)
 
     def use_model(self, model: str) -> None:
         if self._download.active or local_model.missing(model):
