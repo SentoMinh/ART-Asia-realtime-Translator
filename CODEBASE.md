@@ -1,6 +1,6 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.7**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.8**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
 
@@ -147,3 +147,7 @@ Source `ce06fb9` passed 518 tests and was published with the Obsidian guide incl
 `ServiceChain` loads and appends add-ons only for online services. Local NLLB/Qwen failures retain the local error and cannot call Gemini or other add-ons, including after online-to-local switching. Typed and speech translation share this routing. See CHANGELOG.md and AGENT_HANDOFF.md for regression and release evidence.
 
 Published release source `f06758e` passed 521 tests, packaged local routing/error/cooldown/recovery/service-switch checks, EXE self-check, source/runtime/native DLL checks, ZIP integrity and all uploaded asset digests. The real GitHub upgrade from 0.12.6 to 0.12.7 passed download/SHA-256 verification, replacement/restart, new-version self-check and no-update checks. Live VRChat audio was not retested; local inference behavior is unchanged.
+
+## 0.12.8 detector adjustment
+
+`Segmenter._sentence_threshold` preserves the start threshold until the sentence ends. Settings → Sound can restore the three detector defaults without changing model/device choices. Read VOICE_DETECTION.md before further threshold tuning; the rejected continuation-count change admitted extra noise.

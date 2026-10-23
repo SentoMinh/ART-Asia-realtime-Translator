@@ -1,10 +1,10 @@
 # Project context
 
-Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 24 October 2026 handoff: the 0.12.7 local-only translation fix, model deletion and Obsidian guide, prior PhoWhisper/Qwen integration, HF-Mirror fallback, latency evidence and release checks. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
+Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 24 October 2026 handoff: the 0.12.8 detector adjustment, 0.12.7 local-only translation fix, model deletion and Obsidian guide, prior PhoWhisper/Qwen integration, HF-Mirror fallback, latency evidence and release checks. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
 
 For the user-facing architecture overview, read [ART Project Guide](ART%20Project%20Guide.md). It is an Obsidian-compatible standalone note.
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.7 and the preceding release validation; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.8 and the preceding release validation; recheck current code before relying on its findings.
 
 Read `CHANGELOG.md` for the reason behind recent changes, their implementation commits, regression tests and troubleshooting steps.
 
@@ -62,3 +62,5 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 - Version 0.12.4 passed 479 tests, packaged self-checks, runtime/native-DLL checks, source/artifact scans and ZIP/checksum checks. The GitHub download and packaged upgrade from 0.12.3 to 0.12.4 were verified. Read the changelog for later source checks. Live Windows 10 and fresh-machine mixer installation remain outstanding; selected-app music currently requires Windows 11.
 - Provider credentials belong in the existing AppData configuration, not source files or test fixtures.
 - Source updates and packaged updates live in `tools/update.py` and `ui/updater.py`. Releases belong in `SentoMinh/ART-Asia-realtime-Translator`.
+
+Read [VOICE_DETECTION.md](VOICE_DETECTION.md) before changing detector thresholds. Preserve the per-sentence threshold and validate both speech retention and noise rejection; fixed-threshold behavior matches 0.12.2.

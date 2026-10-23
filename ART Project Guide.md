@@ -265,3 +265,7 @@ Source edits do not update an already-built EXE. A release tag identifies the bu
 - [[ROADMAP]] — current focus and deferred speaker identification.
 
 Outstanding checks include mainland-China downloads, broad accent/mixed-language accuracy, translation meaning across all six languages, controlled VRChat contention, Windows 10 behavior and fresh-PC installation. Keep those separate from unit-test or single-machine inference success.
+
+## Voice detector adjustment (0.12.8)
+
+Higher strictness rejects more uncertain sound; it can also miss quiet words. Settings → Sound → Restore detector defaults turns detection on and restores microphone 50% / other players 70%, preserving selected models and devices. Changes apply between sentences. See [[VOICE_DETECTION]] for the comparison with 0.12.2, recorded-audio checks and remaining limits.

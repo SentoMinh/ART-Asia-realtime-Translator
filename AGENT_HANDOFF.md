@@ -2,7 +2,7 @@
 
 Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and the relevant entries in [CHANGELOG.md](CHANGELOG.md). This describes the current handoff; recheck Git and release state before making changes.
 
-**0.12.7 source update:** local translation excludes all add-on fallbacks. Previously a local failure could call an installed Gemini add-on and hide the real error. Add-ons now load only when an online translation chain is needed; switching back to local excludes them. Keep this boundary for typed text and both speech queues. Three regressions in `tests/test_engine.py` failed before the fix. The user's settings/add-ons are preserved. Check the release table below for packaging/publication status.
+**0.12.8 source update:** detector strictness is held for each sentence; slider changes apply to the next sentence. Sound settings add Restore detector defaults (on, microphone 50%, other players 70%). User settings are preserved until clicked. See [VOICE_DETECTION.md](VOICE_DETECTION.md): detector/capture matched 0.12.2 before this fix, and all 1,976 fixed-threshold corpus comparisons remain identical. Two adjustment regressions failed before the fix. The broader reported live recognition decline is not proven resolved.
 
 ## Current state
 
@@ -13,7 +13,7 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 | Release validation | 521 tests; packaged local-only routing/error/cooldown/recovery/service-switch checks; EXE self-check, source/runtime/native DLL/asset checks; actual GitHub upgrade 0.12.6 → 0.12.7 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
 | Current release features | Local translation never falls back to online add-ons; the original local error stays visible. Prior model deletion, Obsidian guide and local models retained. |
-| Version constant | 0.12.7; preserve earlier versions and use a new version for subsequent binaries |
+| Version constant | 0.12.8; source validation and packaging in progress |
 | Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
 
 The 0.12.7 fix is source commit `f06758e` in the release repository (`ad4891a` in the development checkout). Evidence: `.tools/release-0.12.7/verification.json`, `packaged-routing.json`, `github-draft.json` and `live-update-result.json`. All five GitHub assets matched their local SHA-256 digests before publication. Isolated packaged checks used fake local translators and an add-on to verify failures never fall through while Local Model is selected; user settings/model files were untouched. Live VRChat audio and the original NLLB failure were not reproduced; this release fixes routing and error visibility, not inference accuracy.

@@ -264,6 +264,10 @@ _ZH = {
         "留空的栏位会使用显示的默认值。可以用逗号列出多个翻译模型：一个用完额度时，由下一个接替。",
     "Get a key": "获取密钥", "Test": "测试", "Testing…": "正在测试…",
     "Cancel": "取消", "Save": "保存", "Could not save": "无法保存",
+    "Detector strictness changes now wait until the current sentence ends, protecting speech already in progress.": "检测严格度的调整现在会等到当前句子结束后生效，保护正在说的话。",
+    "Settings > Sound has Restore detector defaults: detection on, microphone 50%, other players 70%.": "设置 > 声音新增恢复检测默认设置：开启检测、麦克风 50%、其他玩家 70%。",
+    "Restore detector defaults": "恢复检测默认设置",
+    "Higher strictness is not higher recognition accuracy. Restore detection on, microphone 50% and other players 70%. Strictness changes apply after the current sentence.": "严格度越高不代表识别越准确。恢复为开启语音检测、麦克风 50%、其他玩家 70%。严格度调整在当前句子结束后生效。",
     "Sound": "声音", "Microphone": "麦克风", "Windows default": "Windows 默认",
     "Detector strictness: other players": "语音检测严格度：其他玩家",
     "Higher ignores music and noise better but can miss quiet voices. 70% is the tested default.":
@@ -589,6 +593,10 @@ _VI = {
         "dấu phẩy: khi một mô hình hết lượt, mô hình tiếp theo sẽ trả lời.",
     "Get a key": "Lấy khóa", "Test": "Kiểm tra", "Testing…": "Đang kiểm tra…",
     "Cancel": "Hủy", "Save": "Lưu", "Could not save": "Không lưu được",
+    "Detector strictness changes now wait until the current sentence ends, protecting speech already in progress.": "Thay đổi độ nghiêm ngặt sẽ chờ câu hiện tại kết thúc để giữ nguyên lời đang nói.",
+    "Settings > Sound has Restore detector defaults: detection on, microphone 50%, other players 70%.": "Cài đặt > Âm thanh có nút khôi phục mặc định: bật nhận giọng, micro 50%, người khác 70%.",
+    "Restore detector defaults": "Khôi phục mặc định nhận giọng",
+    "Higher strictness is not higher recognition accuracy. Restore detection on, microphone 50% and other players 70%. Strictness changes apply after the current sentence.": "Độ nghiêm ngặt cao hơn không có nghĩa là nhận giọng chính xác hơn. Khôi phục nhận giọng bật, micro 50% và người khác 70%. Thay đổi áp dụng sau câu hiện tại.",
     "Sound": "Âm thanh", "Microphone": "Micro", "Windows default": "Mặc định của Windows",
     "Detector strictness: other players": "Độ chặt nhận biết giọng nói: người chơi khác",
     "Higher ignores music and noise better but can miss quiet voices. 70% is the tested default.":

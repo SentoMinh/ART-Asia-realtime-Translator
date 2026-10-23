@@ -140,6 +140,31 @@ def test_switching_the_detector_drops_the_half_heard_sentence():
     assert found == []
 
 
+@pytest.mark.parametrize("initial, changed, opening, continuing, expected", [
+    (0.5, 0.9, 0.6, 0.6, 1),
+    (0.9, 0.3, 0.95, 0.4, 0),
+])
+def test_strictness_changes_wait_until_the_current_sentence_ends(initial, changed, opening, continuing, expected):
+    class Probabilities:
+        def probabilities(self, samples):
+            return samples.reshape(-1, FRAME)[:, 0]
+        def reset(self):
+            pass
+    found = []
+    seg = Segmenter(found.append, vad=Probabilities(), threshold=initial)
+    seg.feed(np.full(FRAME * 5, opening, dtype="float32"), RATE)
+    seg.configure(vad_on=True, threshold=changed)
+    seg.feed(np.concatenate([np.full(FRAME * 20, continuing, dtype="float32"),
+                            np.zeros(FRAME * 25, dtype="float32")]), RATE)
+    assert len(found) == expected  # Preserve quiet speech; do not promote a short click.
+    if found:
+        assert len(found[0].samples) == 31 * FRAME
+    found.clear()
+    seg.feed(np.concatenate([np.full(FRAME * 20, 0.6, dtype="float32"),
+                            np.zeros(FRAME * 25, dtype="float32")]), RATE)
+    assert len(found) == (1 if changed == 0.3 else 0)  # Next sentence uses the new value.
+
+
 # ---- speech to text ------------------------------------------------------------------------
 
 class Answer:
