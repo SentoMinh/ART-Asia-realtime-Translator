@@ -151,3 +151,5 @@ Published release source `f06758e` passed 521 tests, packaged local routing/erro
 ## 0.12.8 detector adjustment
 
 `Segmenter._sentence_threshold` preserves the start threshold until the sentence ends. Settings → Sound can restore the three detector defaults without changing model/device choices. Read VOICE_DETECTION.md before further threshold tuning; the rejected continuation-count change admitted extra noise.
+
+Published release source `6b3f9c3` passed 524 tests, 1,976 fixed-threshold comparisons, packaged adjustment/defaults/persistence checks in all three UI languages, EXE self-check, source/runtime/native DLL checks, ZIP integrity and uploaded asset digests. The actual GitHub upgrade 0.12.7 → 0.12.8 passed download/checksum, replacement/restart, new-version self-check and no-update checks. Live recognition quality remains unverified; use Restore detector defaults to compare microphone 50% with a previously raised setting.

@@ -8,13 +8,15 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 
 | Item | State |
 | --- | --- |
-| Published app | **v0.12.7**, release source `f06758eca99dbfe2ffc296bcd5ab0e807e8e9ee3` |
-| Published EXE SHA-256 | `c9bf87c2b3851b4dceab3209f9c4c3be49730c4870fc15c870b184d0ffbd363c` |
-| Release validation | 521 tests; packaged local-only routing/error/cooldown/recovery/service-switch checks; EXE self-check, source/runtime/native DLL/asset checks; actual GitHub upgrade 0.12.6 → 0.12.7 and no-update check passed |
+| Published app | **v0.12.8**, release source `6b3f9c323dc92537ad7163fc19cc7edac55f6c2f` |
+| Published EXE SHA-256 | `bba901e1224206f15d89db3bb93f0a1a427338ecbf077de96190dd8a13ac49ed` |
+| Release validation | 524 tests; 1,976 recorded detector comparisons; packaged active-sentence/defaults/persistence checks in EN/ZH/VI; EXE/source/runtime/native DLL/asset checks; actual GitHub upgrade 0.12.7 → 0.12.8 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| Current release features | Local translation never falls back to online add-ons; the original local error stays visible. Prior model deletion, Obsidian guide and local models retained. |
-| Version constant | 0.12.8; source validation and packaging in progress |
+| Current release features | Strictness changes apply between sentences; Sound settings can restore detector defaults. Local-only translation, model deletion and earlier features retained. |
+| Version constant | 0.12.8; preserve earlier versions and use a new version for subsequent binaries |
 | Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
+
+The 0.12.8 source is `6b3f9c3` in the release repository (`f9592e7` in development; detector fix `2e2a230`). Evidence: `.tools/release-0.12.8/verification.json`, `packaged-detector.json`, `github-draft.json`, `live-update-result.json` and `.tools/vad-0.12.8/final-replay.json`. The packaged detector and defaults controls passed with isolated settings; all five uploaded assets matched local digests. User microphone strictness was 71% during diagnosis and was preserved; direct the user to Restore detector defaults to compare with 50%. No live audio recording or recognition-accuracy benchmark was performed.
 
 The 0.12.7 fix is source commit `f06758e` in the release repository (`ad4891a` in the development checkout). Evidence: `.tools/release-0.12.7/verification.json`, `packaged-routing.json`, `github-draft.json` and `live-update-result.json`. All five GitHub assets matched their local SHA-256 digests before publication. Isolated packaged checks used fake local translators and an add-on to verify failures never fall through while Local Model is selected; user settings/model files were untouched. Live VRChat audio and the original NLLB failure were not reproduced; this release fixes routing and error visibility, not inference accuracy.
 
