@@ -8,6 +8,8 @@ This shared fix covers typed messages and both speech queues. It preserves selec
 
 Regression checks reproduce the old Gemini error for both local translators, verify zero add-on calls after local success/failure/cooldown/recovery, and cover lazy loading plus online → local switching. All three new cases failed before the routing fix; the full suite passed **521 tests** after it. Packaging and release validation are recorded in the handoff after completion.
 
+Published release source `f06758e` passed 521 tests, packaged local routing/error/cooldown/recovery/service-switch checks, EXE self-check, source/runtime/native DLL checks, ZIP integrity and all uploaded asset digests. The real GitHub upgrade from 0.12.6 to 0.12.7 passed download/SHA-256 verification, replacement/restart, new-version self-check and no-update checks. Live VRChat audio was not retested; local inference behavior is unchanged.
+
 ## 0.12.6 — 2026-10-23 — Delete local models and Obsidian project guide
 
 Local model cards now show **Delete** when app-managed weights or partial downloads exist. The first click offers **Confirm delete / Cancel** in the same card. Deletion is disabled while any model download is active. A cleanup-only card offers deletion of retired non-turbo Whisper large-v3 files without restoring its download option. Successful deletion refreshes Settings and allows available models to be downloaded again.

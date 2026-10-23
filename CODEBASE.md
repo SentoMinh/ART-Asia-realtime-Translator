@@ -145,3 +145,5 @@ Source `ce06fb9` passed 518 tests and was published with the Obsidian guide incl
 ## 0.12.7 local translation boundary
 
 `ServiceChain` loads and appends add-ons only for online services. Local NLLB/Qwen failures retain the local error and cannot call Gemini or other add-ons, including after online-to-local switching. Typed and speech translation share this routing. See CHANGELOG.md and AGENT_HANDOFF.md for regression and release evidence.
+
+Published release source `f06758e` passed 521 tests, packaged local routing/error/cooldown/recovery/service-switch checks, EXE self-check, source/runtime/native DLL checks, ZIP integrity and all uploaded asset digests. The real GitHub upgrade from 0.12.6 to 0.12.7 passed download/SHA-256 verification, replacement/restart, new-version self-check and no-update checks. Live VRChat audio was not retested; local inference behavior is unchanged.
