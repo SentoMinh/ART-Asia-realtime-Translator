@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **[0.12.7](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.7)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **[0.12.8](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.8)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 See the [change log](CHANGELOG.md) for implementation details, measurements and troubleshooting notes.
 
@@ -25,7 +25,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.12.7](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.7). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.12.8](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.8). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -151,3 +151,5 @@ The 0.12.5 source passed 505 tests. Real pinned PhoWhisper and Qwen files loaded
 ## Project priorities
 
 Voice recognition is the current focus. Identifying individual speakers as Speaker 1 / Speaker 2 is deferred. See [ROADMAP.md](ROADMAP.md) for the saved plan to revisit during future feature discussions.
+
+For missed words or background-noise subtitles, see [voice detection and repair notes](VOICE_DETECTION.md). Settings → Sound → Restore detector defaults returns to detection on, microphone 50%, other players 70%. Strictness changes take effect between sentences.

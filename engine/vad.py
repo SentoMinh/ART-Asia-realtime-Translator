@@ -3,8 +3,8 @@
 A voice detector (Silero VAD v6, MIT licence; the model file is engine/assets/silero_vad_v6.onnx,
 1.2 MB, run on the CPU by onnxruntime) gives every 32 ms of sound a "someone is speaking"
 probability. A sentence starts when that passes the threshold
-and ends after a short silence. In the benchmark the threshold 0.7 blocked all 14 clips
-without speech and still passed 99% of sentences with music behind them; 0.5 let 2 through.
+and ends after a short silence. Higher thresholds reject more noise but can miss quiet words.
+The threshold is held for each sentence, so moving the slider cannot cut it off midway.
 
 With the detector off, the sound is cut by the clock instead (worse: it cuts inside words and
 lets music through, so the speech model makes up more text).
@@ -87,6 +87,7 @@ class Segmenter:
         self._vad = vad
         self._clock = clock
         self.threshold = threshold
+        self._sentence_threshold = threshold
         self.vad_on = vad_on
         self._resampler = None
         self._resampler_rate = 0
@@ -141,6 +142,7 @@ class Segmenter:
         if not self._talking:
             self._pre.append(piece)
             if probability >= self.threshold:
+                self._sentence_threshold = self.threshold  # Slider changes apply to the next sentence.
                 self._pieces = list(self._pre)
                 self._pre.clear()
                 self._talking, self._silent, self._spoken = True, 0, 1
@@ -148,9 +150,9 @@ class Segmenter:
                     self._on_start()
             return
         self._pieces.append(piece)
-        if probability >= self.threshold - OFF_BELOW:
+        if probability >= self._sentence_threshold - OFF_BELOW:
             self._silent = 0
-            if probability >= self.threshold:
+            if probability >= self._sentence_threshold:
                 self._spoken += 1
         else:
             self._silent += 1

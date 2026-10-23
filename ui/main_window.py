@@ -663,8 +663,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Local translation now stays on your selected local model, even if translation fails.",
-            "Local Model no longer falls back to Gemini or other online add-ons. Errors now show the local model's reason.",
+            "Detector strictness changes now wait until the current sentence ends, protecting speech already in progress.",
+            "Settings > Sound has Restore detector defaults: detection on, microphone 50%, other players 70%.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))

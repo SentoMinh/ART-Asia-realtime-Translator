@@ -1,5 +1,11 @@
 # Change log
 
+## 0.12.8 — 2026-10-24 — Stable detector adjustment and restore defaults
+
+Changing detector strictness during speech could discard a phrase already in progress or promote a short noise burst into speech. `Segmenter` now captures strictness when each sentence starts and applies later slider changes to the next sentence. Normal fixed-threshold detection is unchanged. Settings → Sound adds **Restore detector defaults**: detection on, microphone 50%, other players 70%. It preserves models/devices/languages and existing saved values until clicked. Help text explains the tradeoff between noise rejection and missed quiet words; all new UI and update-notice text is translated to Chinese and Vietnamese.
+
+The detector code/weights and capture code were unchanged between 0.12.2 and 0.12.7. This is a fix for an existing adjustment defect, not a confirmed post-0.12.2 detector regression. Two regression cases reproduced the defect before the fix; the full suite then passed **524 tests**. Replaying 494 recordings at four fixed thresholds matched 0.12.2 in all 1,976 comparisons. A more permissive speech-counting change was rejected because it admitted additional noise. See [VOICE_DETECTION.md](VOICE_DETECTION.md) for evidence, settings guidance and limits. Release validation is recorded in the handoff after completion.
+
 ## 0.12.7 — 2026-10-24 — Keep local translation local
 
 An installed Gemini add-on could run after NLLB or Qwen failed, even with **Local Model** selected. Its error replaced the local error, so the overlay could report Gemini while Settings still showed NLLB. `ServiceChain` now includes add-on fallbacks only for online services and loads add-ons only when an online chain is first needed. Local failures retain the original model error, including during the existing cooldown. Switching from an online service back to local also excludes add-ons.
