@@ -1,10 +1,12 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.5**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.6**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
 
 For current release/source differences, open decisions and continuation instructions, read [AGENT_HANDOFF.md](AGENT_HANDOFF.md). Version 0.12.5 adds HF-Mirror fallback, PhoWhisper Small and Qwen3 1.7B INT8, and removes the non-turbo large-v3 chooser entry. Current measured performance is in [LATENCY_REPORT.md](LATENCY_REPORT.md).
+
+The Obsidian-ready [ART Project Guide](ART%20Project%20Guide.md) explains the full structure in plain language. Version 0.12.6 adds scoped model deletion with inline confirmation and cleanup-only retired-model cards; `local_model.delete` validates all targets and preserves shared/unknown files.
 
 ## What the app does
 

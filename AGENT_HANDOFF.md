@@ -2,6 +2,8 @@
 
 Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and the relevant entries in [CHANGELOG.md](CHANGELOG.md). This describes the current handoff; recheck Git and release state before making changes.
 
+**0.12.6 source update:** model cards support Delete → Confirm delete / Cancel, including partial downloads. Leftover non-turbo large-v3 gets a cleanup-only card. Deletion validates every target before unlinking, preserves other models/shared libraries/settings, and is blocked during downloads. `whisper.deleted` prevents automatic cache downloading after explicit turbo removal. See `tests/test_local_delete.py` and the UI regressions. The new [ART Project Guide](ART%20Project%20Guide.md) is a self-contained Obsidian-ready architecture/user guide. Check the release table below for packaging/publication status.
+
 ## Current state
 
 | Item | State |

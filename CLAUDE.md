@@ -2,6 +2,8 @@
 
 Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 23 October 2026 handoff: the 0.12.5 PhoWhisper/Qwen integration, HF-Mirror fallback, latency evidence and release checks. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
 
+For the user-facing architecture overview, read [ART Project Guide](ART%20Project%20Guide.md). It is an Obsidian-compatible standalone note.
+
 Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.5 and the preceding release validation; recheck current code before relying on its findings.
 
 Read `CHANGELOG.md` for the reason behind recent changes, their implementation commits, regression tests and troubleshooting steps.

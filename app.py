@@ -118,7 +118,8 @@ def selfcheck() -> int:
         if not hasattr(ctranslate2, "Generator"):
             raise RuntimeError("Qwen's CTranslate2 generator is missing")
         dialog = LocalModelDialog()
-        if set(dialog.rows) != set(local_model.MODELS):
+        expected = set(local_model.MODELS) | {model for model in local_model.REMOVED_MODELS if local_model.has_files(model)}
+        if set(dialog.rows) != expected:
             raise RuntimeError("Local model choices are missing")
         dialog.close()
         return "Whisper/PhoWhisper, SenseVoice, NLLB/Qwen CTranslate2, tokenizer and model list included"

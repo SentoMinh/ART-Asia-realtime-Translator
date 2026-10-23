@@ -1,5 +1,15 @@
 # Change log
 
+## 0.12.6 — 2026-10-23 — Delete local models and Obsidian project guide
+
+Local model cards now show **Delete** when app-managed weights or partial downloads exist. The first click offers **Confirm delete / Cancel** in the same card. Deletion is disabled while any model download is active. A cleanup-only card offers deletion of retired non-turbo Whisper large-v3 files without restoring its download option. Successful deletion refreshes Settings and allows available models to be downloaded again.
+
+`engine/local_model.py` enumerates only the chosen model's pinned file paths and partials, validates every resolved target before unlinking, and removes only empty parent directories. It preserves other models, unknown files, shared NVIDIA libraries and provider settings. Redirected paths are refused; file-in-use errors are shown and can be retried. Explicit turbo deletion creates `whisper.deleted` so the existing source-install fallback does not immediately fetch weights again. The Delete action does not clean external Hugging Face caches or unload model objects already held in memory; stop using the model/restart if Windows holds a file open. Repair pointers: inspect `_owned_files`, `delete`, `missing`, and `LocalModelDialog.delete_model` together; never replace this with deletion of the entire cache.
+
+Added [ART Project Guide](ART%20Project%20Guide.md), a self-contained Obsidian-ready note with YAML metadata, diagrams, architecture and folder maps, language controls, storage paths, model tradeoffs, release workflow and troubleshooting. It contains no API credentials. Companion links work when the repository's Markdown notes are also in the vault.
+
+Validation for 0.12.6: 518 tests passed, including all model deletion targets, incomplete downloads, preserved shared files/settings, validation before mutation, redirected paths, file-in-use errors, cache redownload suppression, inline confirmation/cancel, download blocking and retired-model cleanup. Package validation is recorded in the handoff after publication.
+
 ## 0.12.5 — 2026-10-23 — PhoWhisper, Qwen and clearer model choices
 
 Removed the non-turbo Whisper large-v3 chooser entry at the user's request. Existing files remain intact; a saved removed choice resolves to turbo. Added PhoWhisper Small for Vietnamese hearing on CPU INT8 (no NVIDIA download), plus Qwen3 1.7B INT8 as an optional CPU translator. Each model card explains supported app languages, specialization and hardware/speed tradeoffs in English, Vietnamese and Chinese. NLLB stays the low-latency default; merely installing this update does not select a new provider.

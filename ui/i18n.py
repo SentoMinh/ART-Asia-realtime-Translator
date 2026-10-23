@@ -4,6 +4,15 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Local model cards now have Delete with inline confirmation to free disk space, including unfinished downloads.": "本地模型卡片新增删除按钮，在卡片内确认后释放磁盘空间，也可删除未完成的下载。",
+    "Leftover Whisper large-v3 files can also be deleted. Other models, shared NVIDIA libraries and settings are kept.": "也可删除遗留的 Whisper large-v3 文件。保留其他模型、共享 NVIDIA 库和设置。",
+    "Delete": "删除",
+    "Delete model": "删除模型",
+    "Confirm delete": "确认删除",
+    "Model deleted": "模型已删除",
+    "Removed model — files still on this PC": "已移除的模型 — 文件仍保存在本机",
+    "Delete downloaded files? You can download available models again.": "删除已下载的文件？列表中可用的模型以后可以重新下载。",
+    "Delete this model's downloaded files and unfinished download. Shared NVIDIA libraries are kept.": "删除此模型的已下载文件和未完成的下载。保留共享 NVIDIA 库。",
     "Local models now include PhoWhisper Small for Vietnamese hearing and Qwen3 1.7B for translation. NLLB remains the low-latency default.": "本地模型新增用于越南语识别的 PhoWhisper Small 和用于翻译的 Qwen3 1.7B。NLLB 仍是低延迟默认选择。",
     "Whisper large-v3 was removed from the list; turbo remains. Each card explains its languages and strengths.": "列表已移除 Whisper large-v3，保留 turbo。各模型卡片说明支持的语言和特点。",
     "Model downloads try HF-Mirror when Hugging Face cannot connect.": "无法连接 Hugging Face 时，模型下载会尝试 HF-Mirror。",
@@ -311,6 +320,15 @@ _ZH = {
 }
 
 _VI = {
+    "Local model cards now have Delete with inline confirmation to free disk space, including unfinished downloads.": "Thẻ mô hình có nút Xóa và xác nhận ngay trong thẻ để giải phóng dung lượng, kể cả phần tải dở.",
+    "Leftover Whisper large-v3 files can also be deleted. Other models, shared NVIDIA libraries and settings are kept.": "Có thể xóa tệp Whisper large-v3 còn sót. Giữ lại mô hình khác, thư viện NVIDIA dùng chung và cài đặt.",
+    "Delete": "Xóa",
+    "Delete model": "Xóa mô hình",
+    "Confirm delete": "Xác nhận xóa",
+    "Model deleted": "Đã xóa mô hình",
+    "Removed model — files still on this PC": "Mô hình đã bỏ — vẫn còn tệp trên máy",
+    "Delete downloaded files? You can download available models again.": "Xóa các tệp đã tải? Bạn có thể tải lại những mô hình còn trong danh sách.",
+    "Delete this model's downloaded files and unfinished download. Shared NVIDIA libraries are kept.": "Xóa tệp mô hình đã tải và phần tải dở. Giữ lại thư viện NVIDIA dùng chung.",
     "Local models now include PhoWhisper Small for Vietnamese hearing and Qwen3 1.7B for translation. NLLB remains the low-latency default.": "Mô hình cục bộ thêm PhoWhisper Small để nhận dạng tiếng Việt và Qwen3 1.7B để dịch. NLLB vẫn là mặc định ưu tiên độ trễ thấp.",
     "Whisper large-v3 was removed from the list; turbo remains. Each card explains its languages and strengths.": "Đã bỏ Whisper large-v3 khỏi danh sách, vẫn giữ turbo. Mỗi thẻ mô tả ngôn ngữ và thế mạnh của mô hình.",
     "Model downloads try HF-Mirror when Hugging Face cannot connect.": "Tải mô hình sẽ thử HF-Mirror khi không kết nối được Hugging Face.",

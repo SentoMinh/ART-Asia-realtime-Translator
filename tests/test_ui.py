@@ -870,6 +870,66 @@ def test_the_download_tells_the_window_how_it_ended(app):
     assert run(no_room) == ["no room"] and run(stopped) == [STOPPED]
 
 
+def test_delete_model_confirms_inline_cancels_and_allows_redownload(window):
+    from engine import local_model
+    from ui.local_download import LocalDownload
+    from ui.settings_window import LocalModelDialog
+    model = "nllb-200-ct2"
+    path = local_model.model_folder(model) / "model.bin"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"weights")
+    dialog = LocalModelDialog(window, download=LocalDownload())
+    removed = []
+    dialog.removed.connect(removed.append)
+    dialog.delete_model(model)
+    assert path.exists() and not removed
+    assert not dialog.rows[model]["cancel"].isHidden()
+    dialog.cancel_delete()
+    assert path.exists() and dialog.rows[model]["cancel"].isHidden()
+    dialog.delete_model(model)
+    dialog.delete_model(model)
+    assert not path.exists() and removed == [model]
+    assert dialog.rows[model]["delete"].isHidden()
+    assert dialog.rows[model]["action"].isEnabled()
+
+
+def test_delete_model_is_blocked_during_download_and_reports_failure(window, monkeypatch):
+    from engine import local_model
+    from ui.local_download import LocalDownload
+    from ui.settings_window import LocalModelDialog
+    download = LocalDownload()
+    dialog = LocalModelDialog(window, download=download)
+    model = "sensevoice"
+    calls = []
+    def fail(model):
+        calls.append(model)
+        raise local_model.DownloadError("file in use")
+    monkeypatch.setattr(local_model, "delete", fail)
+    dialog.delete_model(model)
+    download.active = True
+    dialog.show_state()
+    dialog.delete_model(model)
+    assert not calls and not dialog.rows[model]["delete"].isEnabled()
+    download.active = False
+    dialog.delete_model(model)
+    assert calls == [model]
+    assert "file in use" in dialog.rows[model]["result"].text()
+
+
+def test_retired_whisper_files_get_cleanup_card_without_download(window):
+    from engine import local_model
+    from ui.settings_window import LocalModelDialog
+    path = local_model.folder() / "downloading/large-v3/model.bin"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"partial old weights")
+    dialog = LocalModelDialog(window)
+    assert "large-v3" in dialog.rows
+    assert "action" not in dialog.rows["large-v3"]
+    dialog.delete_model("large-v3")
+    dialog.delete_model("large-v3")
+    assert not path.exists()
+
+
 def test_status_tooltip_is_translated_line_by_line(window):
     from ui.backend import Status
     try:

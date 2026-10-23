@@ -89,6 +89,7 @@ DESCRIPTIONS = {
     "qwen3-1.7b-ct2": "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Small CPU language-model alternative, with thinking disabled. May be slower or less accurate than NLLB; compare your language pair.",
 }
 _MODEL_FILES = json.loads((Path(__file__).parent / "assets" / "local_models.json").read_text(encoding="utf-8"))
+REMOVED_MODELS = {"large-v3": ("Whisper large-v3", "whisper-v3")}
 
 
 def selected(role: str = "hearing") -> str:
@@ -160,6 +161,58 @@ def arrived(root: Path | None = None, *, model: str | None = None) -> int:
     return count
 
 
+def _owned_files(model: str) -> list[Path]:
+    """Only this model's installed files and partial downloads, never shared GPU libraries."""
+    root = folder().absolute()
+    if model in REMOVED_MODELS:
+        directory = REMOVED_MODELS[model][1]
+        names = ("config.json", "preprocessor_config.json", "tokenizer.json", "vocabulary.json", "model.bin")
+        return [root / directory / name for name in names] + [root / WAITING / model / name for name in names]
+    directory = MODELS[model][2]  # Reject unknown model IDs before touching the filesystem.
+    waiting = root / WAITING if model == "large-v3-turbo" else root / WAITING / model
+    files = []
+    for part in parts(model):
+        owned = [place for place, _ in part.files() if Path(place).parts[0] == directory]
+        if owned:
+            files.extend(root / place for place in owned)
+            files.append(waiting / part.name)
+    return files
+
+
+def has_files(model: str) -> bool:
+    return any(path.exists() or path.is_symlink() for path in _owned_files(model))
+
+
+def delete(model: str) -> None:
+    """Remove app-managed weights/partials; callers must stop downloads first."""
+    files = _owned_files(model)
+    try:
+        root = folder().resolve()
+        # Validate every target before deleting any file, including junctions and symlinks.
+        for path in files:
+            relative = path.relative_to(folder().absolute())
+            expected = root / relative
+            resolved = path.resolve()
+            if not resolved.is_relative_to(root) or resolved != expected or path.is_symlink():
+                raise DownloadError("Model files point outside their expected folder; nothing was deleted")
+    except (OSError, RuntimeError, ValueError) as error:
+        raise DownloadError(f"Could not check model file paths; nothing was deleted: {error}") from error
+    try:
+        if model == "large-v3-turbo":
+            # Explicit deletion must not trigger faster-whisper's automatic cache download.
+            root.mkdir(parents=True, exist_ok=True)
+            (root / "whisper.deleted").touch()
+        for path in files:
+            path.unlink(missing_ok=True)
+        for parent in {path.parent for path in files}:
+            try:
+                parent.rmdir()  # Only empty folders; other models and unknown files stay intact.
+            except OSError:
+                pass
+    except OSError as error:
+        raise DownloadError(f"Could not delete model files. Stop using the model and try again: {error}") from error
+
+
 # ---- can it run here? ----------------------------------------------------------------------
 
 def installed(model: str | None = None) -> bool:
@@ -203,7 +256,7 @@ def missing(model: str | None = None) -> str:
     if model == "large-v3-turbo":
         if not nvidia_card():
             return "the Local Model needs an NVIDIA graphics card, and this PC has none"
-        if model == "large-v3-turbo" and gpu_folders():
+        if gpu_folders() and not (folder() / "whisper.deleted").exists():
             return ""  # Existing source installs let faster-whisper fetch its cached model.
     if not ready(model=model):
         return "the Local Model is not downloaded yet (Settings → Models)"
