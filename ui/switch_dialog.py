@@ -67,7 +67,7 @@ class SwitchModelDialog(QDialog):
         layout.addWidget(heading)
 
         category_title = tr("Hearing") if category == "hearing" else tr("Translating")
-        failed_title = services.title(failed_service) if failed_service in services.SERVICES else failed_service
+        failed_title = services.title(failed_service)
         info_text = tr("The {category} model for {service} is unavailable.").format(
             category=category_title, service=failed_title
         )

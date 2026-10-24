@@ -15,7 +15,7 @@ updated: 2026-10-24
 
 ART means **Asia realtime Translator**. It is one Windows desktop application for hearing speech, translating it, displaying subtitles and sending text to VRChat's chatbox.
 
-Since 0.12.7, selecting **Local Model** for translation keeps every translation attempt on the selected local model. A failure shows that model's error; it cannot fall back to Gemini or another online add-on. Add-on fallback remains available for online translation services only. Hearing and translation are separate selections; choose Local Model for both to run both steps locally.
+Since 0.12.9, translation uses only the selected service and its explicitly configured models. Legacy add-on files are ignored for both Local Model and custom domains; a failure shows the selected service's error. Hearing and translation are separate selections; choose Local Model for both to run both steps locally.
 
 > [!tip] Open this in Obsidian
 > Copy this `.md` file into your Obsidian vault. Its headings, tables and diagrams work without extra plugins. The note is readable on its own. Links such as [[CODEBASE]] open the companion notes if you also put the repository's Markdown files in your vault.
@@ -126,7 +126,7 @@ Downloads try Hugging Face first, then HF-Mirror after a connection failure or r
 | --- | --- |
 | `%APPDATA%\VRChat-Translator\ui.json` | Window, language, capture and chatbox preferences; last update notice shown |
 | `%APPDATA%\VRChat-Translator\models.json` | API URLs/keys, model choices and fetched catalogs |
-| `%APPDATA%\VRChat-Translator\addons\` | Optional local translation add-ons |
+| `%APPDATA%\VRChat-Translator\addons\` | Legacy translation files (ignored since 0.12.9) |
 | `%LOCALAPPDATA%\VRChat-Translator\local-model\` | App-managed local model files |
 | `local-model\whisper\` | Whisper turbo weights |
 | `local-model\sensevoice\` | SenseVoice weights |

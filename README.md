@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **[0.12.8](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.8)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **[0.12.9](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.9)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 See the [change log](CHANGELOG.md) for implementation details, measurements and troubleshooting notes.
 
@@ -25,7 +25,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.12.8](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.8). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.12.9](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.9). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -109,15 +109,17 @@ Existing saved API settings are retained where recoverable. If an older installa
 ## Files it keeps
 
 - `%APPDATA%\VRChat-Translator\ui.json` — settings; `models.json` — API addresses, keys, chosen models and fetched model lists in plain text under your Windows profile. The app does not encrypt them or apply a separate file ACL.
-- `%APPDATA%\VRChat-Translator\addons\` — empty unless you add your own translator (below).
+- `%APPDATA%\VRChat-Translator\addons\` — legacy files are preserved but no longer loaded.
 - `%LOCALAPPDATA%\VRChat-Translator\engine.log` — every sentence heard, its language, the translation and the delay. Look here first when nothing appears.
 - `%LOCALAPPDATA%\VRChat-Translator\local-model\` — downloaded local model files; size depends on your choices. Deleting the folder frees the space; the program offers the downloads again.
 
 What you type or say, and what other players say, is sent to the service picked in Settings → Models to be heard and translated.
 
-### Your own translator (optional)
+### Translation stays on your selected service
 
-Any `.py` file in `%APPDATA%\VRChat-Translator\addons\` that defines `translators()` returning `(name, translator)` pairs is loaded when an online translation service is first used. The chosen online service's models are tried first, in their configured order; add-ons are fallback only if those models cannot answer. **Local Model never uses this fallback**, including after switching back from an online service. A translator has `prepare()` and `translate(text, target, likely_source="", heard=False) -> str`, and raises `vrc.translate.TranslateError` when it can't answer (the next one then takes over). Only put files there that you wrote or trust: they run as part of the program.
+ART tries only the models explicitly configured under Translating. Multiple comma-separated models may fall back within that service. If none can answer, ART shows the selected service's error and lets you choose another service. Legacy per-PC add-on files are ignored for every service, including Custom domain; they cannot silently send a failed translation to Gemini or another provider.
+
+Hearing and Translating are separate choices. Select Local Model for both to keep both inference steps on your PC. A custom domain's Translating model must support text translation/chat; speech-generation models will fail there.
 
 ## Run from source
 

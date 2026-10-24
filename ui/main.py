@@ -52,9 +52,8 @@ def make_on_switch(backend):
 
 
 def speech_translator(pick=lambda: "", on_switch=None):
-    """The engine's translation chain (the models of the service that `pick()` names, then
-    this PC's add-ons, each taking over when the one before hits its limit), also used for typed
-    text. None = no engine: typed text is then sent untranslated."""
+    """The explicitly configured models of the service that `pick()` names, also used for
+    typed text. None = no engine: typed text is then sent untranslated."""
     try:
         from engine.translators import ServiceChain
         return ServiceChain(pick, on_switch=on_switch)

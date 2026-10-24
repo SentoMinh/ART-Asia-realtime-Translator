@@ -274,7 +274,7 @@ class SettingsWindow(QDialog):
             used_service, separator, model = name.partition(":")
             if separator and used_service == svc:
                 return f"{model} ({title})"
-            return name  # a local translation add-on answered
+            return name
         current_model = getattr(backend, "current_translating_model", "")
         current_svc = getattr(backend, "current_translating_service", "")
         if current_model in configured and (not current_svc or current_svc == svc):
