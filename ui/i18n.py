@@ -4,7 +4,8 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
-    "Whisper turbo now has a Vulkan GPU option for AMD PCs. Download it in Settings → Models → Local Model.": "Whisper turbo 新增适用于 AMD 电脑的 Vulkan 显卡选项。在设置 → 模型 → 本地模型中下载。",
+    "Online translation now works on two languages at once. Completed subtitles appear while slower languages continue.": "在线翻译现在可同时处理两种语言。已完成的字幕会立即显示，其他语言继续翻译。",
+    "Panel languages are processed first. Speech recognition settings and complete chatbox messages are preserved.": "优先处理面板显示的语言。语音识别设置保持不变，聊天框仍会发送完整消息。",
     "The Vulkan option uses separate model files. Your existing NVIDIA and CPU model selections stay unchanged.": "Vulkan 选项使用单独的模型文件。您原有的 NVIDIA 和 CPU 模型选择保持不变。",
     "Whisper turbo · Vulkan (AMD)": "Whisper turbo · Vulkan（AMD）",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Whisper turbo on a Vulkan-compatible GPU, including AMD. Uses a separate Q5 model; speed and accuracy depend on your GPU and audio.": "英语、普通话、粤语、越南语、日语和韩语。在兼容 Vulkan 的显卡（包括 AMD）上运行 Whisper turbo。使用单独的 Q5 模型；速度和准确率取决于显卡和音频。",
@@ -330,7 +331,8 @@ _ZH = {
 }
 
 _VI = {
-    "Whisper turbo now has a Vulkan GPU option for AMD PCs. Download it in Settings → Models → Local Model.": "Whisper turbo có thêm lựa chọn GPU Vulkan cho máy AMD. Tải trong Cài đặt → Mô hình → Mô hình cục bộ.",
+    "Online translation now works on two languages at once. Completed subtitles appear while slower languages continue.": "Dịch trực tuyến giờ xử lý hai ngôn ngữ cùng lúc. Phụ đề đã dịch xong sẽ hiện ngay trong khi các ngôn ngữ khác tiếp tục được dịch.",
+    "Panel languages are processed first. Speech recognition settings and complete chatbox messages are preserved.": "Ưu tiên các ngôn ngữ trên bảng hiển thị. Giữ nguyên cài đặt nhận dạng giọng nói và vẫn gửi đầy đủ nội dung vào khung chat.",
     "The Vulkan option uses separate model files. Your existing NVIDIA and CPU model selections stay unchanged.": "Lựa chọn Vulkan dùng tệp mô hình riêng. Các lựa chọn mô hình NVIDIA và CPU hiện tại được giữ nguyên.",
     "Whisper turbo · Vulkan (AMD)": "Whisper turbo · Vulkan (AMD)",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Whisper turbo on a Vulkan-compatible GPU, including AMD. Uses a separate Q5 model; speed and accuracy depend on your GPU and audio.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Whisper turbo chạy trên GPU hỗ trợ Vulkan, gồm AMD. Dùng mô hình Q5 riêng; tốc độ và độ chính xác tùy GPU và âm thanh.",

@@ -1,9 +1,12 @@
 """What every translator shares: the language names, the prompt, and the error they raise.
 
-The translators themselves are in engine/translators.py (the online service picked in
-Settings → Models, plus any add-on found on this PC).
+The translators themselves are in engine/translators.py (the service picked in Settings).
 """
 from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
+import time
 
 TARGET_NAMES = {"en": "English", "zh": "Simplified Chinese", "vi": "Vietnamese",
                 "ja": "Japanese", "ko": "Korean",
@@ -19,19 +22,40 @@ def translate_targets(translator, text, targets, source="", heard=False, on_resu
     """Translate each distinct destination once; one failed language does not hide the others."""
     translations, errors = {}, {}
     targets = list(dict.fromkeys(code for code in targets if code))
-    for index, target in enumerate(targets):
-        if target == source:
-            translations[target] = text
-        else:
-            try:
-                translations[target] = (translator.translate(text, target, source, heard=True) if heard
-                                        else translator.translate(text, target, source))
-            except Exception as error:
-                translations[target] = ""
-                errors[target] = error
-        if on_result is not None and translations[target] and index < len(targets) - 1:
+    def ready(target, value, error=None):
+        translations[target] = value
+        if error is not None:
+            errors[target] = error
+        if on_result is not None and value and len(translations) < len(targets):
             on_result(translations.copy())
-    return translations, errors
+
+    # Original text is already available, even if it is listed after a slow target.
+    if source in targets:
+        ready(source, text)
+    pending = [target for target in targets if target != source]
+
+    def run(target):
+        started = time.perf_counter()
+        try:
+            return ((translator.translate(text, target, source, heard=True) if heard
+                     else translator.translate(text, target, source)), None)
+        except Exception as error:
+            return "", error
+        finally:
+            logging.getLogger("engine.translation").info("translation target=%s duration_ms=%d", target,
+                                                       (time.perf_counter() - started) * 1000)
+
+    # Only online adapters opt in. Local inference retains its shared model/CPU budget.
+    if len(pending) > 1 and getattr(translator, "parallel_targets", False):
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="translate-target") as pool:
+            jobs = {pool.submit(run, target): target for target in pending}
+            for job in as_completed(jobs):
+                ready(jobs[job], *job.result())
+    else:
+        for target in pending:
+            ready(target, *run(target))
+    return ({target: translations[target] for target in targets},
+            {target: errors[target] for target in targets if target in errors})
 
 
 def chat_messages(text: str, target: str, likely_source: str = "", heard: bool = False) -> list[dict]:

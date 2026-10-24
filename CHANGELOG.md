@@ -1,5 +1,13 @@
 # Change log
 
+## 0.12.11 — 2026-10-25 — Faster multi-language online translation
+
+Online translations previously ran destination by destination. They now run up to two at once per utterance and display whichever completes first. Panel languages are processed before chatbox-only destinations; the original is immediately reused for a source-language output. Duplicate requests, partial-failure handling, panel language order and the single final ordered microphone/chatbox message are preserved.
+
+HTTP client and service-chain initialization are synchronized. Concurrent failures keep their cooldown even if another language succeeds. Local models retain their shared lock and CPU limits. Speech detection, recognition models, prompts and decoding settings are unchanged. New timing logs separate hearing wait, recognition and per-target translation to help diagnose remaining delay.
+
+Five warm paired EN/ZH/VI examples through the selected online service: two-output median **188.8 → 102.8 ms** (~46% less); first output **90.5 → 93.2 ms**. All twelve paired target outputs across six examples were identical; the first phrase's 4.14-second startup pair was excluded from warm timing. This is a small component test, not an end-to-end/FPS or accuracy guarantee. See [LATENCY_REPORT.md](LATENCY_REPORT.md) for method, limits, diagnosis and regression coverage. All 544 tests passed, including per-target timing output to engine.log. Release validation is recorded after packaging.
+
 ## 0.12.10 — 2026-10-25 — Whisper turbo through Vulkan for AMD PCs
 
 - Added a separate **Whisper turbo · Vulkan (AMD)** hearing choice. Existing NVIDIA CUDA, SenseVoice, PhoWhisper and translation choices are preserved.

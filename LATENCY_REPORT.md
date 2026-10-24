@@ -1,4 +1,37 @@
-# ART latency measurements — 22–23 October 2026
+# ART latency measurements — 22–25 October 2026
+
+## 25 October: two online translation destinations (0.12.11)
+
+The 0.12.10 helper waited for each destination before starting the next. In 0.12.11, an online `ServiceChain` opts into at most **two simultaneous requests per utterance**, and the caller emits complete results as they finish. Panel destinations are scheduled before chatbox-only destinations; duplicate destinations still run once, and a matching source destination reuses the original immediately. Local translators retain their existing serialization and CPU budget. There is no model, prompt, beam, token-limit or silence-threshold change.
+
+The production helper was compared with the committed helper at development `3fccca6`, using the same `ServiceChain`, configured custom-domain model (advertised as Qwen3.8-27B), HTTP transport and six synthetic EN/ZH/VI phrases, each translated into two other languages. Mode order alternated by phrase. Configuration was read into memory once and supplied to both modes; no user settings were written, no live audio was recorded and no OSC was sent. The model identifier does not verify the server's actual weights, runtime, cache or hardware.
+
+The first sequential pair took 4,140 ms, including a 4,043 ms first request. Client initialization, connection setup and server startup were not separated. **Both modes for that first phrase are excluded** from the warm comparison below (five paired phrases, ten requests per mode):
+
+| Warm measure | Sequential baseline | Parallel targets |
+| --- | ---: | ---: |
+| First complete subtitle, median | 90.5 ms | 93.2 ms |
+| Both translations complete, median | 188.8 ms | 102.8 ms |
+| Both complete, observed range | 175.5–196.7 ms | 94.4–115.8 ms |
+
+Both-language completion took about **46% less time** in this small sample. First-result latency was similar. All 24 requests succeeded; the twelve paired target outputs were identical across modes, including the first phrase. This demonstrates preserved output on these inputs, not a general accuracy improvement. Remote caching and background load are uncontrolled. Measurements exclude audio capture, recognition, sentence-end detection, worker queues, Qt presentation and OSC pacing; they do not establish end-to-end latency, FPS improvement or AMD performance. No local-inference speedup is claimed.
+
+Concurrency preserves individual failures, target display order and one final ordered microphone/chatbox message. Partial callbacks run on the calling worker, not HTTP threads. Client/chain creation is synchronized; an in-flight success cannot erase another target's rate-limit cooldown. With two speaker workers, one microphone worker and one typed worker, the current app can have at most eight target requests active across separate utterances. Request count per utterance is unchanged, but a server with strict concurrent-request limits may still throttle; existing cooldown/error handling applies. The shared HTTP client supports threads ([HTTPX API](https://www.python-httpx.org/api/)).
+
+Evidence is retained in `.tools/latency-0.12.11/production.json`, `measure.py` and regression tests in `tests/test_translation_targets.py` / `tests/test_typing.py`. A Qt worker test holds the first language unfinished and verifies that the second appears in its correct row while chatbox sending waits. A separate test covers a slow failure, original reuse, deduplication and independent partial success.
+
+### Finding the cause of delay or wrong wording
+
+`engine.log` now records `hearing source=... wait_ms=... recognition_ms=...`, per-target `translation target=... duration_ms=...`, and per-line translation duration alongside existing total latency. `wait_ms` includes the final quiet interval and hearing queue wait; it is not pure recognition time. Translation duration includes provider/model waiting and any existing fallback/retry. Timing lines add no transcript, URL or key.
+
+- If the original transcript is wrong, investigate the audio source, overlapping voices/music, clipping, segmentation, language support and hearing model first. A translator cannot reliably reconstruct words that were lost.
+- If the original is correct but its translation is wrong, investigate the selected translator, language direction, context and names/slang. Local versus online is not itself a quality guarantee; the specific model and decoding matter.
+- Reducing unnecessary waiting does not require sacrificing accuracy. Shortening sentence pauses, reducing decoding quality or switching to a smaller model can create a different tradeoff; none is part of this change.
+- Hearing and Translating are independent selections. SenseVoice's input languages do not include Vietnamese; choosing Vietnamese as a translation output does not add Vietnamese speech recognition.
+
+No failing live utterance was supplied for this task, so the user's specific accuracy problem is not yet attributed to a proven cause.
+
+## Earlier component measurements
 
 Measured with ART **0.12.4**, source commit `9c5a96c` in the release repository, starting at 15:27:58 UTC. **Local execution was faster in this run.** These are current component timings, not a measured speedup over an older app version.
 

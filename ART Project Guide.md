@@ -8,12 +8,16 @@ tags:
   - VRChat
   - project
   - architecture
-updated: 2026-10-24
+updated: 2026-10-25
 ---
 
 # ART — Project Structure and User Guide
 
 ART means **Asia realtime Translator**. It is one Windows desktop application for hearing speech, translating it, displaying subtitles and sending text to VRChat's chatbox.
+
+Since 0.12.11, online translation handles two destinations at once per utterance and shows each completed subtitle immediately. Panel destinations run before chatbox-only destinations. Local model CPU limits and recognition settings are unchanged. The chatbox still waits for one complete message. See [[LATENCY_REPORT]] for the measured two-language improvement and its limits.
+
+For wrong wording, compare the original transcript with what was spoken first. Wrong original text points to audio/recognition; a correct original with a wrong translation points to the translation model or context. Lower latency does not automatically mean lower accuracy: this update removes waiting between independent requests without shortening speech capture or changing decoding.
 
 Since 0.12.9, translation uses only the selected service and its explicitly configured models. Legacy add-on files are ignored for both Local Model and custom domains; a failure shows the selected service's error. Hearing and translation are separate selections; choose Local Model for both to run both steps locally.
 

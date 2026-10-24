@@ -663,8 +663,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Whisper turbo now has a Vulkan GPU option for AMD PCs. Download it in Settings → Models → Local Model.",
-            "The Vulkan option uses separate model files. Your existing NVIDIA and CPU model selections stay unchanged.",
+            "Online translation now works on two languages at once. Completed subtitles appear while slower languages continue.",
+            "Panel languages are processed first. Speech recognition settings and complete chatbox messages are preserved.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))
