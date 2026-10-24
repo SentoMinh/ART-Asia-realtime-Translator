@@ -8,6 +8,7 @@ import threading
 
 from . import local_model
 from .stt import Heard, LocalWhisper, SttError, guess_language, in_own_script, mostly_chinese, tidy
+from .whisper_vulkan import VulkanWhisper
 from vrc.translate import TranslateError, chat_messages
 
 
@@ -21,10 +22,18 @@ class LocalHearing:
     def _current(self):
         selected = local_model.selected()
         if selected != self._selected:
+            self.close()
             self._engine = None  # Release the previous model before allocating the next one.
-            self._engine = LocalSenseVoice() if selected == "sensevoice" else LocalWhisper(selected)
+            if selected == "whisper-turbo-vulkan":
+                self._engine = VulkanWhisper()
+            else:
+                self._engine = LocalSenseVoice() if selected == "sensevoice" else LocalWhisper(selected)
             self._selected = selected
         return self._engine
+
+    def close(self):
+        if self._engine is not None and hasattr(self._engine, "close"):
+            self._engine.close()
 
     def load(self):
         self._current().load()

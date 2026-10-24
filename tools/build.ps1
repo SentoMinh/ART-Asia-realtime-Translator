@@ -10,7 +10,7 @@
 # Model weights and Whisper's cuBLAS files are downloaded separately in Settings.
 # PyAV, NVIDIA's Python packages and PyTorch stay out of the program file.
 
-param([switch]$Folder, [string]$DistPath = "dist", [string]$Python = "", [string]$MixerBuild = "")
+param([switch]$Folder, [string]$DistPath = "dist", [string]$Python = "", [string]$MixerBuild = "", [string]$WhisperBuild = "")
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
@@ -20,6 +20,12 @@ $version = (& $py -c "import ui; print(ui.__version__)").Trim()
 $name = "VRChat-Translator"
 $shape = if ($Folder) { "--onedir" } else { "--onefile" }
 $mixerArgs = @()
+$whisperDir = if ($WhisperBuild) { $WhisperBuild } else { Join-Path $root 'assets/whisper-vulkan' }
+$whisperDll = Join-Path $whisperDir 'art_whisper_vulkan.dll'
+if (!(Test-Path -LiteralPath $whisperDll)) { throw 'Build the Vulkan runtime first with tools/build-whisper-vulkan.ps1, or pass -WhisperBuild.' }
+$whisperLicense = Join-Path $whisperDir 'whisper.cpp-LICENSE.txt'
+if (!(Test-Path -LiteralPath $whisperLicense)) { throw 'Missing whisper.cpp license in the runtime folder.' }
+$mixerArgs += @('--add-binary', "$whisperDll;assets/whisper-vulkan", '--add-data', "$whisperLicense;assets/whisper-vulkan")
 if ($MixerBuild) {
     foreach ($dll in @('VrctMicApo.dll', 'VrctApoProducer.dll')) {
         $nativeFile = Join-Path $MixerBuild $dll

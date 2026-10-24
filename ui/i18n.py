@@ -4,6 +4,10 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Whisper turbo now has a Vulkan GPU option for AMD PCs. Download it in Settings → Models → Local Model.": "Whisper turbo 新增适用于 AMD 电脑的 Vulkan 显卡选项。在设置 → 模型 → 本地模型中下载。",
+    "The Vulkan option uses separate model files. Your existing NVIDIA and CPU model selections stay unchanged.": "Vulkan 选项使用单独的模型文件。您原有的 NVIDIA 和 CPU 模型选择保持不变。",
+    "Whisper turbo · Vulkan (AMD)": "Whisper turbo · Vulkan（AMD）",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Whisper turbo on a Vulkan-compatible GPU, including AMD. Uses a separate Q5 model; speed and accuracy depend on your GPU and audio.": "英语、普通话、粤语、越南语、日语和韩语。在兼容 Vulkan 的显卡（包括 AMD）上运行 Whisper turbo。使用单独的 Q5 模型；速度和准确率取决于显卡和音频。",
     "Local translation now stays on your selected local model, even if translation fails.": "本地翻译现在始终使用您选择的本地模型，即使翻译失败也不会切换。",
     "Local Model no longer falls back to Gemini or other online add-ons. Errors now show the local model's reason.": "本地模型不再回退到 Gemini 或其他在线插件。错误提示现在会显示本地模型的失败原因。",
     "Delete": "删除",
@@ -326,6 +330,10 @@ _ZH = {
 }
 
 _VI = {
+    "Whisper turbo now has a Vulkan GPU option for AMD PCs. Download it in Settings → Models → Local Model.": "Whisper turbo có thêm lựa chọn GPU Vulkan cho máy AMD. Tải trong Cài đặt → Mô hình → Mô hình cục bộ.",
+    "The Vulkan option uses separate model files. Your existing NVIDIA and CPU model selections stay unchanged.": "Lựa chọn Vulkan dùng tệp mô hình riêng. Các lựa chọn mô hình NVIDIA và CPU hiện tại được giữ nguyên.",
+    "Whisper turbo · Vulkan (AMD)": "Whisper turbo · Vulkan (AMD)",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Whisper turbo on a Vulkan-compatible GPU, including AMD. Uses a separate Q5 model; speed and accuracy depend on your GPU and audio.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Whisper turbo chạy trên GPU hỗ trợ Vulkan, gồm AMD. Dùng mô hình Q5 riêng; tốc độ và độ chính xác tùy GPU và âm thanh.",
     "Local translation now stays on your selected local model, even if translation fails.": "Dịch cục bộ luôn dùng mô hình bạn đã chọn, kể cả khi dịch thất bại.",
     "Local Model no longer falls back to Gemini or other online add-ons. Errors now show the local model's reason.": "Mô hình cục bộ không còn chuyển sang Gemini hoặc tiện ích trực tuyến khác. Thông báo lỗi sẽ hiển thị nguyên nhân từ mô hình cục bộ.",
     "Delete": "Xóa",

@@ -115,6 +115,8 @@ def selfcheck() -> int:
         from engine.stt import whisper_class
         from ui.settings_window import LocalModelDialog
         whisper_class()
+        if not local_model.installed("whisper-turbo-vulkan"):
+            raise RuntimeError("Whisper Vulkan runtime is missing")
         if not hasattr(ctranslate2, "Generator"):
             raise RuntimeError("Qwen's CTranslate2 generator is missing")
         dialog = LocalModelDialog()
@@ -122,7 +124,7 @@ def selfcheck() -> int:
         if set(dialog.rows) != expected:
             raise RuntimeError("Local model choices are missing")
         dialog.close()
-        return "Whisper/PhoWhisper, SenseVoice, NLLB/Qwen CTranslate2, tokenizer and model list included"
+        return "Whisper/PhoWhisper, Vulkan DLL, SenseVoice, NLLB/Qwen CTranslate2, tokenizer and model list included"
 
     def local_model():
         import time
@@ -136,7 +138,11 @@ def selfcheck() -> int:
         if problem:
             return problem
         started = time.perf_counter()
-        LocalHearing().load()
+        engine = LocalHearing()
+        try:
+            engine.load()
+        finally:
+            engine.close()
         return f"{local.selected()} loaded in {time.perf_counter() - started:.1f} s"
 
     def translators():
