@@ -1,5 +1,7 @@
 # ART agent handoff — 25 October 2026
 
+**0.12.11 source prepared (544 tests; release validation pending):** online target requests now overlap, at most two per utterance, with completion-order partial results and panel-first scheduling. Local inference remains serialized. HTTP client/chain creation and cooldown bookkeeping are synchronized. New timing logs separate recognition from translation. Five warm paired phrases measured two-target median 188.8 → 102.8 ms through the configured online service, not end-to-end/FPS or local performance. See LATENCY_REPORT.md and `.tools/latency-0.12.11/`. Preserve prompts, model selections, VAD/decoding and complete ordered chatbox sends. Full release evidence follows after packaging.
+
 **0.12.10 published:** added a separate `whisper-turbo-vulkan` hearing option for AMD-compatible Vulkan GPUs. See `native/whisper_vulkan/README.md` for pinned native build, model, ABI and validation details. The earlier NVIDIA/CPU choices and user settings are preserved. 536 tests and real Vulkan EN/ZH/VI inference on RTX 3080 passed. AMD hardware remains unverified; do not claim an AMD speed/accuracy result. Release/package verification passed; see the evidence below.
 
 Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and the relevant entries in [CHANGELOG.md](CHANGELOG.md). This describes the current handoff; recheck Git and release state before making changes.
@@ -15,7 +17,7 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 | Release validation | 536 tests; actual EXE Vulkan load/warmup/no-GPU checks; package/source/native DLL/asset checks; GitHub upgrade 0.12.9 → 0.12.10 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
 | Current release features | Separate Whisper turbo Vulkan (AMD) option with pinned Q5 download; previous NVIDIA/CPU models and selected-service translation boundary preserved. |
-| Version constant | 0.12.10; preserve earlier versions and use a new version for subsequent binaries |
+| Version constant | 0.12.11 source; published EXE remains 0.12.10 until release validation completes |
 | Model list | Whisper turbo (NVIDIA CUDA), Whisper turbo Vulkan (AMD), SenseVoice, PhoWhisper Small, NLLB and Qwen3 1.7B INT8 |
 
 Published release source `f38139a` (development `c3143fd`) passed 536 tests, EXE/source/runtime/license checks, actual packaged Vulkan model load/warmup and a no-compatible-GPU failure without a crash. All five GitHub assets matched their local sizes/digests. The actual 0.12.9 → 0.12.10 GitHub upgrade passed download/SHA-256, replacement/restart, new-version self-check and no-update checks. Real Vulkan recognition was tested on RTX 3080, not AMD. User settings were preserved. Evidence: `.tools/release-0.12.10/` and `.tools/whisper-vulkan/`.

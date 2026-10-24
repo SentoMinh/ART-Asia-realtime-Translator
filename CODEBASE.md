@@ -1,6 +1,8 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.10**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.11**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+
+`vrc.translate.translate_targets` runs up to two online targets concurrently per utterance when the selected `ServiceChain.parallel_targets` opts in. Results are collected on the caller and emitted as complete per-language snapshots, retaining requested order in the final dictionaries. Both typed and speech callers schedule panel targets before chatbox-only targets. Local inference is unchanged and serialized. `engine.translators` synchronizes shared client/chain initialization and cooldown bookkeeping. Timing logs now separate hearing wait, recognition and translation. See [LATENCY_REPORT.md](LATENCY_REPORT.md) for the 0.12.11 comparison and its limits.
 
 `engine/whisper_vulkan.py` adds the separate AMD-compatible turbo hearing option. Its versioned C ABI is in `native/whisper_vulkan/bridge.cpp`; `tools/build-whisper-vulkan.ps1` builds the pinned whisper.cpp runtime. The packaged app includes the DLL/license, while weights use the existing verified downloader. Tests and actual RTX 3080 Vulkan inference passed; AMD hardware remains unverified. See [native notes](native/whisper_vulkan/README.md).
 
@@ -45,7 +47,7 @@ flowchart LR
     B[Microphone] --> C
     C --> D[SpeechEngine: prioritized sentence queue]
     D --> E[CloudHearing or LocalHearing]
-    E --> F[ServiceChain: selected models, then add-ons]
+    E --> F[ServiceChain: selected service and models]
     F --> G[Utterance signals and subtitle log]
     F --> H[LiveBackend chatbox queue]
     I[Typed text] --> J[LiveBackend translation worker]

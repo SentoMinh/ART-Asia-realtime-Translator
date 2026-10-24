@@ -1,10 +1,10 @@
 # Project context
 
-Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 24 October 2026 handoff: the 0.12.10 Vulkan hearing option for AMD GPUs, 0.12.9 removal of hidden translation fallback, 0.12.8 detector adjustment, 0.12.7 local-only translation fix, model deletion and Obsidian guide, prior PhoWhisper/Qwen integration, HF-Mirror fallback, latency evidence and release checks. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
+Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 25 October 2026 handoff: 0.12.11 bounded online multi-target translation, the 0.12.10 Vulkan hearing option for AMD GPUs, 0.12.9 removal of hidden translation fallback, 0.12.8 detector adjustment, 0.12.7 local-only translation fix, model deletion and Obsidian guide, prior PhoWhisper/Qwen integration, HF-Mirror fallback, latency evidence and release checks. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
 
 For the user-facing architecture overview, read [ART Project Guide](ART%20Project%20Guide.md). It is an Obsidian-compatible standalone note.
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.10 and the preceding release validation; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.11 and the preceding release validation; recheck current code before relying on its findings.
 
 Read `CHANGELOG.md` for the reason behind recent changes, their implementation commits, regression tests and troubleshooting steps.
 

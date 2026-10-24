@@ -597,7 +597,8 @@ def test_my_voice_is_heard_in_my_language_and_goes_to_the_chatbox_not_the_window
     hears = Hears("xin chào", "vi")
     engine(window, hears, Fixed("你好"), clock).hear(MIC, sentence(clock))
     assert hears.asked == ["vi"]
-    assert [line.final for line in window.utterance.seen] == [False]
+    assert [line.final for line in window.utterance.seen] == [False, False]
+    assert window.utterance.seen[-1].panel_translations == (("vi", "xin chào"),)
     sent = window.sent[0]
     assert (sent.source, sent.final, sent.translation, sent.dst_lang) == ("mic", True, "你好", "zh")
     assert window.last_heard == "zh"          # my own voice never changes "the language heard last"

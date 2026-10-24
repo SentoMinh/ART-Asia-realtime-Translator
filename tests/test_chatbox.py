@@ -335,7 +335,7 @@ def test_nothing_is_sent_without_vrchat(app):
     backend.send_text("hello")
     assert box.sent == [] and seen[-1][1] is False
     backend.send_text("   ")
-    assert len(seen) == 2                # "translating…" and the result of the one real line
+    assert len(seen) == 3                # Initial row, reused original, then the final result.
 
 
 def test_messages_keep_the_gap(app):

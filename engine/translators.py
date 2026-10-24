@@ -13,6 +13,7 @@ Only explicitly configured models of the selected service are tried.
 from __future__ import annotations
 
 import time
+import threading
 
 from vrc.translate import TranslateError, chat_messages
 
@@ -31,6 +32,7 @@ class ServiceTranslator:
         self.service = service
         self.model = model
         self._http = http
+        self._http_lock = threading.Lock()
         self._plain: set[str] = set()
 
     def prepare(self) -> None:
@@ -43,10 +45,11 @@ class ServiceTranslator:
             error.wait = 0            # ask again at once: the key may be there next time
             raise error
         name = services.title(self.service)
-        if self._http is None:
-            import httpx
-            timeout = 60 if services.is_custom(self.service) else 15
-            self._http = httpx.Client(timeout=timeout)
+        with self._http_lock:
+            if self._http is None:
+                import httpx
+                timeout = 60 if services.is_custom(self.service) else 15
+                self._http = httpx.Client(timeout=timeout)
         body = {"model": self.model, "temperature": 0, "max_tokens": 1024,
                 "messages": chat_messages(text, target, likely_source, heard=heard)}
         direct = services.is_custom(self.service) and self.model == "nllb-200-ct2"
@@ -91,6 +94,7 @@ class Chain:
         self._clock = clock
         self._skip_until: dict[str, float] = {}
         self._errors: dict[str, str] = {}
+        self._state_lock = threading.Lock()
         self.last_used = ""                      # name of the one that answered last
         self.on_switch = on_switch
 
@@ -102,24 +106,31 @@ class Chain:
         """`heard`: the text comes from speech recognition, so a word may be misheard."""
         problem: TranslateError | None = None
         for name, translator in self._translators:
-            if self._clock() < self._skip_until.get(name, 0.0):
-                if name in self._errors:
-                    problem = TranslateError(self._errors[name])
-                continue
+            with self._state_lock:
+                if self._clock() < self._skip_until.get(name, 0.0):
+                    if name in self._errors:
+                        problem = TranslateError(self._errors[name])
+                    continue
             try:
                 answer = translator.translate(text, target, likely_source, heard=heard)
             except TranslateError as error:
                 problem = error
-                self._errors[name] = str(error)
                 wait = getattr(error, "wait", None)      # the translator said how long
                 if wait is None:
                     limit = "limit" in str(error) or "used up" in str(error)
                     wait = LIMIT_COOL_OFF_S if limit else COOL_OFF_S
-                self._skip_until[name] = self._clock() + wait
+                with self._state_lock:
+                    until = self._clock() + wait
+                    if until >= self._skip_until.get(name, 0.0):
+                        self._errors[name] = str(error)
+                        self._skip_until[name] = until
                 continue
-            self._errors.pop(name, None)
-            prev_used = self.last_used
-            self.last_used = name
+            with self._state_lock:
+                # Another in-flight language may have hit a limit. Keep its cooldown/error.
+                if self._clock() >= self._skip_until.get(name, 0.0):
+                    self._errors.pop(name, None)
+                prev_used = self.last_used
+                self.last_used = name
             if self.on_switch and (prev_used != name or not prev_used):
                 self.on_switch(name)
             return answer
@@ -134,10 +145,19 @@ class ServiceChain:
         self._pick = pick
         self._clock = clock
         self._chains: dict[tuple, Chain] = {}     # one per provider configuration, keeping its rests
+        self._chain_lock = threading.Lock()
         self.last_used = ""
         self.on_switch = on_switch
 
     def _chain(self) -> Chain:
+        with self._chain_lock:
+            return self._configured_chain()
+
+    @property
+    def parallel_targets(self) -> bool:
+        return (self._pick() or services.default_service()) != "local"
+
+    def _configured_chain(self) -> Chain:
         service = self._pick() or services.default_service()
         models = tuple(services.translate_models(service))
         key = (service, models, services.setting(service, "url"), services.setting(service, "key"))

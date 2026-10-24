@@ -258,7 +258,7 @@ class LiveBackend(Backend):
                     latency_ms=int((time.perf_counter() - started) * 1000)))
 
         translations, errors = translate_targets(
-            self._translator, utterance.original, (target, *utterance.chatbox_targets, *utterance.panel_targets), source,
+            self._translator, utterance.original, (*utterance.panel_targets, target, *utterance.chatbox_targets), source,
             on_result=show_progress)
         utterance = dataclasses.replace(utterance, panel_translations=tuple(
             (code, translations.get(code, "")) for code in utterance.panel_targets),

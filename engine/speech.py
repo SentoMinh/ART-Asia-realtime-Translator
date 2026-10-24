@@ -240,6 +240,7 @@ class SpeechEngine:
             prefer = tuple(dict.fromkeys(code for code in
                            (self.backend.last_heard, *settings.spoken_languages(True)) if code))
         engine = self._engine()
+        recognition_started = self._clock()
         try:
             heard = engine.transcribe(segment.samples, lang, prefer=prefer)
         except SttError as error:
@@ -267,6 +268,8 @@ class SpeechEngine:
                 return
         if engine is self._engines.get("local") and getattr(settings, "hearing", "") != "local":
             self._request_switch("hearing", getattr(settings, "hearing", ""), self._missing)
+        log.info("hearing source=%s wait_ms=%d recognition_ms=%d", source, waited * 1000,
+                 (self._clock() - recognition_started) * 1000)
         self._status("Listening")
         text = heard.text.strip()
         log.info("%s (%.1f s of sound, %s): %s", source, len(segment.samples) / 16000,
@@ -329,6 +332,7 @@ class SpeechEngine:
             log.exception("finishing a line failed")
 
     def finish(self, line: Utterance, segment: Segment) -> None:
+        started = self._clock()
         line = dataclasses.replace(line, final=True)    # a copy: the window holds the first one
         def show_progress(translations):
             ready = tuple((code, translations[code]) for code in line.panel_targets if translations.get(code))
@@ -338,7 +342,7 @@ class SpeechEngine:
                     latency_ms=int((self._clock() - segment.speech_end) * 1000)))
 
         translations, errors = translate_targets(
-            self._translator, line.original, (line.dst_lang, *line.chatbox_targets, *line.panel_targets),
+            self._translator, line.original, (*line.panel_targets, line.dst_lang, *line.chatbox_targets),
             line.src_lang if line.src_lang in LANGS else "", heard=True, on_result=show_progress)
         line.translation = translations.get(line.dst_lang, "") if line.dst_lang != line.src_lang else ""
         line.panel_translations = tuple((code, translations.get(code, "")) for code in line.panel_targets)
@@ -353,6 +357,8 @@ class SpeechEngine:
         if not line.translation:
             line.dst_lang = line.src_lang
         line.latency_ms = int((self._clock() - segment.speech_end) * 1000)
+        log.info("translation line=%d targets=%d duration_ms=%d", line.id, len(translations),
+                 (self._clock() - started) * 1000)
         log.info("%s line %d done in %d ms: %s %s", line.source, line.id, line.latency_ms,
                  line.translation or "(no translation)", line.note)
         send = line.source == MIC or (line.source == SPEAKER and self.backend.settings.chatbox_speaker)

@@ -419,11 +419,11 @@ def test_panel_languages_do_not_change_voice_or_typed_chatbox_target(app):
                        clock=clock, vads={MIC: LoudIsSpeech(), SPEAKER: LoudIsSpeech()})
     try:
         eng.hear(MIC, sentence())
-        assert translator.asked == [("hello", code, "en", True) for code in ("vi", "ja", "ko")]
+        assert translator.asked == [("hello", code, "en", True) for code in ("ja", "ko", "vi")]
         assert [text for event, text in box.events if event == "send"] == ["hello\nvi: hello\nja: hello"]
         clock.now += 2
         live.send_text("typed hello")
-        assert translator.asked[-2:] == [("typed hello", code, "en", False) for code in ("ko", "ja")]
+        assert translator.asked[-2:] == [("typed hello", code, "en", False) for code in ("ja", "ko")]
         assert [text for event, text in box.events if event == "send"][-1] == "ko: typed hello"
         assert finished[-1].panel_targets == ("en", "ja", "ko")
         assert dict(finished[-1].panel_translations) == {
@@ -460,17 +460,19 @@ def test_typed_partial_results_do_not_send_or_mutate_earlier_updates(app):
         live.stop()
 
 
-def test_worker_delivers_first_subtitle_while_later_language_is_blocked(app):
+@pytest.mark.parametrize("slow", ["vi", "ja"])
+def test_worker_delivers_first_subtitle_while_later_language_is_blocked(app, slow):
     import threading
     from PySide6.QtTest import QTest
     from ui.log_view import LogView
     waiting, release = threading.Event(), threading.Event()
     live, box, _ = backend(app, my_lang="en", send_lang="vi", translated_to=["vi", "ja"])
     class Translator:
+        parallel_targets = True
         def prepare(self):
             pass
         def translate(self, text, target, source):
-            if target == "ja":
+            if target == slow:
                 waiting.set()
                 assert release.wait(5), "Test must release the translator"
             return f"{target}: {text}"
@@ -482,10 +484,17 @@ def test_worker_delivers_first_subtitle_while_later_language_is_blocked(app):
     try:
         live.send_text("Hello")
         assert waiting.wait(3)
-        QTest.qWait(50)
         row = log.rows()[0]
-        assert "vi: Hello" in row.translation.text() and not row.translation.isHidden()
-        assert not row.utterance.final and row.translation2.isHidden()
+        for _ in range(100):
+            if row.utterance.panel_translations:
+                break
+            release.wait(0.01)  # Let Python workers run while Qt delivers their signals.
+            QTest.qWait(10)
+        fast_label = row.translation if slow == "ja" else row.translation2
+        slow_label = row.translation2 if slow == "ja" else row.translation
+        fast = "vi" if slow == "ja" else "ja"
+        assert f"{fast}: Hello" in fast_label.text() and not fast_label.isHidden()
+        assert not row.utterance.final and slow_label.isHidden()
         assert not any(event == "send" for event, _ in box.events)
         release.set()
         for _ in range(100):
