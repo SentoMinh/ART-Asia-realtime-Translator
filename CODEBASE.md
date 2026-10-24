@@ -1,6 +1,6 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.8**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.9**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
 
@@ -153,3 +153,7 @@ Published release source `f06758e` passed 521 tests, packaged local routing/erro
 `Segmenter._sentence_threshold` preserves the start threshold until the sentence ends. Settings → Sound can restore the three detector defaults without changing model/device choices. Read VOICE_DETECTION.md before further threshold tuning; the rejected continuation-count change admitted extra noise.
 
 Published release source `6b3f9c3` passed 524 tests, 1,976 fixed-threshold comparisons, packaged adjustment/defaults/persistence checks in all three UI languages, EXE self-check, source/runtime/native DLL checks, ZIP integrity and uploaded asset digests. The actual GitHub upgrade 0.12.7 → 0.12.8 passed download/checksum, replacement/restart, new-version self-check and no-update checks. Live recognition quality remains unverified; use Restore detector defaults to compare microphone 50% with a previously raised setting.
+
+## 0.12.9 selected-service boundary
+
+The automatic add-on loader and ServiceChain add-on injection are removed. Only selected models are tried; explicitly configured alternatives within one service still work. Legacy files are preserved but ignored. Custom-domain failure dialogs use services.title rather than exposing internal IDs. tests/test_service_boundary.py covers import isolation, original errors/cooldown and service switching. Historical add-on descriptions above are superseded.

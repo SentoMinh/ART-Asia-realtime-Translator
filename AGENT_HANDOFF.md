@@ -2,7 +2,7 @@
 
 Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and the relevant entries in [CHANGELOG.md](CHANGELOG.md). This describes the current handoff; recheck Git and release state before making changes.
 
-**0.12.8 source update:** detector strictness is held for each sentence; slider changes apply to the next sentence. Sound settings add Restore detector defaults (on, microphone 50%, other players 70%). User settings are preserved until clicked. See [VOICE_DETECTION.md](VOICE_DETECTION.md): detector/capture matched 0.12.2 before this fix, and all 1,976 fixed-threshold corpus comparisons remain identical. Two adjustment regressions failed before the fix. The broader reported live recognition decline is not proven resolved.
+**0.12.9 source update:** the automatic translation add-on loader is removed for every service. The 0.12.7 fix covered local mode only; custom domains could still fall through to an old Gemini add-on. ServiceChain now uses only explicitly selected service/models. Existing add-on files remain on disk but are ignored. Switch prompts display custom-domain names. Preserve the separate Hearing/Translating selections; do not silently change providers. Full suite: 528 tests passed.
 
 ## Current state
 
@@ -13,7 +13,7 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 | Release validation | 524 tests; 1,976 recorded detector comparisons; packaged active-sentence/defaults/persistence checks in EN/ZH/VI; EXE/source/runtime/native DLL/asset checks; actual GitHub upgrade 0.12.7 → 0.12.8 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
 | Current release features | Strictness changes apply between sentences; Sound settings can restore detector defaults. Local-only translation, model deletion and earlier features retained. |
-| Version constant | 0.12.8; preserve earlier versions and use a new version for subsequent binaries |
+| Version constant | 0.12.9; package/publication pending |
 | Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
 
 The 0.12.8 source is `6b3f9c3` in the release repository (`f9592e7` in development; detector fix `2e2a230`). Evidence: `.tools/release-0.12.8/verification.json`, `packaged-detector.json`, `github-draft.json`, `live-update-result.json` and `.tools/vad-0.12.8/final-replay.json`. The packaged detector and defaults controls passed with isolated settings; all five uploaded assets matched local digests. User microphone strictness was 71% during diagnosis and was preserved; direct the user to Restore detector defaults to compare with 50%. No live audio recording or recognition-accuracy benchmark was performed.

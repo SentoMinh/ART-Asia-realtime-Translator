@@ -51,7 +51,7 @@ class Settings:
     vad_sensitivity: float = 0.7    # how sure the detector must be that it hears a voice (other players)
     mic_vad_sensitivity: float = 0.5   # the same for my own microphone
     # speech → text: an online service, or "local" (Whisper on this PC); text → text: an online
-    # service. New profiles start with Custom domain; add-ons are fallback translators.
+    # service. New profiles start with Custom domain; only selected models are tried.
     hearing: str = field(default_factory=services.default_service)
     translating: str = field(default_factory=services.default_service)
     show_original: bool = True      # show the heard text above its translation

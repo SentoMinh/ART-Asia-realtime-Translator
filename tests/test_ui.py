@@ -1318,6 +1318,19 @@ def test_models_page_shows_currently_in_use_and_updates_on_switch(window, app):
     assert "Domain B" in dialog._translating_desc.text()
 
 
+def test_switch_model_dialog_names_the_failed_custom_domain(window, monkeypatch):
+    from PySide6.QtWidgets import QLabel
+    from engine import services
+    from ui.switch_dialog import SwitchModelDialog
+    services.save("custom_saved", name="My translation server", url="https://example.test/v1")
+    monkeypatch.setattr(services, "ready", lambda service: False)
+    dialog = SwitchModelDialog("translating", "custom_saved", window.settings, reason="Model unavailable", parent=window)
+    labels = "\n".join(label.text() for label in dialog.findChildren(QLabel))
+    assert "My translation server" in labels and "custom_saved" not in labels
+    assert "Model unavailable" in labels
+    dialog.close()
+
+
 def test_switch_model_dialog_asks_to_switch_to_ready_model(window, app, monkeypatch):
     from engine import services
     from ui.switch_dialog import SwitchModelDialog

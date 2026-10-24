@@ -352,8 +352,6 @@ def test_chain_uses_the_first_translator_that_answers():
 
 
 def test_the_chain_follows_the_service_picked_in_settings(models, tmp_path, monkeypatch):
-    from engine import translators
-    monkeypatch.setattr(translators, "addon_folder", lambda: tmp_path / "no such folder")
     picked = ["custom"]
     chain = ServiceChain(lambda: picked[0])
     assert chain.names() == ["custom:model-a", "custom:model-b"]   # saved models, in order
@@ -431,90 +429,39 @@ def test_the_set_up_window_can_test_a_key(models):
     assert models.check("custom", key="c") == (False, "no address yet")
 
 
-def test_a_pc_s_own_add_on_translators_are_fallback(models, tmp_path, monkeypatch):
-    from engine import translators
-    (tmp_path / "mine.py").write_text(
-        "class Mine:\n"
-        "    def prepare(self): pass\n"
-        "    def translate(self, text, target, likely_source='', heard=False): return 'from mine'\n"
-        "def translators(): return [('mine', Mine())]\n", encoding="utf-8")
-    (tmp_path / "broken.py").write_text("this is not python", encoding="utf-8")
-    (tmp_path / "notes.txt").write_text("ignored", encoding="utf-8")
-    monkeypatch.setattr(translators, "addon_folder", lambda: tmp_path)
-    calls = []
-    def unavailable(self, *args, **kwargs):
-        calls.append(self.model)
-        raise TranslateError("unavailable")
-    monkeypatch.setattr(ServiceTranslator, "translate", unavailable)
-    chain = ServiceChain(lambda: "custom")
-    assert chain.names() == ["custom:model-a", "custom:model-b", "mine"]
-    assert chain.translate("hello", "vi") == "from mine" and chain.last_used == "mine"
-    assert calls == ["model-a", "model-b"]
-
-
-def test_selected_custom_model_takes_priority_over_gemini_addon(models, monkeypatch):
+def test_selected_custom_model_is_used(models, monkeypatch):
     models.save("custom", translate_model="qwen/qwen3.8-27b")
-    addon = Fixed("from gemini")
     calls = []
     def translate(self, *args, **kwargs):
         calls.append((self.service, self.model))
         return "from selected model"
     monkeypatch.setattr(ServiceTranslator, "translate", translate)
-    chain = ServiceChain(lambda: "custom", addons=[("gemini", addon)])
+    chain = ServiceChain(lambda: "custom")
     assert chain.translate("hello", "vi") == "from selected model"
     assert calls == [("custom", "qwen/qwen3.8-27b")]
-    assert addon.calls == 0
     assert chain.last_used == "custom:qwen/qwen3.8-27b"
 
 
 @pytest.mark.parametrize("model, runtime", [
     ("nllb-200-ct2", "translator"), ("qwen3-1.7b-ct2", "qwen_translator")])
-def test_local_failure_never_calls_addons_and_keeps_the_local_error(models, monkeypatch, model, runtime):
+def test_local_failure_keeps_the_local_error_and_recovers(models, monkeypatch, model, runtime):
     from engine import local_inference, local_model
     local_model.select(model)
     local = Fixed("local answer")
-    addon = Fixed(error="Gemini can't be reached (no internet?)")
     monkeypatch.setattr(local_inference, runtime, local)
     clock = Clock()
-    chain = ServiceChain(lambda: "local", addons=[("gemini", addon)], clock=clock)
+    chain = ServiceChain(lambda: "local", clock=clock)
     assert chain.translate("hello", "zh", "en") == "local answer"
     local.error = "Local model could not translate this sentence"
     for target in ("vi", "zh"):
         with pytest.raises(TranslateError, match="^Local model could not translate this sentence$"):
             chain.translate("hello", target, "en", heard=True)
     assert local.calls == 2  # The second failure preserves the error during cooldown.
-    assert addon.calls == 0
     local.error = None
     clock.now += 61
     assert chain.translate("hello", "vi", "en") == "local answer"
     assert chain.names() == [f"local:{model}"]
     assert chain.last_used == f"local:{model}"
-
-
-def test_addons_load_only_for_online_service_and_stay_out_of_local_chain(models, monkeypatch):
-    from engine import translators, local_inference
-    loaded = []
-    addon = Fixed("addon answer")
-    def load():
-        loaded.append(True)
-        return [("gemini", addon)]
-    monkeypatch.setattr(translators, "addon_translators", load)
-    monkeypatch.setattr(local_inference, "translator", Fixed("local answer"))
-    def offline(*args, **kwargs):
-        raise TranslateError("offline")
-    monkeypatch.setattr(ServiceTranslator, "translate", offline)
-    selected = ["local"]
-    chain = ServiceChain(lambda: selected[0])
-    chain.prepare()
-    assert chain.translate("hello", "vi", "en") == "local answer"
-    assert loaded == []
-    selected[0] = "custom"
-    assert chain.translate("hello", "vi", "en") == "addon answer"
-    assert loaded == [True] and addon.calls == 1
-    selected[0] = "local"
-    assert chain.translate("hello", "vi", "en") == "local answer"
-    assert chain.names() == ["local:nllb-200-ct2"]
-    assert addon.calls == 1
 
 
 def test_chain_skips_a_translator_that_hit_its_limit_until_it_rested():
@@ -1169,7 +1116,7 @@ def test_changing_api_credentials_clears_translation_cooldown(models, monkeypatc
             raise TranslateError("endpoint or key rejected")
         return "xin chào"
     monkeypatch.setattr(ServiceTranslator, "translate", translate)
-    chain = ServiceChain(lambda: "custom", clock=clock, addons=[])
+    chain = ServiceChain(lambda: "custom", clock=clock)
     for _ in range(2):
         with pytest.raises(TranslateError, match="endpoint or key rejected"):
             chain.translate("hello", "vi")

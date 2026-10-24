@@ -1,10 +1,10 @@
 # Project context
 
-Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 24 October 2026 handoff: the 0.12.8 detector adjustment, 0.12.7 local-only translation fix, model deletion and Obsidian guide, prior PhoWhisper/Qwen integration, HF-Mirror fallback, latency evidence and release checks. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
+Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 24 October 2026 handoff: the 0.12.9 removal of hidden translation fallback, 0.12.8 detector adjustment, 0.12.7 local-only translation fix, model deletion and Obsidian guide, prior PhoWhisper/Qwen integration, HF-Mirror fallback, latency evidence and release checks. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
 
 For the user-facing architecture overview, read [ART Project Guide](ART%20Project%20Guide.md). It is an Obsidian-compatible standalone note.
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.8 and the preceding release validation; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.9 and the preceding release validation; recheck current code before relying on its findings.
 
 Read `CHANGELOG.md` for the reason behind recent changes, their implementation commits, regression tests and troubleshooting steps.
 
@@ -35,7 +35,7 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 - `ui/main_window.py`: below 30%, alpha-zero blank space passes clicks through; text/input/top controls stay interactive. `ui/overlay_backdrop.py` preserves the selected darkness on an input-transparent surface behind the text; keep its geometry, stacking and lifetime aligned with the overlay. Use the standard bottom-right `QSizeGrip` to resize; only the top edge/corners also accept native edge resizing. The embedded update notice uses `Settings.last_update_notice` and must have current release text.
 - `ui/settings_window.py`: API setup with Fetch models; Connect beside each domain; visible model dropdown arrows below Hearing/Translating. Selections save immediately; manual model entry remains available.
 - `ui/service_health.py`: silent startup/API checks, 30-second deadline, Settings status and stale-result handling. Do not reintroduce the startup popup.
-- `engine/translators.py`, `vrc/translate.py`: provider adapters, add-ons, fallback chain and shared prompts.
+- `engine/translators.py`, `vrc/translate.py`: provider adapters, explicitly configured same-service fallback and shared prompts.
 - `engine/local_model.py`, `ui/local_download.py`: verified/resumable downloads and Qt progress signals.
 - `ui/config.py`: shared settings and persistence; `ui/i18n.py`: English-keyed Chinese/Vietnamese translations.
 - `ui/theme.py`, `ui/widgets.py`, `ui/log_view.py`: existing appearance and message controls.
@@ -64,3 +64,5 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 - Source updates and packaged updates live in `tools/update.py` and `ui/updater.py`. Releases belong in `SentoMinh/ART-Asia-realtime-Translator`.
 
 Read [VOICE_DETECTION.md](VOICE_DETECTION.md) before changing detector thresholds. Preserve the per-sentence threshold and validate both speech retention and noise rejection; fixed-threshold behavior matches 0.12.2.
+
+Translation must remain within the selected service. Legacy per-PC add-on loading was removed in 0.12.9; do not restore it as an automatic fallback. Hearing and Translating are independent choices.

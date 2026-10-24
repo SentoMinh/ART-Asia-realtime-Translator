@@ -113,6 +113,6 @@ def test_successful_fallback_records_the_model_for_the_ui(model_ui, monkeypatch)
             raise TranslateError("unavailable")
         return "translated"
     monkeypatch.setattr(ServiceTranslator, "translate", translate)
-    chain = ServiceChain(lambda: "custom", addons=[])
+    chain = ServiceChain(lambda: "custom")
     assert chain.translate("hello", "vi") == "translated"
     assert chain.last_result[1:] == ("custom", ("first", "second"), "custom:second")

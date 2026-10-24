@@ -155,7 +155,7 @@ def test_missing_translation_can_retry_immediately_after_download(monkeypatch):
 def test_local_translation_chain_uses_shared_runtime_without_http(monkeypatch):
     called = []
     monkeypatch.setattr(local_inference.translator, "translate", lambda *a, **kw: called.append(a) or "Xin chao")
-    chain = ServiceChain(lambda: "local", addons=[])
+    chain = ServiceChain(lambda: "local")
     assert chain.translate("Hello", "vi", "en") == "Xin chao"
     assert chain.last_used == "local:nllb-200-ct2"
     assert called == [("Hello", "vi", "en")]
@@ -164,7 +164,7 @@ def test_local_translation_chain_uses_shared_runtime_without_http(monkeypatch):
 def test_translation_switch_routes_all_chains_and_keeps_hearing_selection(monkeypatch):
     monkeypatch.setattr(local_inference.translator, "translate", lambda *a, **kw: "NLLB")
     monkeypatch.setattr(local_inference.qwen_translator, "translate", lambda *a, **kw: "Qwen")
-    typed, speech = ServiceChain(lambda: "local", addons=[]), ServiceChain(lambda: "local", addons=[])
+    typed, speech = ServiceChain(lambda: "local"), ServiceChain(lambda: "local")
     local_model.select("sensevoice")
     for model, expected in (("nllb-200-ct2", "NLLB"), ("qwen3-1.7b-ct2", "Qwen"), ("nllb-200-ct2", "NLLB")):
         local_model.select(model)

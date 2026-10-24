@@ -8,23 +8,16 @@ can be listed with commas (engine/services.py).
 Every translator has prepare() and translate(text, target, likely_source, heard=False) -> str,
 and raises vrc.translate.TranslateError with a plain-words reason.
 
-A PC can add its own translators without changing the program: see addon_translators().
+Only explicitly configured models of the selected service are tried.
 """
 from __future__ import annotations
 
-import importlib.util
-import logging
-import os
-import sys
 import time
-from pathlib import Path
 
 from vrc.translate import TranslateError, chat_messages
 
 from . import services
 from .stt import guess_language, mostly_chinese
-
-log = logging.getLogger(__name__)
 
 COOL_OFF_S = 60           # a translator that failed is skipped this long...
 LIMIT_COOL_OFF_S = 600    # ...and this long when it said its limit is reached
@@ -133,39 +126,13 @@ class Chain:
         raise problem or TranslateError("every translator is resting after an error; try again soon")
 
 
-def addon_folder() -> Path:
-    return Path(os.environ.get("APPDATA") or str(Path.home())) / "VRChat-Translator" / "addons"
-
-
-def addon_translators(folder: Path | None = None) -> list[tuple[str, object]]:
-    """Translators that exist only on this PC. Every .py file in the add-on folder that has a
-    translators() function returning (name, translator) pairs is loaded, and its translators
-    are tried after the selected online service's models. Local Model never uses add-ons.
-    The program ships with that folder empty.
-    A broken add-on is skipped and logged."""
-    found: list[tuple[str, object]] = []
-    for path in sorted((folder or addon_folder()).glob("*.py")):
-        name = f"vrchat_translator_addon_{path.stem}"
-        try:
-            spec = importlib.util.spec_from_file_location(name, path)
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
-            spec.loader.exec_module(module)
-            found += [(str(label), translator) for label, translator in module.translators()]
-        except Exception:
-            sys.modules.pop(name, None)
-            log.exception("the add-on %s could not be loaded", path.name)
-    return found
-
-
 class ServiceChain:
-    """The selected model(s), with this PC's add-ons as fallback only for online services.
+    """Only the models explicitly configured for the selected service.
     `pick()` says which service that is right now; it can change while the program runs."""
 
-    def __init__(self, pick=lambda: "", clock=time.monotonic, addons: list | None = None, on_switch=None):
+    def __init__(self, pick=lambda: "", clock=time.monotonic, on_switch=None):
         self._pick = pick
         self._clock = clock
-        self._addons = addons  # Load add-ons only when an online service is selected.
         self._chains: dict[tuple, Chain] = {}     # one per provider configuration, keeping its rests
         self.last_used = ""
         self.on_switch = on_switch
@@ -181,9 +148,6 @@ class ServiceChain:
                 choices = [(f"local:{model}", qwen_translator if model == "qwen3-1.7b-ct2" else translator)]
             else:
                 choices = [(f"{service}:{model}", ServiceTranslator(service, model)) for model in models]
-                if self._addons is None:
-                    self._addons = addon_translators()
-                choices += self._addons
             self._chains[key] = Chain(
                 choices,
                 self._clock,
