@@ -1,6 +1,6 @@
-# ART agent handoff — 24 October 2026
+# ART agent handoff — 25 October 2026
 
-**0.12.10 in progress:** added a separate `whisper-turbo-vulkan` hearing option for AMD-compatible Vulkan GPUs. See `native/whisper_vulkan/README.md` for pinned native build, model, ABI and validation details. The earlier NVIDIA/CPU choices and user settings are preserved. 536 tests and real Vulkan EN/ZH/VI inference on RTX 3080 passed. AMD hardware remains unverified; do not claim an AMD speed/accuracy result. Release/package verification is recorded separately below when complete.
+**0.12.10 published:** added a separate `whisper-turbo-vulkan` hearing option for AMD-compatible Vulkan GPUs. See `native/whisper_vulkan/README.md` for pinned native build, model, ABI and validation details. The earlier NVIDIA/CPU choices and user settings are preserved. 536 tests and real Vulkan EN/ZH/VI inference on RTX 3080 passed. AMD hardware remains unverified; do not claim an AMD speed/accuracy result. Release/package verification passed; see the evidence below.
 
 Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and the relevant entries in [CHANGELOG.md](CHANGELOG.md). This describes the current handoff; recheck Git and release state before making changes.
 
@@ -10,13 +10,15 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 
 | Item | State |
 | --- | --- |
-| Published app | **v0.12.9**, release source `a7b09a645a1f17822a567f4fcf781ee743fa4e59` |
-| Published EXE SHA-256 | `603d8d250f7ae51d47336b35d0d65655ef3625c29cb3a9969d0e1356b9324ab5` |
-| Release validation | 528 tests; bundled routing/error/cooldown checks; actual EXE startup ignores a legacy add-on trap; EXE/source/runtime/native DLL/asset checks; actual GitHub upgrade 0.12.8 → 0.12.9 and no-update check passed |
+| Published app | **v0.12.10**, release source `f38139ac77baff5e0d44d559519992970778cc29` |
+| Published EXE SHA-256 | `bd7e681dc074244783cd519da9a8701a7b267a7504c8eae465eac03e23d2c86e` |
+| Release validation | 536 tests; actual EXE Vulkan load/warmup/no-GPU checks; package/source/native DLL/asset checks; GitHub upgrade 0.12.9 → 0.12.10 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| Current release features | Hidden translation add-on fallback removed for every service; switch prompts show custom-domain names. Detector adjustment/defaults and earlier features retained. |
-| Version constant | 0.12.9; preserve earlier versions and use a new version for subsequent binaries |
-| Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
+| Current release features | Separate Whisper turbo Vulkan (AMD) option with pinned Q5 download; previous NVIDIA/CPU models and selected-service translation boundary preserved. |
+| Version constant | 0.12.10; preserve earlier versions and use a new version for subsequent binaries |
+| Model list | Whisper turbo (NVIDIA CUDA), Whisper turbo Vulkan (AMD), SenseVoice, PhoWhisper Small, NLLB and Qwen3 1.7B INT8 |
+
+Published release source `f38139a` (development `c3143fd`) passed 536 tests, EXE/source/runtime/license checks, actual packaged Vulkan model load/warmup and a no-compatible-GPU failure without a crash. All five GitHub assets matched their local sizes/digests. The actual 0.12.9 → 0.12.10 GitHub upgrade passed download/SHA-256, replacement/restart, new-version self-check and no-update checks. Real Vulkan recognition was tested on RTX 3080, not AMD. User settings were preserved. Evidence: `.tools/release-0.12.10/` and `.tools/whisper-vulkan/`.
 
 The 0.12.9 fix is `a7b09a6` in the release repository (`4d8b164` in development). Evidence: `.tools/release-0.12.9/verification.json`, `packaged-boundary.json`, `github-draft.json` and `live-update-result.json`. Bundled translator bytecode was exercised with fake adapters for both local models and online services; actual EXE self-check separately verified that a legacy add-on trap was never imported. All five uploaded assets matched local digests. The user's provider/model choices and legacy files were preserved. A selected speech-generation model cannot translate text; ask before changing the user's provider/model. Live successful inference against the user's custom endpoint was not tested.
 

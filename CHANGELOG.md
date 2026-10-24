@@ -1,6 +1,6 @@
 # Change log
 
-## 0.12.10 — 2026-10-24 — Whisper turbo through Vulkan for AMD PCs
+## 0.12.10 — 2026-10-25 — Whisper turbo through Vulkan for AMD PCs
 
 - Added a separate **Whisper turbo · Vulkan (AMD)** hearing choice. Existing NVIDIA CUDA, SenseVoice, PhoWhisper and translation choices are preserved.
 - Bundled a pinned whisper.cpp runtime behind a small C ABI; the SDK is only a developer dependency. Downloads use a separate ~547 MiB Q5 model with pinned size/SHA-256 and existing HF-Mirror fallback. Model deletion remains scoped to its own files.
@@ -8,6 +8,8 @@
 - Added regression coverage for selection/reuse/cleanup, GPU errors, Chinese routing, silence/repetition, invalid audio and missing files/runtime. 536 tests passed. Actual RTX 3080 Vulkan inference passed six EN/ZH/VI recorded-clip calls; this is not a SenseVoice comparison or AMD benchmark.
 - Initial load/warmup took 20.4 s; later recorded calls took 403–1,625 ms with uncontrolled concurrent GPU load. AMD hardware, mixed-language accuracy and VRChat performance remain unverified. See [native integration notes](native/whisper_vulkan/README.md).
 
+
+Published release source `f38139a` (development `c3143fd`) passed 536 tests, EXE/source/runtime/license checks, actual packaged Vulkan model load/warmup and a no-compatible-GPU failure without a crash. All five GitHub assets matched their local sizes/digests. The actual 0.12.9 → 0.12.10 GitHub upgrade passed download/SHA-256, replacement/restart, new-version self-check and no-update checks. Real Vulkan recognition was tested on RTX 3080, not AMD. User settings were preserved. Evidence: `.tools/release-0.12.10/` and `.tools/whisper-vulkan/`.
 
 ## 0.12.9 — 2026-10-24 — Remove hidden translation fallback for every service
 
