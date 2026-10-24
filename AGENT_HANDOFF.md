@@ -1,6 +1,6 @@
 # ART agent handoff — 25 October 2026
 
-**0.12.11 source prepared (544 tests; release validation pending):** online target requests now overlap, at most two per utterance, with completion-order partial results and panel-first scheduling. Local inference remains serialized. HTTP client/chain creation and cooldown bookkeeping are synchronized. New timing logs separate recognition from translation. Five warm paired phrases measured two-target median 188.8 → 102.8 ms through the configured online service, not end-to-end/FPS or local performance. See LATENCY_REPORT.md and `.tools/latency-0.12.11/`. Preserve prompts, model selections, VAD/decoding and complete ordered chatbox sends. Full release evidence follows after packaging.
+**0.12.11 published:** online target requests now overlap, at most two per utterance, with completion-order partial results and panel-first scheduling. Local inference remains serialized. HTTP client/chain creation and cooldown bookkeeping are synchronized. New timing logs separate recognition from translation. Five warm paired phrases measured two-target median 188.8 → 102.8 ms through the configured online service, not end-to-end/FPS or local performance. See LATENCY_REPORT.md and `.tools/latency-0.12.11/`. Preserve prompts, model selections, VAD/decoding and complete ordered chatbox sends. Release and actual GitHub upgrade checks passed; see the evidence below.
 
 **0.12.10 published:** added a separate `whisper-turbo-vulkan` hearing option for AMD-compatible Vulkan GPUs. See `native/whisper_vulkan/README.md` for pinned native build, model, ABI and validation details. The earlier NVIDIA/CPU choices and user settings are preserved. 536 tests and real Vulkan EN/ZH/VI inference on RTX 3080 passed. AMD hardware remains unverified; do not claim an AMD speed/accuracy result. Release/package verification passed; see the evidence below.
 
@@ -12,13 +12,15 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 
 | Item | State |
 | --- | --- |
-| Published app | **v0.12.10**, release source `f38139ac77baff5e0d44d559519992970778cc29` |
-| Published EXE SHA-256 | `bd7e681dc074244783cd519da9a8701a7b267a7504c8eae465eac03e23d2c86e` |
-| Release validation | 536 tests; actual EXE Vulkan load/warmup/no-GPU checks; package/source/native DLL/asset checks; GitHub upgrade 0.12.9 → 0.12.10 and no-update check passed |
+| Published app | **v0.12.11**, release source `a03ab480f37edb7d24c6d1be98d1e32f9bda878a` |
+| Published EXE SHA-256 | `ca2f6be8e58210b10f2d734144e138525ed6c687c492f50758a79770b7101073` |
+| Release validation | 544 tests; 43 bundled translation checks; EXE self-check, native/source/asset checks; GitHub upgrade 0.12.10 → 0.12.11 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| Current release features | Separate Whisper turbo Vulkan (AMD) option with pinned Q5 download; previous NVIDIA/CPU models and selected-service translation boundary preserved. |
-| Version constant | 0.12.11 source; published EXE remains 0.12.10 until release validation completes |
+| Current release features | Up to two concurrent online translation targets per utterance, panel-first scheduling, immediate completed results and timing logs. Local inference and recognition settings preserved. |
+| Version constant | 0.12.11; preserve earlier versions and use a new version for subsequent binaries |
 | Model list | Whisper turbo (NVIDIA CUDA), Whisper turbo Vulkan (AMD), SenseVoice, PhoWhisper Small, NLLB and Qwen3 1.7B INT8 |
+
+Published release source `a03ab48` (development `8d3b8f8`) passed 544 tests and 43 checks against bundled translation bytecode for concurrent targets, partial results, cooldowns, local isolation and ordered chatbox messages. The actual EXE self-check, bundled native DLL hashes, source/asset scans and ZIP checks passed. All five uploaded GitHub assets matched local sizes/digests. The real 0.12.10 → 0.12.11 upgrade passed download/SHA-256, packaged replacement/restart, new-version self-check and no-update checks. User settings were unchanged. Live recognition errors, game FPS and end-to-end speech latency were not tested. Evidence: `.tools/release-0.12.11/`.
 
 Published release source `f38139a` (development `c3143fd`) passed 536 tests, EXE/source/runtime/license checks, actual packaged Vulkan model load/warmup and a no-compatible-GPU failure without a crash. All five GitHub assets matched their local sizes/digests. The actual 0.12.9 → 0.12.10 GitHub upgrade passed download/SHA-256, replacement/restart, new-version self-check and no-update checks. Real Vulkan recognition was tested on RTX 3080, not AMD. User settings were preserved. Evidence: `.tools/release-0.12.10/` and `.tools/whisper-vulkan/`.
 
@@ -82,7 +84,7 @@ Next useful measurements are actual game/GPU contention, short conversational an
 - Never bundle AppData settings, API credentials, logs, benchmark recordings, model weights or local infrastructure. Tests isolate AppData through `tests/conftest.py`; direct benchmarks must avoid saving provider changes or opening capture/OSC.
 - For a new release, stage the committed/scanned source in a new `.tools/release-<version>/source` directory. Build with `tools/build.ps1`, the development Python, and validated `.tools/apo-prototype-10` DLLs. Preserve old artifacts. Bundle only `VrctMicApo.dll` and `VrctApoProducer.dll`, never test DLLs.
 - Prior release helpers/evidence are in `.tools/release-0.12.4/`; adapt versions, source commit, notice assertions and test counts rather than copying old expectations blindly. Keep checksums, ZIP, packaged self-check, draft-asset verification, and the GitHub download/replacement/restart check.
-- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. Version 0.12.6 is published; use a new version for subsequent binaries.
+- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. Version 0.12.11 is published; use a new version for subsequent binaries.
 - The optional verified NLLB offline ZIP remains an asset of v0.12.3. Keep existing links valid, but it is not the user's preferred solution for this current request.
 
 Run focused tests with `.venv-app\Scripts\python.exe -m pytest tests/test_local_model.py tests/test_local_choices.py tests/test_nllb_offline.py -q`; run the full suite before packaging. A source test result does not validate a new EXE or mainland-China access.
