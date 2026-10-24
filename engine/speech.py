@@ -217,6 +217,9 @@ class SpeechEngine:
         while True:
             _, _, source, segment = self._sentences.get()
             if source is None:
+                for engine in self._engines.values():
+                    if hasattr(engine, "close"):
+                        engine.close()
                 return
             try:
                 self.hear(source, segment)

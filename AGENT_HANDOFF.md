@@ -1,5 +1,7 @@
 # ART agent handoff — 24 October 2026
 
+**0.12.10 in progress:** added a separate `whisper-turbo-vulkan` hearing option for AMD-compatible Vulkan GPUs. See `native/whisper_vulkan/README.md` for pinned native build, model, ABI and validation details. The earlier NVIDIA/CPU choices and user settings are preserved. 536 tests and real Vulkan EN/ZH/VI inference on RTX 3080 passed. AMD hardware remains unverified; do not claim an AMD speed/accuracy result. Release/package verification is recorded separately below when complete.
+
 Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and the relevant entries in [CHANGELOG.md](CHANGELOG.md). This describes the current handoff; recheck Git and release state before making changes.
 
 **0.12.9 source update:** the automatic translation add-on loader is removed for every service. The 0.12.7 fix covered local mode only; custom domains could still fall through to an old Gemini add-on. ServiceChain now uses only explicitly selected service/models. Existing add-on files remain on disk but are ignored. Switch prompts display custom-domain names. Preserve the separate Hearing/Translating selections; do not silently change providers. Full suite: 528 tests passed.

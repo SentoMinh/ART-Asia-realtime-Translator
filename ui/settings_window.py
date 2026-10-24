@@ -996,7 +996,7 @@ class LocalModelDialog(QDialog):
             panel.setObjectName("card")
             row = QHBoxLayout(panel)
             details = QVBoxLayout()
-            heading = QLabel(f"{tr('Hearing' if category == 'hearing' else 'Translating')} — {title}")
+            heading = QLabel(f"{tr('Hearing' if category == 'hearing' else 'Translating')} — {tr(title)}")
             heading.setWordWrap(True)
             details.addWidget(heading)
             model_note = QLabel(tr(local_model.DESCRIPTIONS[model]))

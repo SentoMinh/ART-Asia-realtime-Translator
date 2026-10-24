@@ -7,7 +7,7 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **[0.12.9](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.9)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **[0.12.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.10)**. Enter your API URL and key under **Custom domain**, or choose local models.
 
 See the [change log](CHANGELOG.md) for implementation details, measurements and troubleshooting notes.
 
@@ -25,7 +25,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.12.9](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.9). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.12.10](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.10). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -61,12 +61,13 @@ Open **Settings → Models → Local Model → Set up…** and choose a model:
 | Model | Job | Hardware and languages |
 |---|---|---|
 | Whisper large-v3-turbo | Hearing | Fast NVIDIA GPU option; English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Multilingual conversations; mixed sentences can still be misheard. |
+| Whisper turbo · Vulkan (AMD) | Hearing | The six app languages, using whisper.cpp and a separate Q5 model (~547 MiB download). Requires a Vulkan-compatible GPU/driver; supports AMD. Actual AMD performance remains unverified. |
 | SenseVoice Small | Hearing | Lightweight CPU option; Chinese, Cantonese, English, Japanese and Korean. Automatic detection; no Vietnamese. Mixed-language accuracy varies. |
 | PhoWhisper Small | Hearing | Vietnamese specialist trained on diverse accents. CPU INT8, no NVIDIA needed; may be slower than GPU turbo. About 0.9 GiB download. |
 | NLLB-200 · CTranslate2 | Translation | CPU INT8; all six app languages. Default for low latency. |
 | Qwen3 1.7B · INT8 | Translation | Optional CPU language model for all six app languages, thinking disabled. About 1.6 GiB download. Slower than NLLB in our replay; wording and Cantonese quality need comparison. |
 
-The download panel opens inside Settings and moves with it. Its model list has one scrollbar; the title and single Close button stay at the top. All models are listed directly, each with a **Download** button, download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. Only Whisper turbo requires NVIDIA libraries. Non-turbo Whisper large-v3 is removed from the list; an old selection falls back to turbo without deleting its downloaded files. Existing hearing and translation choices otherwise stay unchanged. Switching translators releases the previous model before loading the next.
+The download panel opens inside Settings and moves with it. Its model list has one scrollbar; the title and single Close button stay at the top. All models are listed directly, each with a **Download** button, download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. Only the original NVIDIA Whisper turbo option requires CUDA libraries; Vulkan uses the graphics driver instead. Non-turbo Whisper large-v3 is removed from the list; an old selection falls back to turbo without deleting its downloaded files. Existing hearing and translation choices otherwise stay unchanged. Switching translators releases the previous model before loading the next.
 
 **Free disk space:** click **Delete → Confirm delete** on a model card, or Cancel to keep it. This removes app-managed weights and partial downloads; shared NVIDIA libraries, other models and your settings stay intact. Deletion is disabled during downloads. Leftover non-turbo large-v3 files get a cleanup-only card. External Hugging Face caches and loaded model memory are not removed. If a file is in use, stop using the model/restart ART and retry. Available models can be downloaded again.
 

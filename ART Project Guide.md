@@ -97,12 +97,15 @@ An **Online** connection result confirms the model-list/authentication check suc
 | Model | Job | Languages and purpose | Hardware |
 | --- | --- | --- | --- |
 | Whisper large-v3-turbo | Hearing | English, Chinese, Cantonese, Vietnamese, Japanese and Korean; multilingual option | NVIDIA GPU |
+| Whisper turbo · Vulkan (AMD) | Hearing | The same six app languages; separate Q5 model download (~547 MiB). Added in 0.12.10 | Vulkan-compatible GPU, including AMD |
 | SenseVoice Small | Hearing | Chinese, Cantonese, English, Japanese and Korean; lightweight automatic detection, no Vietnamese | CPU |
 | PhoWhisper Small | Hearing | Vietnamese specialist trained on diverse accents; use turbo for other languages or mixed conversations | CPU INT8 |
 | NLLB-200 CT2 | Translation | All six app languages; default starting choice for low latency | CPU INT8 |
 | Qwen3 1.7B INT8 | Translation | Alternative for the six app languages, thinking disabled; compare quality for your language pair | CPU INT8 |
 
 These language lists describe the app's supported choices, not equal accuracy for every language or accent. PhoWhisper does not replace the multilingual choices. Small Qwen can still alter meaning, omit wording or produce less natural Cantonese.
+
+For an AMD PC, open **Settings → Models → Hearing → Local Model → Set up**, then download **Whisper turbo · Vulkan (AMD)**. The runtime is bundled; install/update the graphics manufacturer's Vulkan-capable driver if needed. First loading can take tens of seconds. The NVIDIA option uses different model files. Vulkan has been tested on an RTX 3080; AMD performance still needs hardware verification. See [[native/whisper_vulkan/README]] for native build and validation details.
 
 The non-turbo **Whisper large-v3** option was removed in 0.12.5. A saved old selection resolves to turbo; removing the option did not delete existing weights.
 

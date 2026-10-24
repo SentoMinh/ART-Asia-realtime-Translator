@@ -1,5 +1,14 @@
 # Change log
 
+## 0.12.10 — 2026-10-24 — Whisper turbo through Vulkan for AMD PCs
+
+- Added a separate **Whisper turbo · Vulkan (AMD)** hearing choice. Existing NVIDIA CUDA, SenseVoice, PhoWhisper and translation choices are preserved.
+- Bundled a pinned whisper.cpp runtime behind a small C ABI; the SDK is only a developer dependency. Downloads use a separate ~547 MiB Q5 model with pinned size/SHA-256 and existing HF-Mirror fallback. Model deletion remains scoped to its own files.
+- Keep one GPU context loaded, warm it once, use independent utterances, and release it on model switches/normal worker shutdown. Native GPU failures become hearing errors. Audio stays in memory; no local server or child inference process is used.
+- Added regression coverage for selection/reuse/cleanup, GPU errors, Chinese routing, silence/repetition, invalid audio and missing files/runtime. 536 tests passed. Actual RTX 3080 Vulkan inference passed six EN/ZH/VI recorded-clip calls; this is not a SenseVoice comparison or AMD benchmark.
+- Initial load/warmup took 20.4 s; later recorded calls took 403–1,625 ms with uncontrolled concurrent GPU load. AMD hardware, mixed-language accuracy and VRChat performance remain unverified. See [native integration notes](native/whisper_vulkan/README.md).
+
+
 ## 0.12.9 — 2026-10-24 — Remove hidden translation fallback for every service
 
 The 0.12.7 fix protected Local Model only. A selected custom domain could still load a legacy per-PC Gemini add-on after its configured model failed. Gemini's error then replaced the actual service error. ART now removes the automatic add-on loader entirely: `ServiceChain` uses only the selected local model or the models explicitly configured for the selected online service. Existing add-on files are preserved but ignored. Explicit comma-separated alternatives within the selected service retain their cooldown/fallback behavior. Switching services remains a user choice.

@@ -1,6 +1,8 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.9**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.10**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+
+`engine/whisper_vulkan.py` adds the separate AMD-compatible turbo hearing option. Its versioned C ABI is in `native/whisper_vulkan/bridge.cpp`; `tools/build-whisper-vulkan.ps1` builds the pinned whisper.cpp runtime. The packaged app includes the DLL/license, while weights use the existing verified downloader. Tests and actual RTX 3080 Vulkan inference passed; AMD hardware remains unverified. See [native notes](native/whisper_vulkan/README.md).
 
 Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
 
@@ -12,7 +14,7 @@ The Obsidian-ready [ART Project Guide](ART%20Project%20Guide.md) explains the fu
 
 A Python 3.12 / PySide6 desktop companion for VRChat. It captures VRChat audio or a selected playback device for translated subtitles, translates your microphone into the OSC chatbox, and translates typed messages into that same chatbox. Conversation languages are English, Mandarin, Cantonese, Vietnamese, Japanese and Korean; interface languages remain English, Chinese and Vietnamese.
 
-It is an always-on-top desktop window. Live audio is a mix of the other players: the production engine does not identify individual speakers, although the demo and `Utterance` structure support speaker numbers. Speech recognition and text translation are separate steps. Local hearing offers Whisper turbo on NVIDIA, SenseVoice on CPU or Vietnamese-focused PhoWhisper Small on CPU INT8. Translation uses the selected online service, NLLB (default) or Qwen3 1.7B INT8 on CPU, or an installed add-on. The two local translators share a lock and release the other model before loading; a cached ServiceChain follows the current selection. Qwen uses the pinned non-thinking chat prefix, a 1,024-token prompt limit and a 512-token generation limit; missing EOS is an error, not a partial success.
+It is an always-on-top desktop window. Live audio is a mix of the other players: the production engine does not identify individual speakers, although the demo and `Utterance` structure support speaker numbers. Speech recognition and text translation are separate steps. Local hearing offers Whisper turbo on NVIDIA CUDA or a Vulkan GPU (including AMD), SenseVoice on CPU or Vietnamese-focused PhoWhisper Small on CPU INT8. Translation uses the selected online service, NLLB (default) or Qwen3 1.7B INT8 on CPU. Legacy add-ons are ignored. The two local translators share a lock and release the other model before loading; a cached ServiceChain follows the current selection. Qwen uses the pinned non-thinking chat prefix, a 1,024-token prompt limit and a 512-token generation limit; missing EOS is an error, not a partial success.
 
 ## Working tree and exports
 
