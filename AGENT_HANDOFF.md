@@ -8,13 +8,15 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 
 | Item | State |
 | --- | --- |
-| Published app | **v0.12.8**, release source `6b3f9c323dc92537ad7163fc19cc7edac55f6c2f` |
-| Published EXE SHA-256 | `bba901e1224206f15d89db3bb93f0a1a427338ecbf077de96190dd8a13ac49ed` |
-| Release validation | 524 tests; 1,976 recorded detector comparisons; packaged active-sentence/defaults/persistence checks in EN/ZH/VI; EXE/source/runtime/native DLL/asset checks; actual GitHub upgrade 0.12.7 → 0.12.8 and no-update check passed |
+| Published app | **v0.12.9**, release source `a7b09a645a1f17822a567f4fcf781ee743fa4e59` |
+| Published EXE SHA-256 | `603d8d250f7ae51d47336b35d0d65655ef3625c29cb3a9969d0e1356b9324ab5` |
+| Release validation | 528 tests; bundled routing/error/cooldown checks; actual EXE startup ignores a legacy add-on trap; EXE/source/runtime/native DLL/asset checks; actual GitHub upgrade 0.12.8 → 0.12.9 and no-update check passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| Current release features | Strictness changes apply between sentences; Sound settings can restore detector defaults. Local-only translation, model deletion and earlier features retained. |
-| Version constant | 0.12.9; package/publication pending |
+| Current release features | Hidden translation add-on fallback removed for every service; switch prompts show custom-domain names. Detector adjustment/defaults and earlier features retained. |
+| Version constant | 0.12.9; preserve earlier versions and use a new version for subsequent binaries |
 | Model list | Whisper turbo, SenseVoice, PhoWhisper Small (VI CPU), NLLB and Qwen3 1.7B INT8 (CPU); non-turbo large-v3 removed |
+
+The 0.12.9 fix is `a7b09a6` in the release repository (`4d8b164` in development). Evidence: `.tools/release-0.12.9/verification.json`, `packaged-boundary.json`, `github-draft.json` and `live-update-result.json`. Bundled translator bytecode was exercised with fake adapters for both local models and online services; actual EXE self-check separately verified that a legacy add-on trap was never imported. All five uploaded assets matched local digests. The user's provider/model choices and legacy files were preserved. A selected speech-generation model cannot translate text; ask before changing the user's provider/model. Live successful inference against the user's custom endpoint was not tested.
 
 The 0.12.8 source is `6b3f9c3` in the release repository (`f9592e7` in development; detector fix `2e2a230`). Evidence: `.tools/release-0.12.8/verification.json`, `packaged-detector.json`, `github-draft.json`, `live-update-result.json` and `.tools/vad-0.12.8/final-replay.json`. The packaged detector and defaults controls passed with isolated settings; all five uploaded assets matched local digests. User microphone strictness was 71% during diagnosis and was preserved; direct the user to Restore detector defaults to compare with 50%. No live audio recording or recognition-accuracy benchmark was performed.
 
