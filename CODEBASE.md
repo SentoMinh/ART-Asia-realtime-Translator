@@ -157,3 +157,5 @@ Published release source `6b3f9c3` passed 524 tests, 1,976 fixed-threshold compa
 ## 0.12.9 selected-service boundary
 
 The automatic add-on loader and ServiceChain add-on injection are removed. Only selected models are tried; explicitly configured alternatives within one service still work. Legacy files are preserved but ignored. Custom-domain failure dialogs use services.title rather than exposing internal IDs. tests/test_service_boundary.py covers import isolation, original errors/cooldown and service switching. Historical add-on descriptions above are superseded.
+
+Published release source `a7b09a6` passed 528 tests, bundled routing/error/cooldown and same-service alternative checks, actual EXE startup with an ignored legacy add-on trap, EXE self-check, source/runtime/native DLL checks, ZIP integrity and uploaded asset digests. The actual GitHub upgrade 0.12.8 → 0.12.9 passed download/checksum, replacement/restart, new-version self-check and no-update checks. Provider/model choices and legacy files were preserved; successful inference against the user's custom endpoint remains unverified.
