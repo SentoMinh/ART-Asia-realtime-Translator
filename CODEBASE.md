@@ -1,6 +1,6 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.12**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.13**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
 
 `vrc.translate.can_reuse_original` keeps the same-language shortcut except when English/Vietnamese output contains CJK text. Local adapters use the same guard; speech completion and subtitle rendering preserve a changed translation even if language labels match. `LocalTranslator.prepare()` loads installed selected weights on the existing typed worker under the shared inference lock. Both speech and typed translation reuse those weights; load failures remain retryable.
 
@@ -156,7 +156,7 @@ Published release source `f06758e` passed 521 tests, packaged local routing/erro
 
 ## 0.12.8 detector adjustment
 
-`Segmenter._sentence_threshold` preserves the start threshold until the sentence ends. The 0.12.8 UI added a reset card; 0.12.12 removes that card. The existing detector toggle and Sound sliders still control the same settings. Read VOICE_DETECTION.md before further threshold tuning; the rejected continuation-count change admitted extra noise.
+`Segmenter._sentence_threshold` preserves the start threshold until the sentence ends. The 0.12.8 UI added a reset card; 0.12.12 removed it and 0.12.13 restores it to honor the requested latency/translation-only scope. The existing detector toggle and Sound sliders still control the same settings. Read VOICE_DETECTION.md before further threshold tuning; the rejected continuation-count change admitted extra noise.
 
 Published release source `6b3f9c3` passed 524 tests, 1,976 fixed-threshold comparisons, packaged adjustment/defaults/persistence checks in all three UI languages, EXE self-check, source/runtime/native DLL checks, ZIP integrity and uploaded asset digests. The actual GitHub upgrade 0.12.7 → 0.12.8 passed download/checksum, replacement/restart, new-version self-check and no-update checks. Live recognition quality remains unverified; use the Sound slider to compare microphone 50% with a previously raised setting.
 

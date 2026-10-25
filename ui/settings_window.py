@@ -201,6 +201,9 @@ class SettingsWindow(QDialog):
             self.mic_device.addItem(name, name)
         self.mic_device.currentIndexChanged.connect(
             lambda: self._set("mic_device", self.mic_device.currentData()))
+        self.restore_detector = QPushButton(tr("Restore detector defaults"))
+        self.restore_detector.setCursor(Qt.PointingHandCursor)
+        self.restore_detector.clicked.connect(self._restore_detector)
         self._page("Sound", [
             ("Microphone", "The microphone the translator listens to. Pick the same one as in VRChat.",
              self.mic_device),
@@ -212,6 +215,9 @@ class SettingsWindow(QDialog):
                                                    "but can miss your quiet words. 50% is the default.",
              self._slider("mic_vad_sensitivity", (round(VAD_RANGE[0] * 100), round(VAD_RANGE[1] * 100)),
                           "%", scale=100)),
+            ("Voice detector", "Higher strictness is not higher recognition accuracy. Restore detection on, "
+                               "microphone 50% and other players 70%. Strictness changes apply after the current sentence.",
+             self.restore_detector),
         ])
         self.hearing = self._service_combo("hearing", services.offered(services.HEARING))
         self.translating = self._service_combo("translating", services.offered(services.TRANSLATING))
@@ -610,6 +616,13 @@ class SettingsWindow(QDialog):
         follow = self.chatbox_mode.currentData()
         self.chatbox_languages.setVisible(not follow)
         self._set("chatbox_follow", follow)
+
+    def _restore_detector(self) -> None:
+        defaults = Settings()
+        for name in ("vad_on", "vad_sensitivity", "mic_vad_sensitivity"):
+            setattr(self.settings, name, getattr(defaults, name))
+        self.sync()
+        self.changed.emit()
 
     def _set(self, name: str, value) -> None:
         setattr(self.settings, name, value)

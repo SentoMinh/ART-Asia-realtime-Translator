@@ -5,7 +5,7 @@ UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown i
 
 _ZH = {
     "Chinese, Japanese or Korean words mixed into English or Vietnamese are no longer skipped during translation.": "混合语言文本中包含中日韩文字时，即使检测语言与英语或越南语输出相同，也会进行翻译。",
-    "Local translation models start loading in the background. Sound settings are simpler; your saved choices stay unchanged.": "本地翻译模型开始在后台加载。声音设置已简化，您保存的选择保持不变。",
+    "Local translation models load in the background. Restore detector defaults is available again in Settings → Sound.": "本地翻译模型在后台加载。设置 → 声音中已恢复“恢复检测默认设置”按钮。",
     "The Vulkan option uses separate model files. Your existing NVIDIA and CPU model selections stay unchanged.": "Vulkan 选项使用单独的模型文件。您原有的 NVIDIA 和 CPU 模型选择保持不变。",
     "Whisper turbo · Vulkan (AMD)": "Whisper turbo · Vulkan（AMD）",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Whisper turbo on a Vulkan-compatible GPU, including AMD. Uses a separate Q5 model; speed and accuracy depend on your GPU and audio.": "英语、普通话、粤语、越南语、日语和韩语。在兼容 Vulkan 的显卡（包括 AMD）上运行 Whisper turbo。使用单独的 Q5 模型；速度和准确率取决于显卡和音频。",
@@ -273,6 +273,8 @@ _ZH = {
     "Settings > Sound has Restore detector defaults: detection on, microphone 50%, other players 70%.": "设置 > 声音新增恢复检测默认设置：开启检测、麦克风 50%、其他玩家 70%。",
     "Translation now uses only the service and models you selected. Hidden online add-on fallback has been removed.": "翻译现在只使用您选择的服务和模型。已移除隐藏的在线插件回退。",
     "If your selected service fails, its own error is shown. Changing to another service requires your choice.": "所选服务失败时会显示其自身的错误。切换到其他服务需要您自行选择。",
+    "Restore detector defaults": "恢复检测默认设置",
+    "Higher strictness is not higher recognition accuracy. Restore detection on, microphone 50% and other players 70%. Strictness changes apply after the current sentence.": "严格度越高不代表识别越准确。恢复为开启语音检测、麦克风 50%、其他玩家 70%。严格度调整在当前句子结束后生效。",
     "Sound": "声音", "Microphone": "麦克风", "Windows default": "Windows 默认",
     "Detector strictness: other players": "语音检测严格度：其他玩家",
     "Higher ignores music and noise better but can miss quiet voices. 70% is the tested default.":
@@ -330,7 +332,7 @@ _ZH = {
 
 _VI = {
     "Chinese, Japanese or Korean words mixed into English or Vietnamese are no longer skipped during translation.": "Văn bản có xen chữ Trung, Nhật hoặc Hàn vẫn được dịch dù ngôn ngữ nhận dạng trùng với đầu ra tiếng Anh hoặc tiếng Việt.",
-    "Local translation models start loading in the background. Sound settings are simpler; your saved choices stay unchanged.": "Mô hình dịch cục bộ bắt đầu tải vào bộ nhớ ở chế độ nền. Cài đặt âm thanh gọn hơn và giữ nguyên các lựa chọn đã lưu.",
+    "Local translation models load in the background. Restore detector defaults is available again in Settings → Sound.": "Mô hình dịch cục bộ tải vào bộ nhớ ở chế độ nền. Nút Khôi phục mặc định đã trở lại trong Cài đặt → Âm thanh.",
     "The Vulkan option uses separate model files. Your existing NVIDIA and CPU model selections stay unchanged.": "Lựa chọn Vulkan dùng tệp mô hình riêng. Các lựa chọn mô hình NVIDIA và CPU hiện tại được giữ nguyên.",
     "Whisper turbo · Vulkan (AMD)": "Whisper turbo · Vulkan (AMD)",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Whisper turbo on a Vulkan-compatible GPU, including AMD. Uses a separate Q5 model; speed and accuracy depend on your GPU and audio.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Whisper turbo chạy trên GPU hỗ trợ Vulkan, gồm AMD. Dùng mô hình Q5 riêng; tốc độ và độ chính xác tùy GPU và âm thanh.",
@@ -607,6 +609,8 @@ _VI = {
     "Settings > Sound has Restore detector defaults: detection on, microphone 50%, other players 70%.": "Cài đặt > Âm thanh có nút khôi phục mặc định: bật nhận giọng, micro 50%, người khác 70%.",
     "Translation now uses only the service and models you selected. Hidden online add-on fallback has been removed.": "Chỉ dịch bằng dịch vụ và mô hình bạn đã chọn. Đã bỏ việc tự chuyển sang tiện ích trực tuyến ẩn.",
     "If your selected service fails, its own error is shown. Changing to another service requires your choice.": "Nếu dịch vụ đã chọn gặp lỗi, ứng dụng hiển thị đúng lỗi đó. Bạn quyết định việc chuyển sang dịch vụ khác.",
+    "Restore detector defaults": "Khôi phục mặc định",
+    "Higher strictness is not higher recognition accuracy. Restore detection on, microphone 50% and other players 70%. Strictness changes apply after the current sentence.": "Độ nghiêm ngặt cao hơn không có nghĩa là nhận giọng chính xác hơn. Khôi phục nhận giọng bật, micro 50% và người khác 70%. Thay đổi áp dụng sau câu hiện tại.",
     "Sound": "Âm thanh", "Microphone": "Micro", "Windows default": "Mặc định của Windows",
     "Detector strictness: other players": "Độ chặt nhận biết giọng nói: người chơi khác",
     "Higher ignores music and noise better but can miss quiet voices. 70% is the tested default.":
