@@ -17,15 +17,15 @@ app_version: "0.12.12"
 
 ART means **Asia realtime Translator**. It is a Windows desktop companion for recognizing speech, translating it, showing subtitles and sending text to VRChat's chatbox. An optional microphone mixer adds music from another application to the physical microphone.
 
-This note describes the source and release evidence available on **25 October 2026**, with the **0.12.12 source follow-up** to the verified 0.12.11 release. It brings together the product behavior, architecture, setup, models, costs, performance, development workflow and outstanding work.
+This note describes the source and release evidence available on **25 October 2026**, at application version **0.12.12**. It brings together the product behavior, architecture, setup, models, costs, performance, development workflow and outstanding work.
 
 > [!tip] Use this note in Obsidian
 > Copy this Markdown file into your vault. It is readable on its own; headings, tables, callouts and Mermaid diagrams use Obsidian's built-in support. Copy the repository's companion Markdown files too if you want links such as [[CODEBASE]] to open locally. Source paths below are relative to the project root.
 
 > [!info] Current state
-> Version 0.12.11 is published. Online translation can run two target languages concurrently per utterance and show each subtitle as it finishes. A target shared by the panel and chatbox is translated once. Local translation remains serialized. The complete chatbox message still follows its own queue and pacing.
+> Version 0.12.12 is published. Online translation can run two target languages concurrently per utterance and show each subtitle as it finishes. A target shared by the panel and chatbox is translated once. Local translation remains serialized. The complete chatbox message still follows its own queue and pacing.
 
-The 0.12.12 source also loads installed local translator weights on the background worker at startup and translates mixed CJK text instead of skipping it when an English/Vietnamese output matches the detected label. Completed mixed-text translations remain visible. The Voice detector restore-defaults card is removed from Settings → Sound; saved thresholds remain unchanged. Package evidence will be recorded after validation.
+Version 0.12.12 also loads installed local translator weights on the background worker at startup and translates mixed CJK text instead of skipping it when an English/Vietnamese output matches the detected label. Completed mixed-text translations remain visible. The Voice detector restore-defaults card is removed from Settings → Sound; saved thresholds remain unchanged. Package and actual GitHub upgrade checks passed; see the verified snapshot below.
 
 > [!warning] Evidence boundaries
 > Passing tests and package checks establish the behaviors tested. They do not establish accuracy for every language, compatibility with every microphone or GPU, access from China, or the effect on VRChat frame rate. Open defects and missing checks are recorded below.
@@ -591,7 +591,13 @@ The production music package includes `VrctMicApo.dll` and `VrctApoProducer.dll`
 
 Keep API configuration, AppData, logs, recordings, model weights and local infrastructure out of source exports and application artifacts.
 
-### Verified 0.12.11 snapshot
+### Verified 0.12.12 snapshot
+
+Published release source `2df0d65` (implementation `5ee86df`; development `fbdc497`, documentation `95630d5`) passed 559 source tests, 170 subsequent focused checks and 322 checks against bundled translation/local-model/UI bytecode. Actual EXE self-check, source/native/runtime checks, ZIP integrity and all five GitHub asset digests passed. The real 0.12.11 → 0.12.12 upgrade passed download/SHA-256, packaged replacement/restart, new-version self-check and no-update checks. User settings were unchanged. The local mixed-text replay is a text/model/rendering check, not a live recognition or game-FPS test. NLLB still changes meaning on a repeated Chinese example. Evidence: `.tools/release-0.12.12/` and `.tools/local-translation-diagnosis/`.
+
+EXE SHA-256: `1515f8b1f400eb4f1128e1aa6bd727421cf6537ff6f96b5de4c7f78e7482fa97`. The ZIP guide is the source snapshot prepared before release verification; the repository note records the completed checks.
+
+### Earlier verified 0.12.11 snapshot
 
 [Public repository](https://github.com/SentoMinh/ART-Asia-realtime-Translator) · [v0.12.11 release](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.11)
 
