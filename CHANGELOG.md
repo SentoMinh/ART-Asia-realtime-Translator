@@ -1,5 +1,11 @@
 # Change log
 
+## 0.12.13 — 2026-10-25 — Keep the requested release scope
+
+The user's scope reply was received after 0.12.12 was published: include only latency and translation fixes. This release restores the previous Sound-page detector reset card and the earlier compact project guide. The expanded Obsidian guide is preserved locally outside the release. Version 0.12.12 remains an unchanged historical artifact; 0.12.13 supersedes it.
+
+Online target concurrency, background local translation weight loading, mixed-language translation and display fixes remain unchanged. No model selections, saved settings, detector thresholds or inference parameters are changed. Validation and release evidence follows after checks.
+
 ## 0.12.12 — 2026-10-25 — Mixed-language translation and local startup
 
 Mixed Chinese/Japanese/Korean text labelled as English or Vietnamese was previously copied unchanged when the target matched that label. It now reaches the selected translator, including NLLB/Qwen, and its completed translation remains visible even when source/target labels match. Ordinary same-language text still reuses the original. This script check is deliberately limited to English/Vietnamese outputs; it does not solve every code-switching pair or distinguish foreign proper names.

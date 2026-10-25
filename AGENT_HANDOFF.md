@@ -1,5 +1,7 @@
 # ART agent handoff — 25 October 2026
 
+**0.12.13 scope correction prepared:** the user answered “Only the latency and translation fixes” after 0.12.12 had already been published. Restore the 0.12.11 Sound reset card and compact guide; retain all latency/translation fixes. The expanded guide is preserved at `.tools/scope-0.12.13/ART Project Guide - expanded.md` and must not be included again without a new request. Do not rewrite the published 0.12.12 assets. Package/release validation pending.
+
 **0.12.12 published:** mixed CJK text labelled EN/VI now reaches the selected translator and remains visible; ordinary same-language original reuse stays fast. Installed local translation weights preload on the existing worker with retryable failures. Sound reset card removed; detector settings are unchanged. Expanded Obsidian guide included. 559 source tests passed; local text replay and rendering evidence: `.tools/local-translation-diagnosis/`. NLLB still changes meaning on a repeated Chinese example. Package and actual GitHub upgrade checks passed.
 
 **0.12.11 published:** online target requests now overlap, at most two per utterance, with completion-order partial results and panel-first scheduling. Local inference remains serialized. HTTP client/chain creation and cooldown bookkeeping are synchronized. New timing logs separate recognition from translation. Five warm paired phrases measured two-target median 188.8 → 102.8 ms through the configured online service, not end-to-end/FPS or local performance. See LATENCY_REPORT.md and `.tools/latency-0.12.11/`. Preserve prompts, model selections, VAD/decoding and complete ordered chatbox sends. Release and actual GitHub upgrade checks passed; see the evidence below.
@@ -40,6 +42,7 @@ The preceding 0.12.5 work added the models and descriptions with **505 tests pas
 
 ## User decisions and open choices
 
+- The latest explicit release scope is **only latency and translation fixes**. Exclude the other terminal's Sound-page cleanup and expanded Obsidian guide. Version 0.12.13 restores the previous reset card and compact guide while keeping the performance and mixed-text fixes.
 - ART is one application. Do not introduce separate friend/public/private editions. Use Custom domain for different API endpoints.
 - Prioritize voice recognition reliability and **low latency with preserved meaning**. Speaker identification is deferred; mention the saved idea during future feature planning, not as an implemented feature or scheduled reminder.
 - The user prefers a normal online model download for their friend in China, not an offline-package workflow. They explicitly requested keeping Hugging Face and using `https://hf-mirror.com/` if the first source cannot connect.

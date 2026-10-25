@@ -380,6 +380,25 @@ def test_microphone_picker(window, monkeypatch):
     assert window.settings.mic_device == ""
 
 
+def test_restore_detector_defaults_preserves_models_and_audio_device(window):
+    window.settings.vad_on = False
+    window.settings.vad_sensitivity = 0.9
+    window.settings.mic_vad_sensitivity = 0.71
+    window.settings.mic_device = "My microphone"
+    window.settings.hearing = window.settings.translating = "local"
+    dialog = SettingsWindow(window.settings, window)
+    dialog.changed.connect(window.settings_changed)
+    dialog.restore_detector.click()
+    assert window.settings.vad_on
+    assert window.settings.vad_sensitivity == 0.7 and window.settings.mic_vad_sensitivity == 0.5
+    assert dialog._sliders["vad_sensitivity"][0].value() == 70
+    assert dialog._sliders["mic_vad_sensitivity"][1].text() == "50%"
+    assert dialog._switches["vad_on"].isChecked()
+    assert window.settings.mic_device == "My microphone"
+    assert window.settings.hearing == window.settings.translating == "local"
+    assert window.saved[-1].mic_vad_sensitivity == 0.5
+
+
 def test_hearing_engine_and_detector_strictness(window, tmp_path):
     from engine import services
     services.save("custom_second", url="https://second.test/v1")

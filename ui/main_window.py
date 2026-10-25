@@ -664,7 +664,7 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(dialog)
         for text in (
             "Chinese, Japanese or Korean words mixed into English or Vietnamese are no longer skipped during translation.",
-            "Local translation models start loading in the background. Sound settings are simpler; your saved choices stay unchanged.",
+            "Local translation models load in the background. Restore detector defaults is available again in Settings → Sound.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))
