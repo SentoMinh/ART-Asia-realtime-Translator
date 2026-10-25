@@ -1,6 +1,6 @@
 # ART agent handoff — 25 October 2026
 
-**0.12.13 scope correction prepared:** the user answered “Only the latency and translation fixes” after 0.12.12 had already been published. Restore the 0.12.11 Sound reset card and compact guide; retain all latency/translation fixes. The expanded guide is preserved at `.tools/scope-0.12.13/ART Project Guide - expanded.md` and must not be included again without a new request. Do not rewrite the published 0.12.12 assets. Package/release validation pending.
+**0.12.13 scope correction published:** the user answered “Only the latency and translation fixes” after 0.12.12 had already been published. Restore the 0.12.11 Sound reset card and compact guide; retain all latency/translation fixes. The expanded guide is preserved at `.tools/scope-0.12.13/ART Project Guide - expanded.md` and must not be included again without a new request. Do not rewrite the published 0.12.12 assets. Package and actual GitHub upgrade checks passed.
 
 **0.12.12 published:** mixed CJK text labelled EN/VI now reaches the selected translator and remains visible; ordinary same-language original reuse stays fast. Installed local translation weights preload on the existing worker with retryable failures. Sound reset card removed; detector settings are unchanged. Expanded Obsidian guide included. 559 source tests passed; local text replay and rendering evidence: `.tools/local-translation-diagnosis/`. NLLB still changes meaning on a repeated Chinese example. Package and actual GitHub upgrade checks passed.
 
@@ -16,13 +16,15 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 
 | Item | State |
 | --- | --- |
-| Published app | **v0.12.12**, release source `2df0d6568b7be38831c5709b42bf28f410591774` |
-| Published EXE SHA-256 | `1515f8b1f400eb4f1128e1aa6bd727421cf6537ff6f96b5de4c7f78e7482fa97` |
-| Release validation | 559 tests; 322 bundled checks; EXE/native/source/asset checks; actual GitHub upgrade 0.12.11 → 0.12.12 passed |
+| Published app | **v0.12.13**, release source `2a5d0a0cd2afeffb90ffe436d44bd5893f3e2092` |
+| Published EXE SHA-256 | `ba96c2df16c959ba6d7a895c0c3fc95e9d92cf5af554fdc47835731687948348` |
+| Release validation | 560 tests; 323 bundled checks; EXE/native/source/asset checks; actual GitHub upgrade 0.12.12 → 0.12.13 passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| Current release features | Mixed CJK/EN/VI translation and display fix; background local weight preparation; Sound-page cleanup and expanded Obsidian guide. Online target concurrency retained. |
-| Version constant | 0.12.12; preserve earlier versions and use a new version for subsequent binaries |
+| Current release features | Latency and translation fixes retained; earlier Sound reset card and compact guide restored. Expanded guide excluded from the release. |
+| Version constant | 0.12.13; preserve earlier versions and use a new version for subsequent binaries |
 | Model list | Whisper turbo (NVIDIA CUDA), Whisper turbo Vulkan (AMD), SenseVoice, PhoWhisper Small, NLLB and Qwen3 1.7B INT8 |
+
+Published release source `2a5d0a0` (development `f5fcd94`) passed 560 source tests and 323 checks against bundled translation/local-model/UI bytecode, including the restored detector reset control. Actual EXE self-check, source/native/runtime checks, ZIP integrity and all five GitHub asset digests passed. The real 0.12.12 → 0.12.13 upgrade passed download/SHA-256, packaged replacement/restart, new-version self-check and no-update checks. Saved settings were unchanged. Latency/translation implementation is unchanged from 0.12.12; the reset card matches 0.12.11. The compact guide is bundled; the expanded guide is preserved locally outside the release. Live audio and game performance were not retested. Evidence: `.tools/release-0.12.13/` and `.tools/scope-0.12.13/`.
 
 Published release source `2df0d65` (implementation `5ee86df`; development `fbdc497`, documentation `95630d5`) passed 559 source tests, 170 subsequent focused checks and 322 checks against bundled translation/local-model/UI bytecode. Actual EXE self-check, source/native/runtime checks, ZIP integrity and all five GitHub asset digests passed. The real 0.12.11 → 0.12.12 upgrade passed download/SHA-256, packaged replacement/restart, new-version self-check and no-update checks. User settings were unchanged. The local mixed-text replay is a text/model/rendering check, not a live recognition or game-FPS test. NLLB still changes meaning on a repeated Chinese example. Evidence: `.tools/release-0.12.12/` and `.tools/local-translation-diagnosis/`.
 
@@ -91,7 +93,7 @@ Next useful measurements are actual game/GPU contention, short conversational an
 - Never bundle AppData settings, API credentials, logs, benchmark recordings, model weights or local infrastructure. Tests isolate AppData through `tests/conftest.py`; direct benchmarks must avoid saving provider changes or opening capture/OSC.
 - For a new release, stage the committed/scanned source in a new `.tools/release-<version>/source` directory. Build with `tools/build.ps1`, the development Python, and validated `.tools/apo-prototype-10` DLLs. Preserve old artifacts. Bundle only `VrctMicApo.dll` and `VrctApoProducer.dll`, never test DLLs.
 - Prior release helpers/evidence are in `.tools/release-0.12.4/`; adapt versions, source commit, notice assertions and test counts rather than copying old expectations blindly. Keep checksums, ZIP, packaged self-check, draft-asset verification, and the GitHub download/replacement/restart check.
-- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. Version 0.12.12 is published; use a new version for subsequent binaries.
+- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. Version 0.12.13 is published; use a new version for subsequent binaries.
 - The optional verified NLLB offline ZIP remains an asset of v0.12.3. Keep existing links valid, but it is not the user's preferred solution for this current request.
 
 Run focused tests with `.venv-app\Scripts\python.exe -m pytest tests/test_local_model.py tests/test_local_choices.py tests/test_nllb_offline.py -q`; run the full suite before packaging. A source test result does not validate a new EXE or mainland-China access.

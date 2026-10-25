@@ -4,7 +4,9 @@
 
 The user's scope reply was received after 0.12.12 was published: include only latency and translation fixes. This release restores the previous Sound-page detector reset card and the earlier compact project guide. The expanded Obsidian guide is preserved locally outside the release. Version 0.12.12 remains an unchanged historical artifact; 0.12.13 supersedes it.
 
-Online target concurrency, background local translation weight loading, mixed-language translation and display fixes remain unchanged. No model selections, saved settings, detector thresholds or inference parameters are changed. Validation and release evidence follows after checks.
+Online target concurrency, background local translation weight loading, mixed-language translation and display fixes remain unchanged. No model selections, saved settings, detector thresholds or inference parameters are changed. Package and actual GitHub upgrade checks passed.
+
+Published release source `2a5d0a0` (development `f5fcd94`) passed 560 source tests and 323 checks against bundled translation/local-model/UI bytecode, including the restored detector reset control. Actual EXE self-check, source/native/runtime checks, ZIP integrity and all five GitHub asset digests passed. The real 0.12.12 → 0.12.13 upgrade passed download/SHA-256, packaged replacement/restart, new-version self-check and no-update checks. Saved settings were unchanged. Latency/translation implementation is unchanged from 0.12.12; the reset card matches 0.12.11. The compact guide is bundled; the expanded guide is preserved locally outside the release. Live audio and game performance were not retested. Evidence: `.tools/release-0.12.13/` and `.tools/scope-0.12.13/`.
 
 ## 0.12.12 — 2026-10-25 — Mixed-language translation and local startup
 
