@@ -71,7 +71,7 @@ The priorities are intelligible, complete translations, dependable microphone an
 ### Packaged application
 
 1. Get the Windows EXE or ZIP from the [public releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases). Extract the ZIP before running the program.
-2. Start `VRChat-Translator-0.12.11.exe`. The one-file package unpacks its runtime on launch, so startup can take a few seconds. Python is included; users do not install Python or a development environment.
+2. Start the included `VRChat-Translator-<version>.exe`. The one-file package unpacks its runtime on launch, so startup can take a few seconds. Python is included; users do not install Python or a development environment.
 3. Select the microphone and incoming audio source using the device controls. Enable the microphone and speaker controls that you want to use, and check their level meters.
 4. In Settings, configure **Hearing** and **Translating** separately. For local inference, download the chosen models. For a custom service, enter its base URL, API key if required and model choices, then use Connect.
 5. Set **I speak**, **They speak**, **Translated to** and the chatbox languages.
