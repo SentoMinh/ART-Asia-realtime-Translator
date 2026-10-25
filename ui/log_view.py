@@ -132,7 +132,7 @@ class LogRow(QFrame):
             f'<span style="color:{color}; font-weight:600; font-size:{small + 1}px">{name}</span>'
             f'<span style="color:{dim}; font-size:{small}px">&nbsp;&nbsp;{" · ".join(meta)}</span>')
 
-        translated = bool(u.translation) and u.src_lang != u.dst_lang
+        translated = bool(u.translation) and (u.src_lang != u.dst_lang or u.translation != u.original)
         if other:
             # not one of our languages: say which one it was instead of guessing at the words
             self.original.setText(self._span(other, dim, self._font_px, italic=True))
@@ -154,7 +154,7 @@ class LogRow(QFrame):
             for index, label in enumerate((self.translation, self.translation2, self.translation3)):
                 code = u.panel_targets[index] if index < len(u.panel_targets) else ""
                 text = values.get(code, "")
-                shown = bool(text) and not (code == u.src_lang and show_original)
+                shown = bool(text) and not (code == u.src_lang and text == u.original and show_original)
                 label.setVisible(shown)
                 if shown:
                     label.setText(self._span(SHORT.get(code, code) + " · ", dim, small + 1)

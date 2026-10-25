@@ -5,11 +5,12 @@ from collections import Counter
 import logging
 import re
 import threading
+import time
 
 from . import local_model
 from .stt import Heard, LocalWhisper, SttError, guess_language, in_own_script, mostly_chinese, tidy
 from .whisper_vulkan import VulkanWhisper
-from vrc.translate import TranslateError, chat_messages
+from vrc.translate import TranslateError, can_reuse_original, chat_messages
 
 
 class LocalHearing:
@@ -117,18 +118,41 @@ def translation_loop(tokens, source_tokens):
 
 
 class LocalTranslator:
+    model_id = "nllb-200-ct2"
+
     def __init__(self):
         self._model = self._tokenizer = None
         self._lock = _translation_lock
 
     def prepare(self):
-        pass  # Load on the translation worker, never on the UI thread.
+        # The backend invokes this on its worker before the first typed request.
+        try:
+            with self._lock:
+                if self._model is not None or local_model.missing(self.model_id):
+                    return
+                started = time.perf_counter()
+                self._load()
+            logging.getLogger(__name__).info("local translation model=%s preparation_ms=%d", self.model_id,
+                                             (time.perf_counter() - started) * 1000)
+        except Exception as error:
+            logging.getLogger(__name__).warning("local translation preparation deferred: %s", error)
+
+    def _load(self):
+        if self._model is None:
+            _release_other_translator(self)
+            import ctranslate2
+            from tokenizers import Tokenizer
+            root = local_model.model_folder(self.model_id)
+            tokenizer = Tokenizer.from_file(str(root / "tokenizer.json"))
+            model = ctranslate2.Translator(str(root), device="cpu", compute_type="int8",
+                                          inter_threads=1, intra_threads=2)
+            self._model, self._tokenizer = model, tokenizer
 
     def translate(self, text, target, likely_source="", heard=False):
         source = likely_source or guess_language(text)
         if source not in LANGUAGES or target not in LANGUAGES:
             raise TranslateError("Local NLLB does not support this language in the app")
-        if source == target:
+        if can_reuse_original(text, source, target):
             return text
         problem = local_model.missing("nllb-200-ct2")
         if problem:
@@ -137,15 +161,7 @@ class LocalTranslator:
             raise error
         with self._lock:
             try:
-                if self._model is None:
-                    _release_other_translator(self)
-                    import ctranslate2
-                    from tokenizers import Tokenizer
-                    root = local_model.model_folder("nllb-200-ct2")
-                    tokenizer = Tokenizer.from_file(str(root / "tokenizer.json"))
-                    model = ctranslate2.Translator(str(root), device="cpu", compute_type="int8",
-                                                  inter_threads=1, intra_threads=2)
-                    self._model, self._tokenizer = model, tokenizer
+                self._load()
                 # NLLB's source format is language token + text + EOS.
                 tokens = [[LANGUAGES[source], *self._tokenizer.encode(sentence, add_special_tokens=False).tokens, "</s>"]
                           for sentence in translation_sentences(text)]
@@ -175,11 +191,24 @@ class LocalTranslator:
 
 
 class LocalQwenTranslator(LocalTranslator):
+    model_id = "qwen3-1.7b-ct2"
+
+    def _load(self):
+        if self._model is None:
+            _release_other_translator(self)
+            import ctranslate2
+            from tokenizers import Tokenizer
+            root = local_model.model_folder(self.model_id)
+            tokenizer = Tokenizer.from_file(str(root / "tokenizer.json"))
+            model = ctranslate2.Generator(str(root), device="cpu", compute_type="int8",
+                                         inter_threads=1, intra_threads=2)
+            self._model, self._tokenizer = model, tokenizer
+
     def translate(self, text, target, likely_source="", heard=False):
         source = likely_source or guess_language(text)
         if source not in LANGUAGES or target not in LANGUAGES:
             raise TranslateError("Local Qwen does not support this language in the app")
-        if source == target:
+        if can_reuse_original(text, source, target):
             return text
         problem = local_model.missing("qwen3-1.7b-ct2")
         if problem:
@@ -188,15 +217,7 @@ class LocalQwenTranslator(LocalTranslator):
             raise error
         with self._lock:
             try:
-                if self._model is None:
-                    _release_other_translator(self)
-                    import ctranslate2
-                    from tokenizers import Tokenizer
-                    root = local_model.model_folder("qwen3-1.7b-ct2")
-                    tokenizer = Tokenizer.from_file(str(root / "tokenizer.json"))
-                    model = ctranslate2.Generator(str(root), device="cpu", compute_type="int8",
-                                                 inter_threads=1, intra_threads=2)
-                    self._model, self._tokenizer = model, tokenizer
+                self._load()
                 messages = chat_messages(text, target, source, heard=heard)
                 prompt = "".join(f"<|im_start|>{message['role']}\n{message['content']}<|im_end|>\n" for message in messages)
                 # Pinned Qwen3 chat template's enable_thinking=False generation prefix.

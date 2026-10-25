@@ -663,8 +663,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Online translation now works on two languages at once. Completed subtitles appear while slower languages continue.",
-            "Panel languages are processed first. Speech recognition settings and complete chatbox messages are preserved.",
+            "Chinese, Japanese or Korean words mixed into English or Vietnamese are no longer skipped during translation.",
+            "Local translation models start loading in the background. Sound settings are simpler; your saved choices stay unchanged.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))

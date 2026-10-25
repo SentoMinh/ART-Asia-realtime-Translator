@@ -31,6 +31,14 @@ Evidence is retained in `.tools/latency-0.12.11/production.json`, `measure.py` a
 
 No failing live utterance was supplied for this task, so the user's specific accuracy problem is not yet attributed to a proven cause.
 
+## 25 October: local weight preparation and mixed-text correctness (0.12.12)
+
+Installed NLLB/Qwen weights now load on the existing background translation worker during startup, under the same model lock used by later speech and typed calls. No dummy generation is performed. Missing weights are skipped; preparation failures are logged and can retry on the first translation. This moves loading earlier when there is enough startup time; it does not remove loading cost, guarantee that the first request will never wait, or change steady-state inference speed. Switching models later still loads lazily.
+
+The other terminal replayed supplied text through real local NLLB with fake hearing and Qt rendering. Weight preparation took 1,225 ms. Three mixed CJK/English inputs previously copied unchanged because their source label matched English now reached NLLB in 199–287 ms. For example, the Chinese thank-you followed by “see you later” became “Thank you, see you later.” Ordinary English still reused the original with no inference. The pipeline and visible same-label translation checks passed. The fix adds necessary translation work for these previously skipped cases; it is a correctness fix, not a latency reduction.
+
+A repeated Chinese negative phrase still became “I'm not going to say anything.” in both old and new paths. This is a demonstrated model meaning error; it has not been repaired by the scheduling or mixed-text fixes. No live audio accuracy conclusion follows from this replay. Evidence: `.tools/local-translation-diagnosis/verification.json` and `mixed-text-panel.png`; 559 source tests and a subsequent 170-test UI/local/target check passed.
+
 ## Earlier component measurements
 
 Measured with ART **0.12.4**, source commit `9c5a96c` in the release repository, starting at 15:27:58 UTC. **Local execution was faster in this run.** These are current component timings, not a measured speedup over an older app version.

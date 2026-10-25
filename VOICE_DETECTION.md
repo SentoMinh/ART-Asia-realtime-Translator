@@ -1,12 +1,12 @@
 # Voice detection: behavior and repair notes
 
-Updated 24 October 2026 for source version 0.12.8.
+Detector evidence: 24 October 2026, version 0.12.8. UI instructions updated 25 October 2026 for the 0.12.12 removal of the restore-defaults card.
 
 ## What strictness changes
 
 The detector decides which audio reaches speech recognition. Strictness is its confidence threshold, not a translation-quality control. Raising it rejects more uncertain audio, including quiet speech; lowering it can admit music or noise that the recognition model then mistakes for words. Translation cannot recover words that recognition never received.
 
-Start with **Settings → Sound → Restore detector defaults**: detection on, microphone **50%**, other players **70%**. The button saves only those three settings. Model choices, audio devices and languages are preserved. Existing installations retain their saved strictness until the user changes it or clicks Restore.
+To compare the defaults, enable **Voice detector** in **Settings → Translation**, then set the sliders in **Settings → Sound** to microphone **50%** and other players **70%**. Existing installations retain their saved strictness until the user changes it. The separate restore-defaults card has been removed from the current source UI.
 
 If words are missing, reduce the affected source's strictness gradually. If music or room noise creates subtitles, raise it gradually. The two sliders are independent. Turning the detector off uses fixed four-second chunks; it can split words and admit background sound.
 

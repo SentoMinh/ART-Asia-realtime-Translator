@@ -344,7 +344,9 @@ class SpeechEngine:
         translations, errors = translate_targets(
             self._translator, line.original, (*line.panel_targets, line.dst_lang, *line.chatbox_targets),
             line.src_lang if line.src_lang in LANGS else "", heard=True, on_result=show_progress)
-        line.translation = translations.get(line.dst_lang, "") if line.dst_lang != line.src_lang else ""
+        line.translation = translations.get(line.dst_lang, "")
+        if line.dst_lang == line.src_lang and line.translation == line.original:
+            line.translation = ""
         line.panel_translations = tuple((code, translations.get(code, "")) for code in line.panel_targets)
         line.chatbox_translations = tuple((code, translations.get(code, "")) for code in line.chatbox_targets)
         for code, error in errors.items():
