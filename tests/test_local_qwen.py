@@ -39,6 +39,14 @@ def test_qwen_uses_non_thinking_template_and_returns_only_completed_answer(qwen)
     assert len(calls) == count
 
 
+def test_qwen_translates_mixed_script_text_with_matching_source_and_target(qwen):
+    engine, calls = qwen
+    engine._model.generate_batch = lambda *args, **kwargs: [
+        SimpleNamespace(sequences=[["Thank", "you,", "see", "you", "later.", "<|im_end|>"]])]
+    assert engine.translate("谢谢, see you later.", "en", "en") == "Thank you, see you later."
+    assert "into English" in calls[0] and "谢谢, see you later." in calls[0]
+
+
 @pytest.mark.parametrize("tokens,message,target", [
     (["Xin"], "did not finish", "vi"),
     (["<|im_end|>"], "did not return", "vi"),

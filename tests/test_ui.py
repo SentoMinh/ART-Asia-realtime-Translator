@@ -380,25 +380,6 @@ def test_microphone_picker(window, monkeypatch):
     assert window.settings.mic_device == ""
 
 
-def test_restore_detector_defaults_preserves_models_and_audio_device(window):
-    window.settings.vad_on = False
-    window.settings.vad_sensitivity = 0.9
-    window.settings.mic_vad_sensitivity = 0.71
-    window.settings.mic_device = "My microphone"
-    window.settings.hearing = window.settings.translating = "local"
-    dialog = SettingsWindow(window.settings, window)
-    dialog.changed.connect(window.settings_changed)
-    dialog.restore_detector.click()
-    assert window.settings.vad_on
-    assert window.settings.vad_sensitivity == 0.7 and window.settings.mic_vad_sensitivity == 0.5
-    assert dialog._sliders["vad_sensitivity"][0].value() == 70
-    assert dialog._sliders["mic_vad_sensitivity"][1].text() == "50%"
-    assert dialog._switches["vad_on"].isChecked()
-    assert window.settings.mic_device == "My microphone"
-    assert window.settings.hearing == window.settings.translating == "local"
-    assert window.saved[-1].mic_vad_sensitivity == 0.5
-
-
 def test_hearing_engine_and_detector_strictness(window, tmp_path):
     from engine import services
     services.save("custom_second", url="https://second.test/v1")
@@ -1544,6 +1525,19 @@ def test_panel_shows_only_selected_targets_and_keeps_successful_outputs(app):
     line.panel_translations = (("en", ""),)
     row.set_utterance(line)
     assert not row.original.isHidden()  # Keep the heard text if every translation fails.
+
+
+@pytest.mark.parametrize("panel", [False, True])
+def test_mixed_script_translation_is_visible_when_language_labels_match(app, panel):
+    log = LogView()
+    line = Utterance(id=88, source="speaker", original="对 do you know how to.",
+                     src_lang="en", dst_lang="en", translation="Yes, do you know how to?",
+                     panel_targets=("en",) if panel else (),
+                     panel_translations=(("en", "Yes, do you know how to?"),) if panel else (), final=True)
+    row = log.add_or_update(line)
+    assert not row.translation.isHidden()
+    assert "Yes, do you know how to?" in row.translation.text()
+    assert "对 do you know how to." in row.original.text()
 
 
 def test_panel_partial_results_update_one_row_and_keep_selection(app):

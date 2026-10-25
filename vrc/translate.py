@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
+import re
 import time
 
 TARGET_NAMES = {"en": "English", "zh": "Simplified Chinese", "vi": "Vietnamese",
@@ -16,6 +17,13 @@ TARGET_NAMES = {"en": "English", "zh": "Simplified Chinese", "vi": "Vietnamese",
 
 class TranslateError(Exception):
     """No translation right now; the message says why in plain words."""
+
+
+def can_reuse_original(text, source, target):
+    # shortcut: detect CJK words in Latin output; other mixed-language pairs need evidence before expanding this check.
+    foreign = target in ("en", "vi") and re.search(
+        r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uff66-\uff9d\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]", text)
+    return source == target and not foreign
 
 
 def translate_targets(translator, text, targets, source="", heard=False, on_result=None):
@@ -30,9 +38,9 @@ def translate_targets(translator, text, targets, source="", heard=False, on_resu
             on_result(translations.copy())
 
     # Original text is already available, even if it is listed after a slow target.
-    if source in targets:
+    if source in targets and can_reuse_original(text, source, source):
         ready(source, text)
-    pending = [target for target in targets if target != source]
+    pending = [target for target in targets if target not in translations]
 
     def run(target):
         started = time.perf_counter()

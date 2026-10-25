@@ -1,5 +1,15 @@
 # Change log
 
+## 0.12.12 — 2026-10-25 — Mixed-language translation and local startup
+
+Mixed Chinese/Japanese/Korean text labelled as English or Vietnamese was previously copied unchanged when the target matched that label. It now reaches the selected translator, including NLLB/Qwen, and its completed translation remains visible even when source/target labels match. Ordinary same-language text still reuses the original. This script check is deliberately limited to English/Vietnamese outputs; it does not solve every code-switching pair or distinguish foreign proper names.
+
+Installed local NLLB/Qwen weights now load on the existing background translation worker at startup, sharing the same lock and models used by typed and spoken text. Missing models are skipped; a failed preload remains retryable on the first request. This moves weight loading out of a later first request when preparation finishes in time; it does not accelerate steady-state decoding or shorten speech capture.
+
+Removed the Voice detector help/reset card and its Restore detector defaults button from Settings → Sound. The existing detector toggle and strictness sliders remain available; saved settings and speech processing are unchanged.
+
+The Obsidian guide now covers setup, architecture, models, latency, costs, release workflow and known limitations in one file. Validation: 559 source tests passed. Real local NLLB replay loaded weights in 1,225 ms before the first request and translated three formerly skipped mixed examples in 199–287 ms. A repeated Chinese input still changed meaning; that model limitation is unresolved. The replay used supplied text and fake recognition, not live audio. EN/ZH/VI Sound-page renders preserved custom settings. Package and release evidence follows after verification.
+
 ## 0.12.11 — 2026-10-25 — Faster multi-language online translation
 
 Online translations previously ran destination by destination. They now run up to two at once per utterance and display whichever completes first. Panel languages are processed before chatbox-only destinations; the original is immediately reused for a source-language output. Duplicate requests, partial-failure handling, panel language order and the single final ordered microphone/chatbox message are preserved.

@@ -9,6 +9,32 @@ from engine.translators import Chain, ServiceChain, ServiceTranslator
 from vrc.translate import TranslateError, translate_targets
 
 
+@pytest.mark.parametrize("text,source", [
+    ("对 do you know how to.", "en"),
+    ("ありがとう, see you later.", "en"),
+    ("안녕, see you later.", "en"),
+    ("你好, hẹn gặp lại.", "vi"),
+])
+def test_mixed_script_source_is_translated_even_when_target_matches(text, source):
+    calls = []
+    class Translator:
+        def translate(self, text, target, source, heard=False):
+            calls.append((text, target, source, heard))
+            return "completed translation"
+    values, errors = translate_targets(Translator(), text, (source, source), source, heard=True)
+    assert values == {source: "completed translation"} and not errors
+    assert calls == [(text, source, source, True)]
+
+
+@pytest.mark.parametrize("text,source", [("Yeah.", "en"), ("C.", "en"),
+                                        ("Xin chào.", "vi"), ("你好。", "zh")])
+def test_unmixed_source_still_reuses_original_without_inference(text, source):
+    class Translator:
+        def translate(self, *args, **kwargs):
+            pytest.fail("already-translated text should be reused")
+    assert translate_targets(Translator(), text, (source,), source) == ({source: text}, {})
+
+
 def test_target_timings_reach_engine_log_without_transcript(monkeypatch):
     import logging
     from engine import _log_to_file, log_file

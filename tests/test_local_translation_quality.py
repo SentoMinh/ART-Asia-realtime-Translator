@@ -40,6 +40,16 @@ def result(*tokens):
     return SimpleNamespace(hypotheses=[["zho_Hans", *tokens, "</s>"]])
 
 
+def test_nllb_translates_foreign_words_inside_source_language_output(fake_translator):
+    calls = []
+    def translate(tokens, **kwargs):
+        calls.append(tokens)
+        return [result("Yes,", "do", "you", "know", "how", "to?")]
+    fake_translator._model = SimpleNamespace(translate_batch=translate)
+    assert fake_translator.translate("对 do you know how to.", "en", "en") == "Yes, do you know how to?"
+    assert calls == [[["eng_Latn", "对", "do", "you", "know", "how", "to.", "</s>"]]]
+
+
 def test_all_sentences_keep_their_order_and_target_prefix(fake_translator):
     def translate(tokens, **kwargs):
         assert tokens == [["eng_Latn", "Wait?", "</s>"], ["eng_Latn", "Move", "to", "VR.", "</s>"]]

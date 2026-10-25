@@ -126,6 +126,52 @@ def test_sensevoice_reuses_cpu_recognizer_and_rejects_unsupported_language(monke
         model.transcribe([], "vi")
 
 
+@pytest.mark.parametrize("model_id,engine_type,runtime", [
+    ("nllb-200-ct2", local_inference.LocalTranslator, "Translator"),
+    ("qwen3-1.7b-ct2", local_inference.LocalQwenTranslator, "Generator"),
+])
+def test_local_translation_prepares_selected_weights_once_without_generating(monkeypatch, model_id, engine_type, runtime):
+    creates, inference = [], []
+    tokenizer = SimpleNamespace(
+        encode=lambda text, **kwargs: SimpleNamespace(tokens=text.split()),
+        token_to_id=lambda token: token,
+        decode=lambda tokens, **kwargs: " ".join(t for t in tokens if t != "</s>"))
+    def run(*args, **kwargs):
+        inference.append(True)
+        return [SimpleNamespace(hypotheses=[["vie_Latn", "Xin", "chào", "</s>"]],
+                                sequences=[["Xin", "chào", "<|im_end|>"]])]
+    def create(root, **kwargs):
+        creates.append((root, kwargs))
+        return SimpleNamespace(translate_batch=run, generate_batch=run)
+    monkeypatch.setattr(local_model, "missing", lambda model: "")
+    monkeypatch.setitem(sys.modules, "ctranslate2", SimpleNamespace(**{runtime: create}))
+    monkeypatch.setitem(sys.modules, "tokenizers", SimpleNamespace(Tokenizer=SimpleNamespace(from_file=lambda path: tokenizer)))
+    model = engine_type()
+    model.prepare()
+    assert creates == [(str(local_model.model_folder(model_id)),
+                        dict(device="cpu", compute_type="int8", inter_threads=1, intra_threads=2))]
+    assert not inference
+    model.prepare()
+    assert model.translate("Hello", "vi", "en") == "Xin chào"
+    assert len(creates) == 1 and len(inference) == 1
+
+
+def test_local_preparation_failure_is_retryable_on_first_translation(monkeypatch):
+    monkeypatch.setattr(local_model, "missing", lambda model: "")
+    creates = []
+    def create(*args, **kwargs):
+        creates.append(True)
+        raise OSError("temporary model load failure")
+    monkeypatch.setitem(sys.modules, "ctranslate2", SimpleNamespace(Translator=create))
+    monkeypatch.setitem(sys.modules, "tokenizers", SimpleNamespace(Tokenizer=SimpleNamespace(from_file=lambda path: object())))
+    model = local_inference.LocalTranslator()
+    model.prepare()  # A background preload failure must not kill the typed worker.
+    assert len(creates) == 1 and model._model is None
+    with pytest.raises(TranslateError, match="temporary model load failure"):
+        model.translate("Hello", "vi", "en")
+    assert len(creates) == 2
+
+
 def test_nllb_language_prefix_and_decoding(monkeypatch):
     calls = []
     def translate(tokens, **kwargs):

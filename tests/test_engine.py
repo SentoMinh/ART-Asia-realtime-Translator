@@ -583,6 +583,15 @@ def test_another_player_already_in_my_language_is_not_translated():
     assert translator.calls == 0 and final.translation == "" and final.dst_lang == "vi"
 
 
+def test_mixed_script_speech_keeps_the_completed_same_language_translation():
+    clock, window, translator = Clock(), Window(my_lang="en"), Fixed("Yes, do you know how to?")
+    engine(window, Hears("对 do you know how to.", "en"), translator, clock).hear(SPEAKER, sentence(clock))
+    final = window.utterance.seen[-1]
+    assert translator.calls == 1
+    assert (final.src_lang, final.dst_lang, final.translation) == ("en", "en", "Yes, do you know how to?")
+    assert final.panel_translations == (("en", "Yes, do you know how to?"),)
+
+
 def test_their_language_is_detected_on_auto_and_given_when_picked():
     clock = Clock()
     for their, expected in (("auto", None), ("zh", "zh")):
