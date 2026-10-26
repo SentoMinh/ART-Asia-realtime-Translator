@@ -1,6 +1,8 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **0.12.13**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **0.12.14**. The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+
+**0.12.14 integration, 2026-10-26:** `vr/` and its assets/tests/tools were selectively imported from the VR working folder. `ui.main.run()` attaches and stops `WristDisplay`; its title-bar **VR** button opens the hand/settings preview. Both displays use the current backend and `LogView`. Wrist controls update `my_languages` / `their_languages` through the main window's existing apply/save path, preserving all three choices, panel destinations and custom chatbox routing. `python -m vr.main` delegates to the same main startup; there is no separate VR build or older translation engine. The standard build and `app.py --selfcheck` include the VR assets/runtime. The main window wraps its toolbar on narrow layouts and keeps language selectors within its minimum size.
 
 `vrc.translate.can_reuse_original` keeps the same-language shortcut except when English/Vietnamese output contains CJK text. Local adapters use the same guard; speech completion and subtitle rendering preserve a changed translation even if language labels match. `LocalTranslator.prepare()` loads installed selected weights on the existing typed worker under the shared inference lock. Both speech and typed translation reuse those weights; load failures remain retryable.
 
@@ -65,6 +67,8 @@ Audio callbacks only enqueue samples. A cutting thread segments them, a hearing 
 
 | Change | Existing implementation | Relevant tests |
 |---|---|---|
+| Wrist startup, shared settings and lifecycle | `ui/main.py`, `vr/main.py` | `test_vr.py` |
+| Wrist rendering, controller input, placement and preview | `vr/panel.py`, `display.py`, `overlay.py`, `pose.py`, `texture.py`, `settings_dialog.py`, `arm_preview.py` | `test_vr.py`; `tools/check_vr_texture.py`, `tools/snapshot_vr.py` |
 | Capture, microphone selection, meters | `vrc/audio.py`, `ui/live_backend.py` | `test_chatbox.py`, `test_ui.py` |
 | Sentence boundaries and noise rejection | `engine/vad.py`: `Segmenter`, `SileroVad` | `test_engine.py`, `test_typing.py` |
 | Recognition or language handling | `engine/stt.py`: `CloudHearing`, `LocalWhisper`, `tidy`; `engine/local_inference.py`: `LocalHearing`, `LocalSenseVoice` | `test_engine.py`, `test_local_choices.py` |

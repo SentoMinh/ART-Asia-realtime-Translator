@@ -8,7 +8,7 @@ from ctypes import wintypes
 
 from PySide6.QtCore import QEvent, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QColor, QCursor, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGraphicsDropShadowEffect,
+from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGraphicsDropShadowEffect, QGridLayout,
                                QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton,
                                QSizeGrip, QToolButton, QToolTip, QVBoxLayout, QWidget)
 
@@ -192,9 +192,20 @@ class MainWindow(QWidget):
 
     def _build_title_bar(self) -> QWidget:
         bar = TitleBar()
-        row = QHBoxLayout(bar)
-        row.setContentsMargins(4, 0, 0, 0)
+        self._header = QGridLayout(bar)
+        self._header.setContentsMargins(4, 0, 0, 0)
+        self._header.setSpacing(4)
+        self._header_status = QHBoxLayout()
+        self._header_status.setSpacing(4)
+        self._capture_bar = QWidget()
+        row = self._capture_controls = QHBoxLayout(self._capture_bar)
+        row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(4)
+        self._title_actions = QWidget()
+        self.title_buttons = QHBoxLayout(self._title_actions)
+        self.title_buttons.setContentsMargins(0, 0, 0, 0)
+        self.title_buttons.setSpacing(4)
+        self.title_buttons.addStretch(1)
         self.dot = QLabel()
         self.dot.setFixedSize(8, 8)
         self.status = QLabel()
@@ -229,8 +240,8 @@ class MainWindow(QWidget):
             self.ui_lang_actions[code] = action
         self.ui_lang_button.setMenu(menu)
         self.pin_button = self._button("pin", "", lambda: self._flip("always_on_top"))
-        row.addWidget(self.dot)
-        row.addWidget(self.status)
+        self._header_status.addWidget(self.dot)
+        self._header_status.addWidget(self.status)
         self.dock_button = self._button("dock", "Move to VRChat's top-left corner", self.move_to_vrchat)
         row.addWidget(self.dock_button)
         row.addWidget(self.music_button)
@@ -247,12 +258,17 @@ class MainWindow(QWidget):
         row.addStretch(1)
         row.addWidget(self.delay)
         row.addSpacing(4)
-        row.addWidget(self.ui_lang_button)
-        row.addWidget(self.pin_button)
-        row.addWidget(self._button("gear", "Settings", self.open_settings))
-        row.addWidget(self._button("min", "Minimise", self.showMinimized))
-        row.addWidget(self._button("max", "Maximise", self.toggle_maximized))
-        row.addWidget(self._button("close", "Close", self.close, "close"))
+        self.title_buttons.addWidget(self.ui_lang_button)
+        self.title_buttons.addWidget(self.pin_button)
+        self.title_buttons.addWidget(self._button("gear", "Settings", self.open_settings))
+        self.title_buttons.addWidget(self._button("min", "Minimise", self.showMinimized))
+        self.title_buttons.addWidget(self._button("max", "Maximise", self.toggle_maximized))
+        self.title_buttons.addWidget(self._button("close", "Close", self.close, "close"))
+        self._header.addLayout(self._header_status, 0, 0)
+        self._header.addWidget(self._capture_bar, 0, 1)
+        self._header.addWidget(self._title_actions, 0, 2)
+        self._header.setColumnStretch(1, 1)
+        self._header_compact = False
         bar.enable_child_dragging()
         return bar
 
@@ -261,7 +277,8 @@ class MainWindow(QWidget):
         button.setIconSize(QSize(16, 16))
         button.setFixedWidth(18)
         button.setPopupMode(QToolButton.InstantPopup)
-        button.setStyleSheet("QToolButton::menu-indicator { image: none; }")
+        button.setStyleSheet("QToolButton { padding: 4px 0; } "
+                            "QToolButton::menu-indicator { image: none; }")
         menu = QMenu(button)
         menu.aboutToShow.connect(lambda: self._fill_audio_menu(menu, setting))
         button.setMenu(menu)
@@ -663,8 +680,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Chinese, Japanese or Korean words mixed into English or Vietnamese are no longer skipped during translation.",
-            "Local translation models load in the background. Restore detector defaults is available again in Settings → Sound.",
+            "SteamVR wrist subtitles are now part of the app. Open VR to choose a hand and adjust the display.",
+            "Toolbar controls wrap in narrow windows, and language selectors stay visible when resizing.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))
@@ -725,7 +742,42 @@ class MainWindow(QWidget):
 
     # ---- window ---------------------------------------------------------
 
+    def _fit_header(self) -> None:
+        status, controls, buttons = (layout.minimumSize().width() for layout in
+                                     (self._header_status, self._capture_controls, self.title_buttons))
+        margins = self._header.contentsMargins()
+        inset = margins.left() + margins.right()
+        gap = self._header.horizontalSpacing()
+        # Keep the narrow layout's width as the minimum even while the toolbar is on one row.
+        self._header.parentWidget().setMinimumWidth(max(status + gap + buttons, controls) + inset)
+        available = self.width()
+        for layout in (self.layout(), self.bars.layout()):
+            margins = layout.contentsMargins()
+            available -= margins.left() + margins.right()
+        compact = available < status + controls + buttons + 2 * gap + inset
+        if compact != self._header_compact:
+            self._header_compact = compact
+            # Move containers so the buttons keep ownership of their menus and actions.
+            if compact:
+                self._header.addWidget(self._title_actions, 0, 1, 1, 2)
+                self._header.addWidget(self._capture_bar, 1, 0, 1, 3)
+            else:
+                self._header.addWidget(self._capture_bar, 0, 1)
+                self._header.addWidget(self._title_actions, 0, 2)
+            self._header.parentWidget().updateGeometry()
+            self.bars.layout().invalidate()
+            self.bars.updateGeometry()
+            self.layout().invalidate()
+        self.setMinimumSize(self.layout().minimumSize().expandedTo(QSize(*config.MIN_SIZE)))
+
+    def event(self, event):
+        result = super().event(event)
+        if event.type() == QEvent.LayoutRequest and hasattr(self, "resize_grip"):
+            self._fit_header()
+        return result
+
     def resizeEvent(self, event):
+        self._fit_header()
         self.resize_grip.move(self.width() - self.resize_grip.width() - 2,
                               self.height() - self.resize_grip.height() - 2)
         super().resizeEvent(event)

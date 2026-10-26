@@ -38,10 +38,12 @@ if ($MixerBuild) {
     --distpath $DistPath --workpath build --specpath build `
     --icon "$root\assets\icon.ico" `
     --add-data "$root\engine\assets;engine\assets" --add-data "$root\assets\icon.ico;assets" --add-data "$root\assets\icon.png;assets" `
+    --add-data "$root\assets\vr;assets\vr" --add-data "$root\assets\hand;assets\hand" `
     --collect-data zhconv --collect-data certifi `
     --collect-binaries sounddevice --collect-data _sounddevice_data `
     --collect-all pyaudiowpatch `
     --collect-binaries soxr --collect-binaries onnxruntime `
+    --collect-binaries openvr `
     --hidden-import proctap._native --hidden-import engine.speech --hidden-import engine.translators `
     --collect-all sherpa_onnx --collect-all tokenizers --collect-all ctranslate2 `
     --hidden-import engine.local_inference --hidden-import engine.local_model --hidden-import ui.local_download --hidden-import ui.switch_dialog `
@@ -49,6 +51,8 @@ if ($MixerBuild) {
     --exclude-module av --exclude-module hf_xet `
     --exclude-module scipy --exclude-module nvidia --exclude-module torch `
     --exclude-module pytest --exclude-module tkinter `
+    --exclude-module openvr.glframework --exclude-module openvr.gl_renderer `
+    --exclude-module openvr.color_cube_actor --exclude-module openvr.tracked_devices_actor `
     --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets `
     --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQml --exclude-module PySide6.Qt3DCore `
     --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtPdf --exclude-module PySide6.QtCharts

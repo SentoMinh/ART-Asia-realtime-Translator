@@ -1,0 +1,11 @@
+Hand model
+-----------
+Source file: hand2_1.obj
+Credit: omoideshabou
+
+Bundled here as a reduced preview mesh (omoideshabou.npz) for the VR wrist
+settings dialog. Not redistributed as the original full OBJ.
+
+Prepared from the user-supplied OBJ with tools/prepare_hand.py. The preview
+straightens and scales the mesh, clusters nearby vertices, and mirrors it
+for the other wrist. The bundled mesh contains 4,531 triangles.

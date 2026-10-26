@@ -1,0 +1,18 @@
+{
+  "action_sets": [{"name": "/actions/wrist", "usage": "leftright"}],
+  "actions": [
+    {"name": "/actions/wrist/in/point", "type": "pose"},
+    {"name": "/actions/wrist/in/click", "type": "boolean"},
+    {"name": "/actions/wrist/in/scroll", "type": "vector2", "requirement": "optional"}
+  ],
+  "default_bindings": [
+    {"controller_type": "oculus_touch", "binding_url": "touch.json"}
+  ],
+  "localization": [{
+    "language_tag": "en_us",
+    "/actions/wrist": "Translator wrist controls",
+    "/actions/wrist/in/point": "Point at wrist",
+    "/actions/wrist/in/click": "Select wrist control",
+    "/actions/wrist/in/scroll": "Scroll subtitles"
+  }]
+}

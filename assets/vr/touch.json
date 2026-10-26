@@ -1,0 +1,19 @@
+{
+  "controller_type": "oculus_touch",
+  "name": "Translator wrist — Quest / Touch",
+  "description": "Point with the opposite controller, select with trigger, scroll with thumbstick.",
+  "bindings": {
+    "/actions/wrist": {
+      "poses": [
+        {"output": "/actions/wrist/in/point", "path": "/user/hand/left/pose/tip"},
+        {"output": "/actions/wrist/in/point", "path": "/user/hand/right/pose/tip"}
+      ],
+      "sources": [
+        {"path": "/user/hand/left/input/trigger", "mode": "button", "inputs": {"click": {"output": "/actions/wrist/in/click"}}},
+        {"path": "/user/hand/right/input/trigger", "mode": "button", "inputs": {"click": {"output": "/actions/wrist/in/click"}}},
+        {"path": "/user/hand/left/input/joystick", "mode": "joystick", "inputs": {"position": {"output": "/actions/wrist/in/scroll"}}},
+        {"path": "/user/hand/right/input/joystick", "mode": "joystick", "inputs": {"position": {"output": "/actions/wrist/in/scroll"}}}
+      ]
+    }
+  }
+}

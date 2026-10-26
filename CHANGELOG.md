@@ -1,5 +1,23 @@
 # Change log
 
+## 0.12.14 — 2026-10-26 — SteamVR wrist display and main window resizing
+
+The main app now includes the SteamVR wrist display and the resizing fixes below. Its standard EXE keeps the existing GitHub auto-update path. The separate uncommitted local translation/speech experiments are excluded. Saved settings, selected services/models and downloaded model files are preserved. Release validation is recorded after packaging.
+
+### Main window resizing
+
+Narrow windows now place audio controls on a second toolbar row, keeping icons and the VR/settings/window buttons readable. Widening restores the single row. Minimum dimensions follow the controls and language labels, preventing the language selectors from being clipped when the window is shortened or languages change. Audio-device arrows retain their full icon size, and menus and typed text survive reflow.
+
+Before packaging: 197 UI/VR tests passed. Native Windows checks passed 54 resize/language/visibility states in English, Chinese and Vietnamese at 100%, 150% and 200% scaling.
+
+### SteamVR wrist display in the main app
+
+Imported the VR project's wrist overlay, hand model, placement/settings preview, opposite-controller controls, persistent GPU textures and connection recovery. The normal app now exposes a **VR** button and manages the overlay alongside its existing backend, update checks and service-health checks. Existing `vr.json` placements are reused.
+
+Adapted the wrist I / They pickers to the current three-language settings. The wrist uses the shared subtitle view, including progressive translations and same-language mixed-text results. Panel output languages, custom chatbox destinations, selected services/models and the newer speech/translation implementation are preserved. Added OpenVR and the explicit VR assets to the existing build and self-check.
+
+Before packaging: 645 working-tree tests passed, including 81 VR checks; source self-check and isolated Windows startup/shutdown passed. Native OpenGL checks passed 600 uploads/readbacks, and previews were checked in English, Chinese and Vietnamese. The original VR folder and pre-existing local translation/speech fixes were preserved. Live headset/controller behavior remains unverified.
+
 ## 0.12.13 — 2026-10-25 — Keep the requested release scope
 
 The user's scope reply was received after 0.12.12 was published: include only latency and translation fixes. This release restores the previous Sound-page detector reset card and the earlier compact project guide. The expanded Obsidian guide is preserved locally outside the release. Version 0.12.12 remains an unchanged historical artifact; 0.12.13 supersedes it.

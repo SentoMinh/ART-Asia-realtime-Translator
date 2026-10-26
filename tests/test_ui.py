@@ -1215,6 +1215,65 @@ def test_corner_resize_grip_changes_both_dimensions(window, opacity):
     window.hide()
 
 
+@pytest.mark.parametrize("language", ["en", "zh", "vi"])
+@pytest.mark.parametrize("with_wrist", [False, True])
+def test_resizing_keeps_toolbar_and_language_controls_visible(window, language, with_wrist):
+    from PySide6.QtCore import QPoint, QRect
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QToolButton
+    from vr.main import attach_wrist
+
+    window.setStyleSheet(theme.style_sheet())
+    window.ui_lang_actions[language].trigger()
+    wrist = attach_wrist(window) if with_wrist else None
+    window.show()
+    window.delay.setText("12.3 s")
+
+    def check_controls():
+        QTest.qWait(30)  # settle the nested layout requests after text or visibility changes
+        controls = [*window.bars.findChildren(QToolButton), window.my_lang,
+                    window.their_lang, window.translated_to, window.input, window.send_button,
+                    window.send_lang_button, window.status, window.delay,
+                    *(label for label, _ in window._labels)]
+        for control in controls:
+            assert control.isVisible(), control.toolTip()
+            minimum = control.minimumSizeHint().boundedTo(control.maximumSize())
+            assert control.width() >= minimum.width(), control.toolTip()
+            assert control.height() >= minimum.height(), control.toolTip()
+            parent = control.parentWidget()
+            while parent is not None:
+                bounds = QRect(control.mapTo(parent, QPoint()), control.size())
+                assert parent.rect().contains(bounds), (control.toolTip(), bounds, parent.rect())
+                parent = parent.parentWidget()
+        assert window.bars.geometry().bottom() < window.log.geometry().top()
+        assert window.log.geometry().bottom() < window.input_bar.geometry().top()
+
+    try:
+        for width, height in ((440, 220), (900, 300), (440, 220)):
+            window.resize(width, height)
+            check_controls()
+            title_bottom = window.status.mapTo(window, window.status.rect().bottomLeft()).y()
+            audio_top = window.dock_button.mapTo(window, QPoint()).y()
+            assert (audio_top > title_bottom) == (width == 440)
+        assert window.width() == window.minimumWidth()
+        # Text changes must update the bounds even when the user is not resizing.
+        for picker in (window.my_lang, window.their_lang, window.translated_to):
+            picker.set_selected(["yue", "zh", "vi"], emit=True)
+        check_controls()
+        window._show_bars(False)
+        window.resize(440, 220)
+        QApplication.processEvents()
+        window._show_bars(True)
+        check_controls()
+    finally:
+        if wrist is not None:
+            wrist.stop()
+            wrist.panel.close()
+            wrist.panel.deleteLater()
+        window.close()
+        i18n.set_lang("en")
+
+
 @pytest.mark.parametrize("field", ["original", "translation", "translation2"])
 def test_subtitle_drag_copies_only_selected_text(window, field):
     from PySide6.QtCore import QPoint, QPointF, Qt
