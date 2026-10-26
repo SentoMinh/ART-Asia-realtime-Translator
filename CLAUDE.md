@@ -1,6 +1,6 @@
 # Project context
 
-Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 26 October 2026 handoff: the source-only SteamVR wrist integration and its completed checks, the 0.12.13 scope correction (keep latency/translation fixes, restore the earlier Sound reset card and compact guide), 0.12.12 mixed-text translation and background local loading, 0.12.11 bounded online multi-target translation, the 0.12.10 Vulkan hearing option for AMD GPUs, 0.12.9 removal of hidden translation fallback, 0.12.8 detector adjustment, 0.12.7 local-only translation fix, model deletion and Obsidian guide, prior PhoWhisper/Qwen integration, HF-Mirror fallback, latency evidence and release checks. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for current measurements; the older benchmark is historical.
+Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 26 October 2026 handoff: 0.12.14 publishes the integrated SteamVR wrist display and main-window resizing fixes, with package and GitHub upgrade checks complete. The separate uncommitted local translation/speech files remain excluded and preserved. Earlier translation/latency fixes, the Sound reset card and compact guide remain in the app. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for measurements and [CHANGELOG.md](CHANGELOG.md) for prior changes and validation limits.
 
 For the user-facing architecture overview, read [ART Project Guide](ART%20Project%20Guide.md). It is an Obsidian-compatible standalone note.
 

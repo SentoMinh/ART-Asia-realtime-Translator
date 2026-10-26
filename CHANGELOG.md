@@ -2,7 +2,9 @@
 
 ## 0.12.14 — 2026-10-26 — SteamVR wrist display and main window resizing
 
-The main app now includes the SteamVR wrist display and the resizing fixes below. Its standard EXE keeps the existing GitHub auto-update path. The separate uncommitted local translation/speech experiments are excluded. Saved settings, selected services/models and downloaded model files are preserved. Release validation is recorded after packaging.
+The main app now includes the SteamVR wrist display and the resizing fixes below. Its standard EXE keeps the existing GitHub auto-update path. The separate uncommitted local translation/speech experiments are excluded. Saved settings, selected services/models and downloaded model files are preserved. Package and actual GitHub upgrade checks passed.
+
+Published release source `8a67264` (development `3b2b4af`) passed 647 source tests and 380 checks against bundled UI/VR/update/translation bytecode. The actual EXE self-check, VR assets/OpenVR/native/runtime checks, source/privacy scans, ZIP integrity and all five GitHub asset digests passed. Bundled VR texture code passed 600 native GPU uploads/readbacks. Update notices and VR settings rendered correctly in English, Chinese and Vietnamese. The real 0.12.13 → 0.12.14 GitHub upgrade passed download/SHA-256, packaged replacement/restart, new-version self-check and no-update checks. Saved user settings and the four uncommitted local translation/speech files were unchanged. Live headset/controller behavior, Windows 10 and fresh-PC installation remain unverified. Evidence: `.tools/release-0.12.14/`.
 
 ### Main window resizing
 

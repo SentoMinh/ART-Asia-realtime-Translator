@@ -1,6 +1,8 @@
 # ART agent handoff — 26 October 2026
 
-**0.12.14 publication authorized:** the user requested publishing the newer development version after the GitHub/local EXE comparison. Release the committed SteamVR wrist integration and main-window resize fixes as one standard application. Keep the four unrelated uncommitted local translation/speech files and `.obsidian/` out of the release and unchanged. This supersedes the earlier source-only restriction for the VR work. Version and translated update notice are prepared; packaging and GitHub upgrade checks are pending in `.tools/release-0.12.14/`.
+**0.12.14 published:** the user authorized publishing the committed SteamVR wrist integration and main-window resizing fixes. One standard application; existing installations update through GitHub. Unrelated uncommitted local translation/speech files and `.obsidian/` remain outside the release. Package and actual GitHub upgrade checks passed.
+
+Published release source `8a67264` (development `3b2b4af`) passed 647 source tests and 380 checks against bundled UI/VR/update/translation bytecode. The actual EXE self-check, VR assets/OpenVR/native/runtime checks, source/privacy scans, ZIP integrity and all five GitHub asset digests passed. Bundled VR texture code passed 600 native GPU uploads/readbacks. Update notices and VR settings rendered correctly in English, Chinese and Vietnamese. The real 0.12.13 → 0.12.14 GitHub upgrade passed download/SHA-256, packaged replacement/restart, new-version self-check and no-update checks. Saved user settings and the four uncommitted local translation/speech files were unchanged. Live headset/controller behavior, Windows 10 and fresh-PC installation remain unverified. Evidence: `.tools/release-0.12.14/`.
 
 **2026-10-26 main-window resize fix:** the screenshot showed toolbar icons squeezed and language selectors clipped at the old 440 × 220 minimum. Audio controls now wrap below the title buttons when needed and return to one row at wider sizes. Minimum dimensions follow the visible controls and language labels; menus retain their ownership during reflow. `vr.main.add_vr_button()` inserts into `MainWindow.title_buttons`. All 197 UI/VR tests passed, including narrow/wide resizing, language changes, hidden controls and existing grip/click-through behavior. Native Windows checks passed 54 resize/language/visibility states across English/Chinese/Vietnamese and 100%/150%/200% scaling; previews closed automatically. Evidence: `.tools/resize-ui/`. Source only; no version bump, binary build or publication. Existing local translation/speech changes remain separate and untouched.
 
@@ -24,12 +26,12 @@ Read this first, then [CLAUDE.md](CLAUDE.md), [CODEBASE.md](CODEBASE.md), and th
 
 | Item | State |
 | --- | --- |
-| Published app | **v0.12.13**, release source `2a5d0a0cd2afeffb90ffe436d44bd5893f3e2092` |
-| Published EXE SHA-256 | `ba96c2df16c959ba6d7a895c0c3fc95e9d92cf5af554fdc47835731687948348` |
-| Release validation | 560 tests; 323 bundled checks; EXE/native/source/asset checks; actual GitHub upgrade 0.12.12 → 0.12.13 passed |
+| Published app | **v0.12.14**, release source `8a672648969df1f9829f4f6cdc3a48ea25bab8f1` |
+| Published EXE SHA-256 | `ac4625d63b4b4d035797909e2db39eed50c154fbc289919c6dfe35854d56b229` |
+| Release validation | 647 source tests; 380 bundled checks; EXE/VR/native/source/asset checks; actual GitHub upgrade 0.12.13 → 0.12.14 passed |
 | Earlier measurement commit | `2ad5087` in the release repository: [LATENCY_REPORT.md](LATENCY_REPORT.md); no binary change |
-| Current release features | Latency and translation fixes retained; earlier Sound reset card and compact guide restored. Expanded guide excluded from the release. |
-| Version constant | 0.12.13; preserve earlier versions and use a new version for subsequent binaries |
+| Current release features | Integrated SteamVR wrist subtitles and responsive main-window controls; earlier translation/latency fixes, Sound reset and compact guide retained. |
+| Version constant | 0.12.14; preserve earlier versions and use a new version for subsequent binaries |
 | Model list | Whisper turbo (NVIDIA CUDA), Whisper turbo Vulkan (AMD), SenseVoice, PhoWhisper Small, NLLB and Qwen3 1.7B INT8 |
 
 Published release source `2a5d0a0` (development `f5fcd94`) passed 560 source tests and 323 checks against bundled translation/local-model/UI bytecode, including the restored detector reset control. Actual EXE self-check, source/native/runtime checks, ZIP integrity and all five GitHub asset digests passed. The real 0.12.12 → 0.12.13 upgrade passed download/SHA-256, packaged replacement/restart, new-version self-check and no-update checks. Saved settings were unchanged. Latency/translation implementation is unchanged from 0.12.12; the reset card matches 0.12.11. The compact guide is bundled; the expanded guide is preserved locally outside the release. Live audio and game performance were not retested. Evidence: `.tools/release-0.12.13/` and `.tools/scope-0.12.13/`.
@@ -101,7 +103,7 @@ Next useful measurements are actual game/GPU contention, short conversational an
 - Never bundle AppData settings, API credentials, logs, benchmark recordings, model weights or local infrastructure. Tests isolate AppData through `tests/conftest.py`; direct benchmarks must avoid saving provider changes or opening capture/OSC.
 - For a new release, stage the committed/scanned source in a new `.tools/release-<version>/source` directory. Build with `tools/build.ps1`, the development Python, and validated `.tools/apo-prototype-10` DLLs. Preserve old artifacts. Bundle only `VrctMicApo.dll` and `VrctApoProducer.dll`, never test DLLs.
 - Prior release helpers/evidence are in `.tools/release-0.12.4/`; adapt versions, source commit, notice assertions and test counts rather than copying old expectations blindly. Keep checksums, ZIP, packaged self-check, draft-asset verification, and the GitHub download/replacement/restart check.
-- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. Version 0.12.13 is published; use a new version for subsequent binaries.
+- Update `ui/__init__.py`, translated update-notice strings, README/changelog and package notes for the next binary. Version 0.12.14 is published; use a new version for subsequent binaries.
 - The optional verified NLLB offline ZIP remains an asset of v0.12.3. Keep existing links valid, but it is not the user's preferred solution for this current request.
 
 Run focused tests with `.venv-app\Scripts\python.exe -m pytest tests/test_local_model.py tests/test_local_choices.py tests/test_nllb_offline.py -q`; run the full suite before packaging. A source test result does not validate a new EXE or mainland-China access.
