@@ -7,7 +7,9 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **[0.12.13](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.13)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Version **[0.12.14](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.14)**. Enter your API URL and key under **Custom domain**, or choose local models.
+
+Version 0.12.14 includes the SteamVR wrist display through the **VR** button and keeps toolbar controls and language selectors readable when resizing the main window.
 
 Version 0.12.12 fixes skipped mixed-language text for English/Vietnamese outputs and starts loading installed local translation models on the background worker. Existing model choices are preserved.
 
@@ -27,7 +29,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.12.13](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.13). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v0.12.14](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.14). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -143,9 +145,18 @@ Release validation for 0.11.10: **422 tests passed**, including the 30% click-th
 
 The 0.12.5 source passed 505 tests. Real pinned PhoWhisper and Qwen files loaded and ran on CPU; two Vietnamese recording replays and short multilingual translation checks are recorded in LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. This is not a broad quality evaluation. Fresh-PC installation, Windows 10 behavior and mainland-China download access remain unverified.
 
+### SteamVR wrist display
+
+The main app now includes the wrist display from the VR project. Start `run_ui.bat`, then click **VR** beside Settings to choose the left or right hand, placement, size, rotation, opacity and text size. Existing placement settings in `vr.json` are reused. Turn **Show on my wrist** off to disable the overlay. SteamVR must already be running; ART does not start it.
+
+The wrist shows the same subtitles as the desktop. Look at it and point with the opposite controller; press and release the trigger to select controls, drag the scrollbar, or use the thumbstick to scroll. The **I / They** pickers support the main app's three-language selections and update its settings. **Translated to** and custom chatbox destinations remain controlled from the desktop. The hand preview and sample controls in VR settings can be tried without a headset.
+
+Version 0.12.14 includes the wrist code, OpenVR library, hand model and controller bindings in the normal app. Headset placement and SteamVR compositor behavior still need a live hardware check.
+
 ## Layout
 
 - `ui\` — the window (PySide6): main window, settings, chat log, the three window languages.
+- `vr\` — SteamVR wrist display, controller input, hand preview and placement settings; `assets/vr` and `assets/hand` contain its bindings and preview mesh.
 - `vrc\` — VRChat itself: finding it, the chatbox (OSC), sound capture, text translation.
 - `engine\` — speech: voice detector → sentences → speech-to-text (online or local Whisper/SenseVoice) → translation (online or local NLLB). `engine\services.py` lists the services.
 - `apo\` — native microphone mixer and development validation/removal tools; `driver\` retains the earlier unused virtual-microphone prototype.

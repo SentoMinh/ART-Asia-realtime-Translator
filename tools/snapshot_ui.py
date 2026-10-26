@@ -21,6 +21,7 @@ from ui.config import Settings  # noqa: E402
 from ui.demo_backend import SCRIPT, DemoBackend  # noqa: E402
 from ui.main_window import MainWindow  # noqa: E402
 from ui.settings_window import SettingsWindow  # noqa: E402
+from vr.main import attach_wrist  # noqa: E402
 
 
 def over_game(widget) -> QImage:
@@ -53,6 +54,7 @@ def main() -> None:
     app.setStyleSheet(theme.style_sheet())
     settings = Settings(backdrop=args.backdrop, font_px=args.font, ui_lang=args.lang)
     window = MainWindow(DemoBackend(), settings, save=lambda s: None)
+    wrist = attach_wrist(window)
     # the offscreen platform has no fonts, so the real one is used without showing anything
     window.setAttribute(Qt.WA_DontShowOnScreen)
     window.show_status(Status("warn", "Demo", ""))

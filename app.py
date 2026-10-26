@@ -1,6 +1,6 @@
 """Program start (this is what VRChat-Translator.exe runs).
 
-    VRChat-Translator.exe              the translator window
+    VRChat-Translator.exe              the translator window and optional SteamVR wrist display
     VRChat-Translator.exe --demo       example lines, no connection to VRChat
     VRChat-Translator.exe --selfcheck  loads every part once, writes selfcheck.txt, and exits
                  (with --get-local-model it first downloads the Local Model's 2 GB if missing)
@@ -52,6 +52,27 @@ def selfcheck() -> int:
         if not ICON_FILE.exists() or not sizes:
             raise RuntimeError(f"the icon is missing: {ICON_FILE}")
         return f"{sizes[0].width()} px"
+
+    def wrist():
+        import json
+        import openvr
+        from PySide6.QtWidgets import QApplication
+        from ui.backend import Backend
+        from vr.arm_preview import hand_mesh
+        from vr.panel import WristPanel, rgba
+        assets = Path(__file__).resolve().parent / "assets"
+        for name in ("actions.json", "touch.json"):
+            json.loads((assets / "vr" / name).read_text(encoding="utf-8"))
+        if hand_mesh() is None:
+            raise RuntimeError("Wrist preview hand asset is missing or invalid")
+        qt = QApplication.instance() or QApplication(sys.argv[:1])
+        panel = WristPanel(Backend())
+        try:
+            picture = panel.image()
+            return f"openvr {openvr.__version__}; {picture.width()} x {picture.height()}, {len(rgba(picture)):,} bytes"
+        finally:
+            panel.close()
+            panel.deleteLater()
 
     def microphones():
         from vrc import audio
@@ -157,7 +178,7 @@ def selfcheck() -> int:
         with httpx.Client(timeout=10) as client:
             return client.get("https://api.github.com").status_code    # where updates come from
 
-    for name, action in (("version", version), ("window", window), ("icon", icon),
+    for name, action in (("version", version), ("window", window), ("icon", icon), ("wrist display", wrist),
                          ("microphones", microphones),
                          ("VRChat sound capture", game_capture), ("VRChat detection", vrchat),
                          ("music mixer", music_mixer),

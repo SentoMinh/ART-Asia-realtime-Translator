@@ -8,6 +8,7 @@ soxr>=1.1                # resampling to 16 kHz
 onnxruntime>=1.20        # runs the voice detector (engine/assets/silero_vad_v6.onnx)
 httpx>=0.28              # the online hearing and translating services
 zhconv>=1.4              # simplified / traditional Chinese
+openvr>=2.12             # SteamVR wrist display (SteamVR itself starts separately)
 
 # Local speech recognition and translation:
 faster-whisper>=1.2
