@@ -140,12 +140,15 @@ def selfcheck() -> int:
             raise RuntimeError("Whisper Vulkan runtime is missing")
         if not hasattr(ctranslate2, "Generator"):
             raise RuntimeError("Qwen's CTranslate2 generator is missing")
+        import llama_cpp
+        if not hasattr(llama_cpp, "Llama"):
+            raise RuntimeError("Hy-MT2's llama.cpp runtime is missing")
         dialog = LocalModelDialog()
         expected = set(local_model.MODELS) | {model for model in local_model.REMOVED_MODELS if local_model.has_files(model)}
         if set(dialog.rows) != expected:
             raise RuntimeError("Local model choices are missing")
         dialog.close()
-        return "Whisper/PhoWhisper, Vulkan DLL, SenseVoice, NLLB/Qwen CTranslate2, tokenizer and model list included"
+        return "Whisper/PhoWhisper, Vulkan DLL, SenseVoice, NLLB/Qwen CTranslate2, Hy-MT2 llama.cpp, tokenizer and model list included"
 
     def local_model():
         import time

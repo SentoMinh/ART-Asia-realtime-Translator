@@ -92,6 +92,7 @@ def test_labels_refresh_and_ignore_old_configuration(model_ui, monkeypatch):
         last_result=(2, "custom", ("first", "second"), "custom:first")))
     dialog._update_model_labels()
     assert "first" in dialog._translating_desc.text()
+    dialog.show()
     parent.backend._translator.last_result = (3, "custom", ("first", "second"), "custom:second")
     from PySide6.QtTest import QTest
     QTest.qWait(650)
@@ -104,6 +105,28 @@ def test_labels_refresh_and_ignore_old_configuration(model_ui, monkeypatch):
     assert "new-model" in dialog._translating_desc.text()
     assert "second" not in dialog._translating_desc.text()
     parent.deleteLater()
+
+
+def test_hidden_settings_pause_model_refresh_and_refresh_when_shown(model_ui):
+    services.save("custom", url="https://models.example/v1", hear_model="before")
+    dialog = SettingsWindow(Settings(hearing="custom", translating="custom"))
+    try:
+        assert not dialog._model_timer.isActive()
+        dialog.show()
+        assert dialog._model_timer.isActive()
+        dialog.hide()
+        assert not dialog._model_timer.isActive()
+        services.save("custom", hear_model="after")
+        QTest.qWait(650)
+        assert "before" in dialog._hearing_desc.text()
+        dialog.show()
+        assert dialog._model_timer.isActive()
+        assert "after" in dialog._hearing_desc.text()
+        dialog.close()
+        assert not dialog._model_timer.isActive()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
 
 
 def test_successful_fallback_records_the_model_for_the_ui(model_ui, monkeypatch):

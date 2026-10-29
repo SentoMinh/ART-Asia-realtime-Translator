@@ -20,6 +20,7 @@ import json
 import math
 import os
 import sys
+import threading
 import time
 import types
 import wave
@@ -147,14 +148,24 @@ def tidy(text: str, lang: str) -> Heard:
     return Heard(zhconv.convert(text, "zh-cn" if lang == "zh" else "zh-hk"), lang)
 
 
+_gpu_dll_handles: dict[str, object] = {}
+_gpu_dll_lock = threading.Lock()
+
+
 def _add_gpu_libraries() -> None:
     """faster-whisper needs NVIDIA's cuBLAS, from wherever this copy has it
     (engine/local_model.py)."""
-    folders = local_model.gpu_folders()
-    for folder in folders:
-        os.add_dll_directory(folder)
-    if folders:       # it is loaded by name later, which only looks at PATH
-        os.environ["PATH"] = os.pathsep.join(folders + [os.environ.get("PATH", "")])
+    with _gpu_dll_lock:
+        folders = local_model.gpu_folders()
+        for folder in folders:
+            if folder not in _gpu_dll_handles and hasattr(os, "add_dll_directory"):
+                # Keep the handle alive: disposing it removes the DLL search directory.
+                _gpu_dll_handles[folder] = os.add_dll_directory(folder)
+        if folders:       # some native runtimes also load libraries by name through PATH
+            paths = os.environ.get("PATH", "").split(os.pathsep)
+            known = {os.path.normcase(path) for path in paths}
+            added = [folder for folder in folders if os.path.normcase(folder) not in known]
+            os.environ["PATH"] = os.pathsep.join(added + paths)
 
 
 def whisper_class():
@@ -193,13 +204,20 @@ class LocalWhisper:
                 # library's own check for that is not thread-safe: always copy instead.
                 download.are_symlinks_supported = lambda cache_dir=None: False
                 source = self._model_id                            # faster-whisper fetches it
-            options = dict(device="cpu", compute_type="int8", cpu_threads=2) if vietnamese else dict(device="cuda", compute_type="float16")
+            from .runtime import cpu_threads
+            options = dict(device="cpu", compute_type="int8") if vietnamese else dict(device="cuda", compute_type="float16")
+            # CUDA still performs feature preparation on the host. Cap both backends.
+            options.update(cpu_threads=cpu_threads(), num_workers=1)
             model = whisper_class()(source, **options)
             # the first run on a GPU is slow (2 s instead of 0.6 s): spend it on silence now
             list(model.transcribe(np.zeros(RATE, dtype="float32"), language="vi" if vietnamese else "en", beam_size=1)[0])
             self._model = model
         except Exception as error:
             raise SttError(f"the speech model could not be loaded: {error}") from error
+
+    def close(self) -> None:
+        """Free the loaded weights and any CUDA/CPU worker threads. The next use reloads."""
+        self._model = None
 
     def transcribe(self, samples: np.ndarray, lang: str | None, prefer: tuple = ()) -> Heard:
         """`prefer` is not needed here: the model says how likely each language is."""

@@ -17,7 +17,7 @@ def qwen(monkeypatch):
     engine._tokenizer = SimpleNamespace(encode=encode, token_to_id=lambda token: token,
                                        decode=lambda ids, **kw: " ".join(ids))
     def generate(tokens, **kwargs):
-        calls.append(kwargs)
+        calls.append(dict(kwargs, start_tokens=tokens[0]))
         return [SimpleNamespace(sequences=[["Xin", "chào", "<|im_end|>"]])]
     engine._model = SimpleNamespace(generate_batch=generate)
     monkeypatch.setattr(local_model, "missing", lambda model: "")
@@ -31,12 +31,34 @@ def test_qwen_uses_non_thinking_template_and_returns_only_completed_answer(qwen)
     assert "into Vietnamese" in calls[0]
     assert "<|im_start|>user\nHello<|im_end|>\n" in calls[0]
     assert calls[0].endswith("<|im_start|>assistant\n<think>\n\n</think>\n\n")
-    assert calls[1]["include_prompt_in_result"] is False
-    assert calls[1]["return_end_token"] is True
-    assert calls[1]["max_length"] == 512 and calls[1]["sampling_topk"] == 1
+    options = next(call for call in calls if isinstance(call, dict))
+    assert options["include_prompt_in_result"] is False
+    assert options["return_end_token"] is True
+    assert options["max_length"] == 512 and options["sampling_topk"] == 1
     count = len(calls)
     assert engine.translate("Hello", "en", "en") == "Hello"
     assert len(calls) == count
+
+
+def test_qwen_reuses_the_target_instructions_as_a_static_prompt(qwen):
+    engine, calls = qwen
+    assert engine.translate("Hello", "vi", "en") == "Xin chào"
+    prompt, prefix, options = calls[:3]
+    assert prefix.startswith("<|im_start|>system\n") and "into Vietnamese" in prefix
+    assert "most likely" not in prefix   # the source sentence varies, so it is sent each time
+    assert options["static_prompt"] == prefix.split()
+    assert options["static_prompt"] + options["start_tokens"] == prompt.split()
+
+
+def test_qwen_sends_the_whole_prompt_when_the_instructions_are_not_a_token_prefix(qwen):
+    engine, calls = qwen
+    full = engine._tokenizer.encode
+    engine._tokenizer.encode = lambda text, **kw: full(text) if "<|im_start|>user" in text else SimpleNamespace(
+        tokens=["merged"])
+    assert engine.translate("Hello", "vi", "en") == "Xin chào"
+    options = calls[-1]
+    assert options["static_prompt"] is None
+    assert options["start_tokens"] == calls[0].split()
 
 
 def test_qwen_translates_mixed_script_text_with_matching_source_and_target(qwen):
@@ -54,6 +76,7 @@ def test_qwen_translates_mixed_script_text_with_matching_source_and_target(qwen)
     (["you", "a", "give", "you"] * 16 + ["<|im_end|>"], "kept repeating", "vi"),
     (["你好", "<|im_end|>"], "instead of translating", "vi"),
     (["Hello", "<|im_end|>"], "requested language", "ja"),
+    (["Okay,", "let's", "see.", "<|im_end|>"], "did not return", "vi"),
 ])
 def test_qwen_rejects_incomplete_repetitive_or_wrong_script_output(qwen, tokens, message, target):
     engine, _ = qwen
@@ -97,6 +120,14 @@ def test_qwen_loads_cpu_once_and_releases_other_weights(qwen, monkeypatch):
     assert engine.translate("Hello", "vi", "en") == "Xin chào"
     assert engine.translate("Hello again", "vi", "en") == "Xin chào"
     assert creates == [(str(local_model.model_folder("qwen3-1.7b-ct2")),
-                        dict(device="cpu", compute_type="int8", inter_threads=1, intra_threads=2))]
+                        dict(device="cpu", compute_type="int8", inter_threads=1, intra_threads=1))]
     assert local_inference.translator._model is None
     assert local_inference.translator._tokenizer is None
+
+
+def test_qwen_translation_error_sets_zero_cooldown(qwen):
+    engine, _ = qwen
+    engine._model.generate_batch = lambda *a, **kw: [SimpleNamespace(sequences=[["Xin"]])]
+    with pytest.raises(TranslateError) as caught:
+        engine.translate("Hello", "vi", "en")
+    assert caught.value.wait == 0

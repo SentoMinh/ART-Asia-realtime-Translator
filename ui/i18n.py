@@ -4,6 +4,12 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "Local models are grouped into Hearing and Translating, with model names, CPU/GPU labels and supported languages.": "本地模型按语音识别和翻译分类，显示模型名称、CPU/GPU 标识及支持的语言。",
+    "Download, use and delete now have compact icon buttons. Hover over an icon to see its action.": "下载、使用和删除操作现采用简洁的图标按钮。将鼠标悬停在图标上即可查看操作说明。",
+    "English, Chinese, Cantonese, Vietnamese, Japanese, Korean": "英语、普通话、粤语、越南语、日语、韩语",
+    "Chinese, Cantonese, English, Japanese, Korean": "普通话、粤语、英语、日语、韩语",
+    "Hy-MT2 1.8B is a new local translation choice. It kept the meaning better than Qwen in local tests; NLLB stays the faster default.": "新增 Hy-MT2 1.8B 本地翻译选项。在本机测试中，它比 Qwen 更能保留原意；NLLB 仍是速度更快的默认选项。",
+    "Local translation uses less processor time. The Music dialog stops idle checks while hidden and keeps music playing.": "本地翻译占用更少的处理器时间。音乐窗口隐藏时停止空闲检查，音乐继续播放。",
 
     # SteamVR wrist display.
     "On the arm": "在手臂上",
@@ -99,13 +105,13 @@ _ZH = {
     "Remove domain": "移除域名",
     "Local model": "本地模型",
     "Use model": "使用模型",
-    "Choose a hearing or translation model to download and run on this PC. No API key is needed.": "选择语音识别或翻译模型，下载后在本机运行。无需 API 密钥。",
     "Download: {size}. The model becomes active when the download finishes. You can close this window while it continues.": "下载大小：{size}。下载完成后会启用此模型。关闭此窗口后下载仍会继续。",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Fast NVIDIA GPU option for multilingual conversations; mixed-language sentences can still be misheard.": "英语、普通话、粤语、越南语、日语和韩语。适合多语对话的快速 NVIDIA 显卡方案；一句话中混用语言仍可能识别错误。",
     "Chinese, Cantonese, English, Japanese and Korean; no Vietnamese. Lightweight CPU option with automatic language detection. Mixed-language accuracy varies.": "普通话、粤语、英语、日语和韩语；不支持越南语。轻量 CPU 方案，自动检测语言。混合语言的识别效果因情况而异。",
     "Vietnamese specialist, trained on diverse Vietnamese accents. Runs on CPU without NVIDIA; may be slower than GPU turbo. Choose turbo for other languages or mixed-language conversations.": "专注越南语，使用多种越南语口音训练。使用 CPU，无需 NVIDIA 显卡；可能比显卡上的 turbo 慢。其他语言或混合语言对话请选择 turbo。",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Translation-focused CPU model; keep this as the low-latency starting choice.": "英语、普通话、粤语、越南语、日语和韩语。专用于翻译的 CPU 模型；建议作为低延迟的首选。",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Small CPU language-model alternative, with thinking disabled. May be slower or less accurate than NLLB; compare your language pair.": "英语、普通话、粤语、越南语、日语和韩语。较小的 CPU 语言模型备选，已关闭思考。可能比 NLLB 慢或准确率更低；请按所需语言对比较效果。",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Tencent's translation model on CPU: kept the meaning better than NLLB in local tests, but takes about three times longer per sentence and more CPU.": "英语、普通话、粤语、越南语、日语和韩语。腾讯的 CPU 翻译模型：在本机测试中比 NLLB 更准确，但每句大约慢三倍，也更占用处理器。",
     "You can switch to your downloaded local hearing model.": "可以切换到已下载的本地语音识别模型。",
     "Choose a local hearing model to download and run on this PC.": "选择本地语音识别模型，下载后在本机运行。",
     "None": "无",
@@ -229,6 +235,10 @@ _ZH = {
     "not sent": "未发送", "copied": "已复制",
     "listening…": "聆听中…", "translating…": "翻译中…", "Click to copy the original text. Drag to select and copy only that text.": "点击复制原文，拖动选择并仅复制选中的文字。",
     "not translated": "未翻译", "cut to 144 characters": "已截短到 144 个字符",
+    "Translation skipped to keep up with live speech": "为跟上实时语音，已跳过翻译",
+    "Translation skipped after waiting too long": "等待时间过长，已跳过翻译",
+    "Translation failed": "翻译失败",
+    "Translation cancelled": "翻译已取消",
     "VRChat is not running": "VRChat 未运行", "OSC is off in VRChat": "VRChat 的 OSC 已关闭",
     "could not send": "发送失败",
     "demo: nothing was sent": "演示：没有发送任何内容",
@@ -380,6 +390,12 @@ _ZH = {
 }
 
 _VI = {
+    "Local models are grouped into Hearing and Translating, with model names, CPU/GPU labels and supported languages.": "Mô hình cục bộ được chia thành nhóm Nghe giọng nói và Dịch, hiển thị tên mô hình, CPU/GPU và ngôn ngữ hỗ trợ.",
+    "Download, use and delete now have compact icon buttons. Hover over an icon to see its action.": "Tải xuống, sử dụng và xóa nay dùng nút biểu tượng gọn hơn. Di chuột lên biểu tượng để xem chức năng.",
+    "English, Chinese, Cantonese, Vietnamese, Japanese, Korean": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật, Hàn",
+    "Chinese, Cantonese, English, Japanese, Korean": "Tiếng Trung, Quảng Đông, Anh, Nhật, Hàn",
+    "Hy-MT2 1.8B is a new local translation choice. It kept the meaning better than Qwen in local tests; NLLB stays the faster default.": "Thêm lựa chọn dịch cục bộ Hy-MT2 1.8B. Mô hình giữ nghĩa tốt hơn Qwen trong thử nghiệm trên máy này; NLLB vẫn là lựa chọn mặc định nhanh hơn.",
+    "Local translation uses less processor time. The Music dialog stops idle checks while hidden and keeps music playing.": "Dịch cục bộ dùng ít thời gian xử lý hơn. Cửa sổ Nhạc dừng kiểm tra lúc không hoạt động khi bị ẩn và vẫn tiếp tục phát nhạc.",
 
     # SteamVR wrist display.
     "On the arm": "Trên cánh tay",
@@ -475,13 +491,13 @@ _VI = {
     "Remove domain": "Xóa tên miền",
     "Local model": "Mô hình cục bộ",
     "Use model": "Dùng mô hình",
-    "Choose a hearing or translation model to download and run on this PC. No API key is needed.": "Chọn mô hình nhận dạng giọng nói hoặc dịch để tải về và chạy trên máy này. Không cần khóa API.",
     "Download: {size}. The model becomes active when the download finishes. You can close this window while it continues.": "Dung lượng tải: {size}. Mô hình sẽ được dùng khi tải xong. Bạn có thể đóng cửa sổ này trong khi vẫn tiếp tục tải.",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Fast NVIDIA GPU option for multilingual conversations; mixed-language sentences can still be misheard.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Lựa chọn nhanh trên GPU NVIDIA cho hội thoại đa ngôn ngữ; câu trộn nhiều ngôn ngữ vẫn có thể bị nhận sai.",
     "Chinese, Cantonese, English, Japanese and Korean; no Vietnamese. Lightweight CPU option with automatic language detection. Mixed-language accuracy varies.": "Tiếng Trung, Quảng Đông, Anh, Nhật và Hàn; không có tiếng Việt. Nhẹ, chạy CPU và tự nhận diện ngôn ngữ. Độ chính xác với câu trộn ngôn ngữ tùy trường hợp.",
     "Vietnamese specialist, trained on diverse Vietnamese accents. Runs on CPU without NVIDIA; may be slower than GPU turbo. Choose turbo for other languages or mixed-language conversations.": "Chuyên tiếng Việt, được huấn luyện với nhiều giọng vùng miền. Chạy CPU, không cần NVIDIA; có thể chậm hơn turbo chạy GPU. Chọn turbo cho ngôn ngữ khác hoặc hội thoại trộn ngôn ngữ.",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Translation-focused CPU model; keep this as the low-latency starting choice.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Mô hình CPU chuyên dịch; nên dùng trước khi ưu tiên độ trễ thấp.",
     "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Small CPU language-model alternative, with thinking disabled. May be slower or less accurate than NLLB; compare your language pair.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Mô hình ngôn ngữ nhỏ chạy CPU để thử thay thế, đã tắt suy luận. Có thể chậm hoặc kém chính xác hơn NLLB; hãy so sánh theo cặp ngôn ngữ bạn dùng.",
+    "English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Tencent's translation model on CPU: kept the meaning better than NLLB in local tests, but takes about three times longer per sentence and more CPU.": "Tiếng Anh, Trung, Quảng Đông, Việt, Nhật và Hàn. Mô hình dịch của Tencent chạy trên CPU: giữ nghĩa tốt hơn NLLB trong thử nghiệm trên máy này, nhưng mỗi câu chậm khoảng ba lần và dùng nhiều CPU hơn.",
     "You can switch to your downloaded local hearing model.": "Bạn có thể chuyển sang mô hình nhận dạng giọng nói cục bộ đã tải.",
     "Choose a local hearing model to download and run on this PC.": "Chọn mô hình nhận dạng giọng nói cục bộ để tải về và chạy trên máy này.",
     "None": "Không",
@@ -606,6 +622,10 @@ _VI = {
     "not sent": "chưa gửi", "copied": "đã chép",
     "listening…": "đang nghe…", "translating…": "đang dịch…", "Click to copy the original text. Drag to select and copy only that text.": "Bấm để chép câu gốc. Kéo để chọn và chỉ chép phần chữ đã chọn.",
     "not translated": "chưa dịch", "cut to 144 characters": "đã cắt còn 144 ký tự",
+    "Translation skipped to keep up with live speech": "Đã bỏ qua bản dịch để theo kịp lời nói trực tiếp",
+    "Translation skipped after waiting too long": "Đã bỏ qua bản dịch vì chờ quá lâu",
+    "Translation failed": "Dịch thất bại",
+    "Translation cancelled": "Đã hủy dịch",
     "VRChat is not running": "VRChat chưa chạy", "OSC is off in VRChat": "OSC trong VRChat đang tắt",
     "could not send": "không gửi được",
     "demo: nothing was sent": "bản thử: không gửi gì cả",

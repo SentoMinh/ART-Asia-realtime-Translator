@@ -505,6 +505,66 @@ def test_look_only_shows_the_panel_while_the_wrist_is_turned_to_the_face(wrist, 
     assert not steamvr.shown
 
 
+def test_hidden_wrist_defers_rendering_until_revealed(wrist, steamvr, backend, monkeypatch):
+    wrist.settings.look_only = True
+    steamvr.room[LEFT] = room_pose((-0.3, 0.9, 0))
+    rendered = []
+    original_image = wrist.panel.image
+
+    def image(*args, **kwargs):
+        rendered.append(1)
+        return original_image(*args, **kwargs)
+
+    monkeypatch.setattr(wrist.panel, "image", image)
+    wrist.tick()
+    backend.status_changed.emit(Status("error", "VRChat is not running", ""))
+    wrist.clock.now += display.SETTLE_S
+    wrist.tick()
+    assert not rendered and not steamvr.images and wrist._dirty
+    steamvr.room[LEFT] = room_pose((0, 1.6, -0.4), right=(0, 0, -1), up=(0, -1, 0), back=(-1, 0, 0))
+    wrist.tick()
+    assert len(rendered) == len(steamvr.images) == 1 and not wrist._dirty
+    assert steamvr.shown
+    steamvr.room[LEFT] = room_pose((-0.3, 0.9, 0))
+    for _ in range(6):
+        wrist.tick()
+    backend.status_changed.emit(Status("ok", "Connected", ""))
+    wrist.tick()
+    assert len(rendered) == 1 and wrist._dirty
+    steamvr.room[LEFT] = room_pose((0, 1.6, -0.4), right=(0, 0, -1), up=(0, -1, 0), back=(-1, 0, 0))
+    wrist.tick()  # reveal must include new text even before its normal debounce expires
+    assert len(rendered) == len(steamvr.images) == 2 and not wrist._dirty
+
+
+def test_wrist_timer_slows_while_idle_and_resumes_after_reconnect(wrist, steamvr):
+    steamvr.running = False
+    wrist.start()
+    try:
+        wrist.tick()
+        assert wrist._timer.interval() == display.IDLE_TICK_MS
+        steamvr.running = True
+        wrist.clock.now += display.RETRY_S
+        wrist.tick()
+        assert wrist.state == display.ON and wrist._timer.interval() == display.TICK_MS
+        wrist.settings.enabled = False
+        wrist.settings_changed()
+        assert wrist.state == display.OFF and wrist._timer.interval() == display.IDLE_TICK_MS
+        wrist.settings.enabled = True
+        wrist.clock.now += display.RETRY_S
+        wrist.settings_changed()
+        assert wrist.state == display.ON and wrist._timer.interval() == display.TICK_MS
+        steamvr.events = [openvr.VREvent_Quit]
+        wrist.tick()
+        assert wrist.state == display.WAITING and wrist._timer.interval() == display.IDLE_TICK_MS
+        steamvr.running = True
+        wrist.clock.now += display.AFTER_QUIT_S
+        wrist.tick()
+        assert wrist.state == display.ON and wrist._timer.interval() == display.TICK_MS
+    finally:
+        wrist.stop()
+    assert not wrist._timer.isActive()
+
+
 def test_the_right_hand_raised_like_a_watch_shows_it_too(wrist, steamvr):
     wrist.settings.look_only, wrist.settings.hand = True, "right"
     # fingers to the left, back of the hand towards the eyes, thumb towards the body

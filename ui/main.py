@@ -89,17 +89,20 @@ def look_for_update(backend) -> None:
 
 
 def run(backend: Backend | None = None) -> int:
+    from engine.runtime import prefer_game_cpu
+    prefer_game_cpu()
     _own_taskbar_button()
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("VRChat Translator")
     app.setWindowIcon(program_icon())        # title bars, taskbar, the settings window
     app.setStyleSheet(theme.style_sheet())
+    settings = config.load()
     if backend is None:
         if "--demo" in sys.argv:
             backend = DemoBackend()
         else:
-            # the window hands its settings to the backend; the chain asks them which service
             backend = LiveBackend()
+            backend.apply_settings(settings)  # hearing starts before the window is constructed
             backend._translator = speech_translator(
                 lambda: backend.settings.translating,
                 on_switch=make_on_switch(backend))
@@ -108,7 +111,7 @@ def run(backend: Backend | None = None) -> int:
         from .service_health import ServiceHealth
         backend.service_health = ServiceHealth(backend)
         app.aboutToQuit.connect(backend.service_health.stop)
-    window = MainWindow(backend, config.load())
+    window = MainWindow(backend, settings)
     from vr.main import attach_wrist
     wrist = attach_wrist(window)
     app.aboutToQuit.connect(wrist.stop)

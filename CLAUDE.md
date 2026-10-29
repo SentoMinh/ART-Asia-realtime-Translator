@@ -1,15 +1,26 @@
 # Project context
 
-Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the 26 October 2026 handoff: 0.12.14 publishes the integrated SteamVR wrist display and main-window resizing fixes, with package and GitHub upgrade checks complete. The separate uncommitted local translation/speech files remain excluded and preserved. Earlier translation/latency fixes, the Sound reset card and compact guide remain in the app. Read [LATENCY_REPORT.md](LATENCY_REPORT.md) for measurements and [CHANGELOG.md](CHANGELOG.md) for prior changes and validation limits.
+OpenCode sessions should start with [AGENTS.md](AGENTS.md): it holds the verified commands, entrypoints and
+release-safety rules. This file is the deeper history and convention reference behind it.
+
+Source version **1.0.6** packages the compact model list requested in this session: Hearing/Translating groups, language-only descriptions, CPU/GPU titles and icon actions, with the introductory text removed from both the Models page and picker. The user requested a new local export; local export is in `dist/1.0.6/`. Preserve earlier packages and unrelated working-tree files. Read the top of `AGENT_HANDOFF.md` for current release validation.
+
+Source version **1.0.5** combines today's Hy-MT2 option, CPU improvements and local speech/translation fixes with the existing VR integration. The resumed request is a local commit and full package; 0.12.14 remains the published release. Read the latest entry in `AGENT_HANDOFF.md` before applying older scope exclusions below.
+
+Start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for current source validation and the completed 1.0.6 local release. The earlier 1.0.5 release includes the previously separate local translation/speech fixes. The last recorded published version is 0.12.14, with integrated SteamVR wrist display and resizing fixes. The Sound reset card and compact guide remain. [LATENCY_REPORT.md](LATENCY_REPORT.md) indexes completed research, retained/rejected optimizations, raw evidence and measurement limits; [CHANGELOG.md](CHANGELOG.md) records the implementation.
+
+Unreleased source after 1.0.6 (`1efb598`) adds a gaming CPU/GPU budget: one inference thread by default, below-normal Windows process priority, reserve-gated CUDA for NLLB/Qwen with CPU fallback, bounded speech queues and cheaper idle wrist rendering. `VRCT_CPU_THREADS=2`, `VRCT_LOCAL_DEVICE=cpu` and `VRCT_PROCESS_PRIORITY=normal` override thread count, translation device and priority; they do not revert the queue or cleanup fixes. The latest suite passed 750 tests in 38.73 seconds. No version bump, build or publication; the handoff records measurements and limits.
 
 For the user-facing architecture overview, read [ART Project Guide](ART%20Project%20Guide.md). It is an Obsidian-compatible standalone note.
 
-Read `CODEBASE.md` for the architecture, export status, test baseline and remaining review items. It describes source version 0.12.14 and the preceding release validation; recheck current code before relying on its findings.
+Read `CODEBASE.md` for the architecture, source changes after 1.0.6, export status, test baseline and remaining review items; historical release sections retain the behavior of their named versions.
 
 Read `CHANGELOG.md` for the reason behind recent changes, their implementation commits, regression tests and troubleshooting steps.
 
 ## Scope and existing work
 
+- User preference: run research through `/agy` (`agy` CLI) in the terminal. Use local code inspection and tests directly; do not substitute another external research tool.
+- Record completed research and optimizations in the relevant Markdown report and handoff, including evidence, rejected options and limits. The gaming-pass `/agy` attempts timed out without a completed sourced answer; local runtime checks and benchmarks are recorded separately in `LATENCY_REPORT.md`.
 - Read `ROADMAP.md` when planning features: voice recognition is the current priority. Speaker 1 / Speaker 2 identification is deferred; remind the user when discussing future work. Close temporary demo previews after verification.
 - Local translation preference: **low latency first**. Read `LOCAL_TRANSLATION_PLAN.md` for Qwen and other candidates. Pick the fastest measured option that preserves meaning on the target PC with VRChat running; keep larger models as alternatives. Do not claim a speed winner before benchmarking or silently switch the user's model.
 
@@ -28,8 +39,9 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 - `ui/backend.py`: `Backend`, `Status`, `Utterance` contracts. Re-emit the same utterance ID to update an existing row.
 - `ui/live_backend.py`: capture lifecycle, typed translation, chatbox queue and typing dots.
 - `vrc/audio.py`, `vrc/chatbox.py`: Windows capture, OSC integration and visible VRChat-window discovery for the header positioning button.
-- `engine/vad.py`, `engine/speech.py`: segmentation, recognition scheduling, translation and routing.
-- `engine/stt.py`: cloud/local recognition through `load()` and `transcribe()` returning `Heard`.
+- `engine/vad.py`, `engine/speech.py`: segmentation, bounded capture/sentence/translation queues, stale-work dropping, recognition scheduling, translation routing and local-weight release.
+- `engine/runtime.py`, `engine/gpu_budget.py`: one-thread inference and process-priority policy plus the NVIDIA VRAM reserve for NLLB/Qwen CUDA. Preserve the device checks, CPU fallback and `VRCT_*` opt-outs.
+- `engine/stt.py`: cloud/local recognition through `load()` and `transcribe()` returning `Heard`; keep CUDA DLL handles alive without duplicating PATH.
 - `engine/services.py`: service registry, configuration, request helpers and per-domain model catalogs bound to URL/key fingerprints.
 - `ui/widgets.py`: `DialogPanel` embeds setup/download forms; preserve cancellation, navigation restoration and shared downloads. Keep the model list to one scroll area and one Close button.
 - `ui/main_window.py`: below 30%, alpha-zero blank space passes clicks through; text/input/top controls stay interactive. `ui/overlay_backdrop.py` preserves the selected darkness on an input-transparent surface behind the text; keep its geometry, stacking and lifetime aligned with the overlay. Use the standard bottom-right `QSizeGrip` to resize; only the top edge/corners also accept native edge resizing. The embedded update notice uses `Settings.last_update_notice` and must have current release text.
@@ -52,6 +64,7 @@ Read `CHANGELOG.md` for the reason behind recent changes, their implementation c
 ## Run and verify
 
 - Tests: `.venv-app\Scripts\python.exe -m pytest tests`.
+- Gaming-budget overrides: `VRCT_CPU_THREADS=2` (two inference threads), `VRCT_LOCAL_DEVICE=cpu` (no CUDA translation), `VRCT_PROCESS_PRIORITY=normal` (normal Windows priority). Defaults are one thread, automatic reserve-gated CUDA and below-normal priority.
 - Tests use pytest, fake clocks, fake HTTP/audio/model dependencies and Qt offscreen mode. Extend the nearest existing test file for meaningful behavior changes.
 - Direct launch: `.venv-app\Scripts\python.exe -m ui.main`; demo: append `--demo`.
 - `run_ui.bat` also invokes the source Git updater. `VRCT_NO_UPDATE=1` disables that check.

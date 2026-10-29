@@ -2,11 +2,17 @@
 the translators and the window: no GPU, no network, no sound device."""
 from __future__ import annotations
 
+import threading
+import queue
+from concurrent.futures import Future, ThreadPoolExecutor
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
 from engine import stt, vad
-from engine.speech import MIC, SPEAKER, SpeechEngine
+from engine.speech import (AUDIO_BACKLOG_S, MAX_AUDIO_CHUNKS, MAX_PENDING_SENTENCES, MAX_PENDING_TRANSLATIONS,
+                           MIC, RELEASE, SPEAKER, SpeechEngine)
 from engine.stt import CloudHearing, Heard, SttError
 from engine.translators import LIMIT_COOL_OFF_S, Chain, ServiceChain, ServiceTranslator
 from engine.vad import FRAME, FRAME_S, RATE, Segment, Segmenter
@@ -137,6 +143,17 @@ def test_switching_the_detector_drops_the_half_heard_sentence():
     seg.feed(sound(1.0, True), RATE)
     seg.configure(vad_on=False, threshold=0.7)
     seg.feed(sound(1.0, False), RATE)
+    assert found == []
+
+
+def test_interrupted_capture_drops_speech_and_resampler_history():
+    found = []
+    seg = segmenter(found)
+    seg.feed(np.full(48000, 0.5, dtype="float32"), 48000)
+    assert seg._resampler is not None
+    seg.reset()
+    assert seg._resampler is None
+    seg.feed(sound(1.5, False), RATE)
     assert found == []
 
 
@@ -464,6 +481,40 @@ def test_local_failure_keeps_the_local_error_and_recovers(models, monkeypatch, m
     assert chain.last_used == f"local:{model}"
 
 
+def test_engine_shortens_openmp_spinning_unless_already_configured(monkeypatch):
+    import importlib
+    import os
+    import engine
+    monkeypatch.delenv("KMP_BLOCKTIME", raising=False)
+    importlib.reload(engine)
+    assert os.environ["KMP_BLOCKTIME"] == "0"
+    monkeypatch.setenv("KMP_BLOCKTIME", "50")
+    importlib.reload(engine)
+    assert os.environ["KMP_BLOCKTIME"] == "50"
+
+
+def test_local_chain_answers_a_repeated_line_without_running_the_model_again(monkeypatch):
+    from engine import local_inference, translators
+    local = Fixed("Xin chào")
+    monkeypatch.setattr(local_inference, "translator", local)
+    chain = ServiceChain(lambda: "local")
+    for _ in range(3):
+        assert chain.translate("Hello", "vi", "en", heard=True) == "Xin chào"
+    assert local.calls == 1
+    for other in (("Hello", "zh", "en"), ("Hello", "vi", ""), ("Hi", "vi", "en")):
+        chain.translate(*other, heard=True)
+    chain.translate("Hello", "vi", "en")            # typed text keeps its own entry
+    assert local.calls == 5
+    local.error = "Local NLLB could not translate"
+    with pytest.raises(TranslateError):
+        chain.translate("New line", "vi", "en")
+    local.error = None
+    small = translators.Remembered(local, size=2)
+    for text in ("a", "b", "a", "c", "b"):          # "b" was the oldest when "c" arrived
+        small.translate(text, "vi")
+    assert local.calls == 6 + 4
+
+
 def test_chain_skips_a_translator_that_hit_its_limit_until_it_rested():
     clock = Clock()
     first, second = Fixed(error="the service's limit was reached"), Fixed("ok")
@@ -550,6 +601,193 @@ def sentence(clock, ago=0.5) -> Segment:
     return Segment(np.zeros(RATE, dtype="float32"), clock.now - ago)
 
 
+def test_capture_keeps_recent_audio_without_waiting_for_the_cutter():
+    clock, window = Clock(), Window()
+    eng = engine(window, Hears(), clock=clock)
+    audio = np.zeros(FRAME, dtype="float32")
+    for _ in range(MAX_AUDIO_CHUNKS + 20):
+        window.on_game_audio(audio, RATE)
+    assert eng._chunks.qsize() == MAX_AUDIO_CHUNKS
+    oldest = eng._chunks.get_nowait()
+    assert oldest[3] == 20
+    eng.stop()
+    window.on_mic_audio(audio, RATE)
+    assert eng._chunks.get_nowait() is None
+    with pytest.raises(queue.Empty):
+        eng._chunks.get_nowait()
+
+
+def test_dropped_and_stale_audio_reset_only_the_interrupted_source():
+    clock, window = Clock(), Window()
+    eng = engine(window, Hears(), clock=clock)
+    reset, cut = [], []
+    for source in (MIC, SPEAKER):
+        eng._segmenters[source] = SimpleNamespace(reset=lambda source=source: reset.append(source))
+    eng.cut = lambda source, mono, rate: cut.append(source)
+    audio = np.zeros(FRAME, dtype="float32")
+    for source, order, captured_at in (
+            (MIC, 0, clock.now), (SPEAKER, 0, clock.now),
+            (MIC, 2, clock.now),  # One capture callback was discarded while the cutter was busy.
+            (SPEAKER, 1, clock.now - AUDIO_BACKLOG_S - 1),
+            (SPEAKER, 2, clock.now)):
+        eng._chunks.put((source, audio, RATE, order, captured_at))
+    eng._chunks.put(None)
+    eng._cut_loop()
+    assert cut == [MIC, SPEAKER, MIC, SPEAKER]
+    assert reset == [MIC, SPEAKER]
+
+
+def test_pending_speech_is_bounded_and_preserves_microphone_priority():
+    clock = Clock()
+    eng = engine(Window(), Hears(), clock=clock)
+    for _ in range(MAX_PENDING_SENTENCES):
+        eng._queue(SPEAKER, sentence(clock))
+    eng._queue(MIC, sentence(clock))
+    eng._queue(SPEAKER, sentence(clock))
+    assert eng._sentences.qsize() == MAX_PENDING_SENTENCES
+    pending = [eng._sentences.get_nowait() for _ in range(MAX_PENDING_SENTENCES)]
+    assert pending[0][2] == MIC
+    assert [item[1] for item in pending[1:]] == list(range(2, MAX_PENDING_SENTENCES)) + [MAX_PENDING_SENTENCES + 1]
+
+
+def test_speaker_overload_does_not_displace_pending_microphone_speech():
+    clock = Clock()
+    eng = engine(Window(), Hears(), clock=clock)
+    for _ in range(MAX_PENDING_SENTENCES):
+        eng._queue(MIC, sentence(clock))
+    eng._queue(SPEAKER, sentence(clock))
+    assert [eng._sentences.get_nowait()[2] for _ in range(MAX_PENDING_SENTENCES)] == [MIC] * MAX_PENDING_SENTENCES
+
+
+def test_pending_speech_keeps_release_and_stop_controls_under_overload():
+    clock = Clock()
+    eng = engine(Window(), Hears(), clock=clock)
+    for _ in range(MAX_PENDING_SENTENCES * 2):
+        eng._queue(MIC, sentence(clock))
+        eng.release_local_hearing()
+    assert eng._sentences.qsize() == MAX_PENDING_SENTENCES + 1
+    assert eng._sentences.get_nowait()[2] == RELEASE
+    eng.stop()
+    eng._queue(MIC, sentence(clock))
+    eng.release_local_hearing()
+    assert eng._sentences.get_nowait()[2] is None
+    with pytest.raises(queue.Empty):
+        eng._sentences.get_nowait()
+
+
+def test_disabled_capture_defers_loading_the_hearing_model():
+    clock = Clock()
+    hears, loaded = Hears(), []
+    hears.load = lambda: loaded.append(True)
+    eng = engine(Window(mic_on=False, subtitles_on=False), hears, clock=clock)
+    eng._sentences.put((-1, 0, None, None))
+    eng._hear_loop()
+    assert loaded == []
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_slow_translation_has_bounded_work_and_releases_capacity_after_completion_or_failure(fail):
+    clock, window = Clock(), Window()
+    eng = engine(window, Hears("hello", "en"), clock=clock)
+    entered, resume = threading.Event(), threading.Event()
+    completed, cancelled = [], []
+    window.typing_cancelled = lambda: cancelled.append(True)
+    normal_finish = eng.finish
+
+    def slow_finish(line, segment):
+        entered.set()
+        assert resume.wait(2)
+        completed.append(line.id)
+        if fail:
+            raise RuntimeError("translator failed")
+        normal_finish(line, segment)
+
+    eng.finish = slow_finish
+    eng._mic_pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        eng.hear(MIC, sentence(clock))
+        assert entered.wait(2)
+        for _ in range(MAX_PENDING_TRANSLATIONS):
+            eng.hear(MIC, sentence(clock))
+        skipped = [line for line in window.utterance.seen if "skipped" in line.note]
+        assert len(skipped) == 1 and skipped[0].final
+        assert cancelled == [True]
+    finally:
+        resume.set()
+        eng._mic_pool.shutdown(wait=True)
+    assert len(completed) == MAX_PENDING_TRANSLATIONS
+    assert len(window.sent) == (0 if fail else MAX_PENDING_TRANSLATIONS)
+    if fail:
+        assert len([line for line in window.utterance.seen if line.note == "Translation failed"]) == MAX_PENDING_TRANSLATIONS
+    eng.finish = normal_finish
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        eng._mic_pool = pool
+        eng.hear(MIC, sentence(clock))
+    assert len(window.sent) == (1 if fail else MAX_PENDING_TRANSLATIONS + 1)
+
+
+def test_a_translation_that_expires_in_the_executor_is_not_run_or_sent():
+    clock, window = Clock(), Window()
+    eng = engine(window, Hears("hello", "en"), clock=clock)
+    entered, resume = threading.Event(), threading.Event()
+    completed, cancelled = [], []
+    window.typing_cancelled = lambda: cancelled.append(True)
+    normal_finish = eng.finish
+
+    def slow_finish(line, segment):
+        entered.set()
+        assert resume.wait(2)
+        completed.append(line.id)
+        normal_finish(line, segment)
+
+    eng.finish = slow_finish
+    eng._mic_pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        eng.hear(MIC, sentence(clock))
+        assert entered.wait(2)
+        eng.hear(MIC, sentence(clock))
+        clock.now += 30
+    finally:
+        resume.set()
+        eng._mic_pool.shutdown(wait=True)
+    assert len(completed) == len(window.sent) == 1
+    assert window.utterance.seen[-1].note == "Translation skipped after waiting too long"
+    assert window.utterance.seen[-1].final and cancelled == [True]
+
+
+@pytest.mark.parametrize("source", [MIC, SPEAKER])
+def test_stopping_speech_finalizes_running_and_cancelled_translations_without_sending(source):
+    clock, window = Clock(), Window(my_lang="vi", chatbox_speaker=True)
+    entered, resume = threading.Event(), threading.Event()
+
+    class SlowTranslator(Fixed):
+        def translate(self, text, target, likely_source="", heard=False):
+            entered.set()
+            assert resume.wait(2)
+            return "translated"
+
+    eng = engine(window, Hears("hello", "en"), translator=SlowTranslator(), clock=clock)
+    pool = ThreadPoolExecutor(max_workers=1)
+    if source == MIC:
+        eng._mic_pool = pool
+    else:
+        eng._pool = pool
+    try:
+        eng.hear(source, sentence(clock))
+        assert entered.wait(2)
+        eng._engines["local"].text = "another sentence"
+        eng.hear(source, sentence(clock))
+        eng.stop()
+        after_stop = len(window.utterance.seen)
+    finally:
+        resume.set()
+        pool.shutdown(wait=True)
+    assert window.sent == []
+    final = [line for line in window.utterance.seen if line.final]
+    assert len(final) == 2 and all(line.note == "Translation cancelled" for line in final)
+    assert all(line.final for line in window.utterance.seen[after_stop:])
+
+
 def test_another_player_is_shown_first_as_heard_then_translated_into_my_language():
     clock, window = Clock(), Window(my_lang="vi")
     engine(window, Hears("你好", "zh"), clock=clock).hear(SPEAKER, sentence(clock))
@@ -631,13 +869,15 @@ def test_the_same_line_twice_in_a_row_is_music_fooling_the_model():
     assert len([line for line in window.utterance.seen if line.final]) == 2
 
 
-def test_an_old_sentence_from_another_player_is_dropped_but_mine_never_is():
+def test_stale_speech_does_not_decode_or_send_delayed_microphone_messages():
     clock, window = Clock(), Window()
-    eng = engine(window, Hears("hello", "en"), clock=clock)
+    hears, cancelled = Hears("hello", "en"), []
+    window.typing_cancelled = lambda: cancelled.append(True)
+    eng = engine(window, hears, clock=clock)
     eng.hear(SPEAKER, sentence(clock, ago=30))
     assert window.utterance.seen == []
     eng.hear(MIC, sentence(clock, ago=30))
-    assert len(window.sent) == 1
+    assert hears.asked == [] and window.sent == [] and cancelled == [True]
 
 
 def test_nothing_heard_shows_nothing_and_a_problem_becomes_the_status():
@@ -646,6 +886,16 @@ def test_nothing_heard_shows_nothing_and_a_problem_becomes_the_status():
     assert window.utterance.seen == [] and window.speech_status == "Listening"
     engine(window, Hears(error="the service's limit was reached"), clock=clock).hear(SPEAKER, sentence(clock))
     assert window.speech_status == "the service's limit was reached"
+
+
+@pytest.mark.parametrize("source", [MIC, SPEAKER])
+def test_punctuation_only_recognition_never_translates_or_sends(source):
+    clock, window, translator = Clock(), Window(), Fixed("should not translate")
+    cancelled = []
+    window.typing_cancelled = lambda: cancelled.append(True)
+    engine(window, Hears("。...!", "zh"), translator, clock).hear(source, sentence(clock))
+    assert translator.calls == 0 and window.utterance.seen == [] and window.sent == []
+    assert cancelled == ([True] if source == MIC else [])
 
 
 def test_the_hearing_engine_follows_the_setting():
@@ -668,6 +918,85 @@ def test_cloud_hearing_without_a_key_falls_back_to_hearing_on_this_pc():
                        translator=Fixed("x"), clock=clock)
     eng.hear(SPEAKER, sentence(clock))
     assert window.utterance.seen[0].original == "local"
+
+
+def test_online_hearing_releases_the_local_fallback_weights_after_it_recovers():
+    clock, window = Clock(), Window(hearing="custom")
+    switches = []
+    window.switch_prompt_requested = SimpleNamespace(emit=lambda *args: switches.append(args))
+    local, closed = Hears("local", "en"), []
+    local.close = lambda: closed.append(True) or True
+
+    class Flaky(Hears):
+        def __init__(self):
+            super().__init__("from the service", "en")
+            self.failing = True
+
+        def transcribe(self, samples, lang, prefer=()):
+            if self.failing:
+                raise SttError("rate limited")
+            return super().transcribe(samples, lang, prefer=prefer)
+
+    cloud = Flaky()
+    eng = SpeechEngine(window, engines={"local": local, "custom": cloud},
+                       translator=Fixed("x"), clock=clock)
+    eng.hear(SPEAKER, sentence(clock))
+    assert window.utterance.seen[-1].original == "local" and closed == []
+    assert switches == [("hearing", "custom", "rate limited")]
+    cloud.failing = False
+    eng.hear(SPEAKER, sentence(clock))
+    assert window.utterance.seen[-1].original == "from the service"
+    assert closed == [True]                   # the fallback weights are not kept resident
+
+
+def test_release_local_hearing_runs_on_the_hearing_thread():
+    window = Window(hearing="custom")
+    local, released = Hears("local", "en"), threading.Event()
+    local.close = lambda: released.set() or True
+    eng = SpeechEngine(window, engines={"local": local, "custom": Hears("cloud", "en")},
+                       translator=Fixed("x"), clock=Clock())
+    eng.start()
+    try:
+        eng.release_local_hearing()
+        assert released.wait(2.0)
+    finally:
+        eng.stop()
+        for thread in eng._threads:
+            thread.join(timeout=2)
+
+
+def test_queued_hearing_release_keeps_a_reselected_local_model():
+    clock, window = Clock(), Window(hearing="custom")
+    local, closed, recognized = Hears(), [], []
+    local.close = lambda: closed.append(True)
+    eng = engine(window, local, clock=clock)
+    eng.release_local_hearing()
+    window.settings.hearing = "local"
+    eng._queue(MIC, sentence(clock))
+
+    def recognize(source, segment):
+        recognized.append(len(closed))
+        eng.stop()
+
+    eng.hear = recognize
+    eng._hear_loop()
+    assert recognized == [0]
+    assert closed == [True]  # Shutdown still releases the recognizer.
+
+
+def test_cloud_result_keeps_local_weights_when_local_was_selected_during_recognition():
+    clock, window = Clock(), Window(hearing="custom")
+    local, closed = Hears(), []
+    local.close = lambda: closed.append(True)
+    eng = engine(window, local, clock=clock)
+
+    def recognize(*args, **kwargs):
+        window.settings.hearing = "local"
+        return Heard("cloud result", "en")
+
+    eng._engines["custom"].transcribe = recognize
+    eng.hear(SPEAKER, sentence(clock))
+    assert closed == []
 
 
 def test_no_key_and_no_local_model_names_both_reasons():
@@ -748,7 +1077,7 @@ def test_the_local_model_loads_from_the_program_s_own_download(monkeypatch, tmp_
     monkeypatch.setattr(stt, "whisper_class", lambda: Model)
     stt.LocalWhisper().load()
     assert made == [(str(tmp_path / "VRChat-Translator" / "local-model" / "whisper"),
-                     {"device": "cuda", "compute_type": "float16"})]
+                     {"device": "cuda", "compute_type": "float16", "cpu_threads": 1, "num_workers": 1})]
 
 
 # ---- on Auto, focus on our languages -------------------------------------------------------
@@ -995,6 +1324,8 @@ def test_panel_targets_are_captured_before_settings_change():
     class Pending:
         def submit(self, function, *args):
             self.function, self.args = function, args
+            self.future = Future()
+            return self.future
     clock, window = Clock(), Window(my_lang="en", their_lang="vi", translated_to=["en", "ja", "ko"])
     window.speech_target_lang = lambda: "vi"
     speech = engine(window, Hears("Hello", "en"), clock=clock)
@@ -1003,6 +1334,7 @@ def test_panel_targets_are_captured_before_settings_change():
     speech.hear(MIC, sentence(clock))
     window.settings.translated_to = ["zh"]
     pending.function(*pending.args)
+    pending.future.set_result(None)
     assert window.sent[0].panel_targets == ("en", "ja", "ko")
     assert dict(window.sent[0].panel_translations)["en"] == "Hello"
 
@@ -1011,6 +1343,8 @@ def test_microphone_captures_all_chatbox_targets_and_reuses_panel_results():
     class Pending:
         def submit(self, function, *args):
             self.function, self.args = function, args
+            self.future = Future()
+            return self.future
     class Translator:
         def __init__(self):
             self.calls = []
@@ -1026,6 +1360,7 @@ def test_microphone_captures_all_chatbox_targets_and_reuses_panel_results():
     window.settings.their_languages = ["ja"]
     window.settings.translated_to = ["ko"]
     pending.function(*pending.args)
+    pending.future.set_result(None)
     assert translator.calls == [("zh", True), ("vi", True)]
     line = window.sent[0]
     assert line.chatbox_targets == ("zh", "vi", "en")

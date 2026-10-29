@@ -53,8 +53,39 @@ def release(data: bytes, version="v0.9.9", digest=None, name="VRChat-Translator.
          "digest": digest or "sha256:" + hashlib.sha256(data).hexdigest()}]}
 
 
+class Mirror(Http):
+    """GitHub cannot be reached; the address named in VRCT_UPDATE_API answers instead."""
+
+    def __init__(self, mirror: str, release: dict, data=b""):
+        super().__init__(release, data)
+        self.mirror = mirror
+
+    def get(self, url, headers=None):
+        self.asked.append(url)
+        self.headers.append(headers or {})
+        if url != self.mirror:
+            raise OSError("no route to host")
+        return Answer(body=self.release)
+
+
+class Cut(Http):
+    """A connection that dies halfway through the download."""
+
+    def stream(self, method, url, headers=None):
+        self.asked.append(url)
+        self.headers.append(headers or {})
+
+        class CutAnswer(Answer):
+            def iter_bytes(self, size):
+                yield b"version 0."
+                raise OSError("connection reset")
+
+        return CutAnswer()
+
+
 @pytest.fixture
-def program(tmp_path):
+def program(tmp_path, monkeypatch):
+    monkeypatch.delenv(updater.MIRROR_ENV, raising=False)   # a mirror set on this PC must not change the test
     exe = tmp_path / "VRChat-Translator.exe"
     exe.write_bytes(b"version 0.9.8")
     return exe
@@ -82,6 +113,33 @@ def test_a_release_without_a_program_file_is_skipped(program):
     assert updater.Updater(program, "0.9.8", http=http).check() == "" and http.asked == [LATEST]
 
 
+def test_a_mirror_is_asked_when_github_cannot_be_reached(program, monkeypatch):
+    mirror = "https://mirror.test/releases/latest"
+    monkeypatch.setenv(updater.MIRROR_ENV, mirror)          # for networks where GitHub is blocked
+    data = b"version 0.9.9"
+    http = Mirror(mirror, release(data), data)
+    assert updater.Updater(program, "0.9.8", http=http).check() == "0.9.9"
+    assert http.asked == [LATEST, mirror, FILE]            # GitHub first, then the mirror, then its file
+    assert updater.beside(program, ".new").read_bytes() == data
+
+
+def test_a_mirror_does_not_replace_github(program, monkeypatch):
+    monkeypatch.setenv(updater.MIRROR_ENV, "https://mirror.test/latest")
+    http = Http(release(b"x"), b"x")
+    updater.Updater(program, "0.9.9", http=http).check()    # GitHub answers that nothing is newer
+    assert http.asked == [LATEST]
+
+
+def test_mirror_addresses_take_the_repository_name(monkeypatch):
+    monkeypatch.delenv(updater.MIRROR_ENV, raising=False)
+    assert updater.release_urls("owner/repo") == ["https://api.github.com/repos/owner/repo/releases/latest"]
+    monkeypatch.setenv(updater.MIRROR_ENV, "https://mirror.test/{source}/latest; https://second.test/latest")
+    assert updater.release_urls("owner/repo") == [
+        "https://api.github.com/repos/owner/repo/releases/latest",
+        "https://mirror.test/owner/repo/latest",
+        "https://second.test/latest"]
+
+
 def test_a_damaged_download_is_thrown_away(program):
     data = b"version 0.9.9"
     http = Http(release(data, digest="sha256:" + "0" * 64), data)
@@ -105,6 +163,14 @@ def test_bad_pending_file_is_removed_even_when_replacement_download_fails(progra
     updater.beside(program, ".new").write_bytes(b"bad")
     http = Http(release(b"new"), b"damaged download")
     assert updater.Updater(program, "0.9.8", http=http).check() == ""
+    assert not updater.beside(program, ".new").exists()
+
+
+def test_an_interrupted_download_leaves_nothing_behind(program):
+    http = Cut(release(b"version 0.9.9"), b"")
+    with pytest.raises(OSError):
+        updater.Updater(program, "0.9.8", http=http).check()
+    assert not updater.beside(program, ".part").exists()
     assert not updater.beside(program, ".new").exists()
 
 
@@ -141,6 +207,25 @@ def test_the_download_takes_the_program_s_place_at_the_next_start(program, monke
 
 def test_the_source_version_has_no_program_file_to_update():
     assert updater.program_file() is None
+
+
+def test_a_copy_still_held_open_does_not_stop_the_update(program, monkeypatch):
+    updater.beside(program, ".old").write_bytes(b"a copy that is still open")
+    monkeypatch.setattr(updater, "clear_leftovers", lambda folder: None)   # it cannot be deleted this start
+    updater.beside(program, ".new").write_bytes(b"version 0.9.9")
+    started = []
+    assert updater.apply_pending(program, launch=lambda args, **kw: started.append(args))
+    assert program.read_bytes() == b"version 0.9.9"
+    assert updater.beside(program, ".old2").read_bytes() == b"version 0.9.8"       # the backup of this copy
+    assert updater.beside(program, ".old").read_bytes() == b"a copy that is still open"
+    assert len(started) == 1
+
+
+def test_old_copies_are_cleared_when_there_is_nothing_to_apply(program):
+    for suffix in (".old", ".old2", ".old3"):
+        updater.beside(program, suffix).write_bytes(b"previous")
+    assert not updater.apply_pending(program, launch=lambda *args, **kw: pytest.fail("nothing to start"))
+    assert updater.leftovers(program) == []
 
 
 def test_updates_never_send_provider_keys(program):

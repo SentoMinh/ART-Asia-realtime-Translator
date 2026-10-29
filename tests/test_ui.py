@@ -287,6 +287,29 @@ def test_window_language_button(window):
         i18n.set_lang("en")
 
 
+@pytest.mark.parametrize("note", [
+    "Translation skipped to keep up with live speech",
+    "Translation skipped after waiting too long",
+    "Translation failed",
+    "Translation cancelled",
+])
+def test_speech_completion_notes_follow_interface_language(app, note):
+    log = LogView()
+    row = log.add_or_update(Utterance(id=1, source="mic", original="Hello", final=True, note=note))
+    try:
+        for language in ("en", "zh", "vi"):
+            i18n.set_lang(language)
+            row.refresh()
+            expected = i18n.tr(note)
+            assert expected in row.header.text()
+            if language != "en":
+                assert expected != note and note not in row.header.text()
+            assert "Hello" in row.original.text()
+    finally:
+        i18n.set_lang("en")
+        log.deleteLater()
+
+
 def test_cantonese_is_its_own_option(window, tmp_path):
     def codes(combo):
         return [combo.itemData(i) for i in range(combo.count())]
@@ -747,10 +770,14 @@ def test_the_local_model_s_window_downloads_stops_and_says_how_it_ended(window, 
     dialog = LocalModelDialog(window, download=download)
     row = dialog.rows["sensevoice"]
     other = dialog.rows["nllb-200-ct2"]
-    assert row["action"].text() == "Download" and not row["action"].isHidden()
+    assert row["action"].accessibleName() == "Download SenseVoice Small" and not row["action"].isHidden()
+    assert not row["action"].text() and not row["action"].icon().isNull()
+    download_icon = row["action"].icon().cacheKey()
     assert not dialog.findChildren(QComboBox)
     row["action"].click()
-    assert download.calls == ["start"] and row["action"].text() == "Stop"
+    assert download.calls == ["start"] and row["action"].accessibleName() == "Stop SenseVoice Small"
+    assert row["action"].toolTip() == "Stop SenseVoice Small"
+    assert row["action"].icon().cacheKey() != download_icon
     assert download.model == "sensevoice" and not other["action"].isEnabled()
     other_before = other["result"].text()
     download.progress.emit(float(2**30), float(2 * 2**30))
@@ -760,7 +787,8 @@ def test_the_local_model_s_window_downloads_stops_and_says_how_it_ended(window, 
     assert download.calls == ["start", "stop"] and not row["action"].isEnabled()
     download.active = False
     download.finished.emit("stopped")
-    assert row["action"].text() == "Download" and row["action"].isEnabled()
+    assert row["action"].accessibleName() == "Download SenseVoice Small" and row["action"].isEnabled()
+    assert row["action"].icon().cacheKey() == download_icon
     download.finished.emit("not enough free space on C:")
     assert row["result"].text() == "✗ not enough free space on C:"
     state["missing"] = ""
@@ -890,6 +918,8 @@ def test_the_download_tells_the_window_how_it_ended(app):
 
 
 def test_delete_model_confirms_inline_cancels_and_allows_redownload(window):
+    from PySide6.QtCore import Qt
+
     from engine import local_model
     from ui.local_download import LocalDownload
     from ui.settings_window import LocalModelDialog
@@ -898,15 +928,22 @@ def test_delete_model_confirms_inline_cancels_and_allows_redownload(window):
     path.parent.mkdir(parents=True)
     path.write_bytes(b"weights")
     dialog = LocalModelDialog(window, download=LocalDownload())
+    row = dialog.rows[model]
     removed = []
     dialog.removed.connect(removed.append)
-    dialog.delete_model(model)
+    for name in ("delete", "cancel", "use"):
+        assert not row[name].text() and not row[name].icon().isNull()
+        assert row[name].accessibleName() and row[name].toolTip()
+        assert row[name].focusPolicy() == Qt.StrongFocus
+    row["delete"].click()
     assert path.exists() and not removed
-    assert not dialog.rows[model]["cancel"].isHidden()
-    dialog.cancel_delete()
-    assert path.exists() and dialog.rows[model]["cancel"].isHidden()
-    dialog.delete_model(model)
-    dialog.delete_model(model)
+    assert not row["cancel"].isHidden()
+    assert row["delete"].accessibleName().startswith("Confirm delete")
+    row["cancel"].click()
+    assert path.exists() and row["cancel"].isHidden()
+    assert row["delete"].accessibleName().startswith("Delete model")
+    row["delete"].click()
+    row["delete"].click()
     assert not path.exists() and removed == [model]
     assert dialog.rows[model]["delete"].isHidden()
     assert dialog.rows[model]["action"].isEnabled()

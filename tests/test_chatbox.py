@@ -1,8 +1,10 @@
 import os
+import queue
 import socket
 import struct
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -211,6 +213,63 @@ def test_text_is_sent_when_vrchat_listens(app):
     assert lines[-1][:2] == (True, "HELLO THERE")
     assert seen[-1][1] is True and seen[-1][2] == ""
     assert backend._translator.asked == [("hello there", "en", "vi")]
+
+
+def test_switching_to_an_online_provider_releases_local_models(app, monkeypatch):
+    from engine import local_inference
+    released, hearing = [], []
+    monkeypatch.setattr(local_inference, "release_local_translation",
+                        lambda should_release=None: released.append(should_release()))
+    backend, *_ = make(app, READY)
+    backend.speech_engine = SimpleNamespace(release_local_hearing=lambda: hearing.append(True))
+    backend._active_translating = backend._active_hearing = "local"
+    backend.apply_settings(Settings(translating="custom", hearing="custom"))
+    assert released == [True] and hearing == [True]
+    backend.apply_settings(Settings(translating="custom", hearing="custom"))
+    assert released == [True] and hearing == [True]     # unchanged providers do not release again
+    backend.apply_settings(Settings(translating="local", hearing="local"))
+    assert released == [True] and hearing == [True]     # choosing Local again keeps what is loaded
+
+
+def test_local_release_runs_on_the_translate_worker_when_it_is_running(app):
+    backend, *_ = make(app, READY)
+    backend._threaded = True
+    backend._worker = SimpleNamespace(is_alive=lambda: True)
+    backend._release_local_translation()
+    assert backend._jobs.get_nowait() == ("release_local",)
+
+
+def test_queued_translation_release_rechecks_the_current_provider(app, monkeypatch):
+    from engine import local_inference
+    release_allowed = []
+    monkeypatch.setattr(local_inference, "release_local_translation",
+                        lambda should_release=None: release_allowed.append(should_release()))
+    backend, *_ = make(app, READY)
+    backend._threaded = True
+    backend._worker = SimpleNamespace(is_alive=lambda: True)
+    backend._active_translating = "local"
+    backend.apply_settings(Settings(translating="custom"))
+    backend.apply_settings(Settings(translating="local"))
+    backend._run(backend._jobs.get_nowait())
+    assert release_allowed == [False]
+
+
+def test_idle_local_translation_worker_rechecks_gpu_budget(app, monkeypatch):
+    from engine import local_inference
+    probes, waits = [], []
+    monkeypatch.setattr(local_inference, "check_local_gpu_budget", lambda: probes.append(True))
+    backend, *_ = make(app, READY)
+    backend.settings.translating = "local"
+
+    def next_job(timeout):
+        waits.append(timeout)
+        if len(waits) == 1:
+            raise queue.Empty
+        return None
+
+    backend._jobs = SimpleNamespace(get=next_job)
+    backend._work()
+    assert probes == [True]
 
 
 def test_target_language_follows_they_speak(app):

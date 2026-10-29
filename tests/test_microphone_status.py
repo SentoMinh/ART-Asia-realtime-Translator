@@ -25,6 +25,40 @@ def test_read_latest_complete_current_session_event(tmp_path, text, expected):
     assert status.logged_microphone(path, STARTED) == expected
 
 
+def test_growing_log_is_read_from_where_the_last_read_stopped(tmp_path, monkeypatch):
+    folder = tmp_path / "AppData/LocalLow/VRChat/VRChat"
+    folder.mkdir(parents=True)
+    log = folder / "output_log_2026-10-26.txt"
+    log.write_bytes(b"")
+    started = log.stat().st_ctime
+    stamp = datetime.fromtimestamp(started + 5).strftime("%Y.%m.%d %H:%M:%S")
+    monkeypatch.setattr(status.Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(status, "process_ids", lambda: [7])
+    monkeypatch.setattr(status, "process_started", lambda _: started)
+    reads, original = [], status.latest_microphone
+    monkeypatch.setattr(status, "latest_microphone",
+                        lambda path, began, start=0: reads.append(start) or original(path, began, start))
+    monitor = status.MicrophoneStatus()
+
+    def append(text):
+        with log.open("ab") as handle:
+            handle.write(text.encode())
+        monitor._read()
+
+    append(event(mic="HyperX", stamp=stamp) + "Chat noise\r\n")
+    assert monitor.microphone == "HyperX" and reads == [0]
+    append("More chat noise\r\n")
+    assert monitor.microphone == "HyperX" and reads[-1] == len(event(mic="HyperX", stamp=stamp)) + 12
+    append(event("Stop", stamp=stamp).rstrip())     # still being written
+    assert monitor.microphone == "HyperX"
+    append("\r\n")
+    assert monitor.microphone == ""
+    assert monitor._read_to == log.stat().st_size
+    log.write_bytes(event(mic="New session mic", stamp=stamp).encode())   # shorter: read again from the start
+    monitor._read()
+    assert monitor.microphone == "New session mic" and reads[-1] == 0
+
+
 def test_exit_clears_previous_microphone(monkeypatch):
     monitor = status.MicrophoneStatus()
     monitor.microphone = "HyperX"

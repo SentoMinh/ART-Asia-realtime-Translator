@@ -2,6 +2,8 @@
 then messages switch directly. Stand-ins for VRChat, the microphone and the speech model."""
 from __future__ import annotations
 
+import time
+
 import numpy as np
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -222,8 +224,8 @@ def engine(window, hears):
                         vads={MIC: LoudIsSpeech(), "speaker": LoudIsSpeech()})
 
 
-def sentence():
-    return Segment(np.zeros(RATE, dtype="float32"), 0.0)
+def sentence(clock=time.monotonic):
+    return Segment(np.zeros(RATE, dtype="float32"), clock())
 
 
 def test_starting_to_talk_into_my_microphone_turns_the_dots_on():
@@ -276,7 +278,7 @@ def test_voice_and_typed_messages_use_separate_languages(
     finished = []
     live.utterance.connect(lambda line: finished.append(line) if line.final else None)
     try:
-        eng.hear(MIC, sentence())
+        eng.hear(MIC, sentence(clock))
         voice = finished[-1]
         assert (voice.source, voice.src_lang, voice.dst_lang, voice.sent) == (
             MIC, mine, voice_target, True)
@@ -418,7 +420,7 @@ def test_panel_languages_do_not_change_voice_or_typed_chatbox_target(app):
     eng = SpeechEngine(live, engines={"gemini": hears, "local": hears}, translator=translator,
                        clock=clock, vads={MIC: LoudIsSpeech(), SPEAKER: LoudIsSpeech()})
     try:
-        eng.hear(MIC, sentence())
+        eng.hear(MIC, sentence(clock))
         assert translator.asked == [("hello", code, "en", True) for code in ("ja", "ko", "vi")]
         assert [text for event, text in box.events if event == "send"] == ["hello\nvi: hello\nja: hello"]
         clock.now += 2

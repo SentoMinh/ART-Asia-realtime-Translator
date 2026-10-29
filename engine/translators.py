@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import time
 import threading
+from collections import OrderedDict
 
 from vrc.translate import TranslateError, chat_messages
 
@@ -137,6 +138,33 @@ class Chain:
         raise problem or TranslateError("every translator is resting after an error; try again soon")
 
 
+class Remembered:
+    """A local model decodes greedily, so the same line always gets the same translation: a line
+    heard again (music, a greeting, a cough the hearing model writes as "T.") skips the model."""
+
+    def __init__(self, translator, size: int = 256):
+        self._translator = translator
+        self._size = size
+        self._answers: OrderedDict[tuple, str] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def prepare(self) -> None:
+        self._translator.prepare()
+
+    def translate(self, text: str, target: str, likely_source: str = "", heard: bool = False) -> str:
+        key = (text, target, likely_source, heard)
+        with self._lock:
+            if key in self._answers:
+                self._answers.move_to_end(key)
+                return self._answers[key]
+        answer = self._translator.translate(text, target, likely_source, heard=heard)
+        with self._lock:
+            self._answers[key] = answer
+            if len(self._answers) > self._size:
+                self._answers.popitem(last=False)
+        return answer
+
+
 class ServiceChain:
     """Only the models explicitly configured for the selected service.
     `pick()` says which service that is right now; it can change while the program runs."""
@@ -163,9 +191,10 @@ class ServiceChain:
         key = (service, models, services.setting(service, "url"), services.setting(service, "key"))
         if key not in self._chains:
             if service == "local":
-                from .local_inference import translator, qwen_translator
+                from .local_inference import hy_mt_translator, qwen_translator, translator
                 model = models[0]
-                choices = [(f"local:{model}", qwen_translator if model == "qwen3-1.7b-ct2" else translator)]
+                runtime = {"qwen3-1.7b-ct2": qwen_translator, "hy-mt2-1.8b": hy_mt_translator}.get(model, translator)
+                choices = [(f"local:{model}", Remembered(runtime))]
             else:
                 choices = [(f"{service}:{model}", ServiceTranslator(service, model)) for model in models]
             self._chains[key] = Chain(

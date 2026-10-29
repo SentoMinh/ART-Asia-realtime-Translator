@@ -77,6 +77,39 @@ def test_hearing_switches_saved_models_and_reuses_the_current_engine(monkeypatch
     assert made == ["large-v3-turbo", "sensevoice", "phowhisper-small"]
 
 
+def test_hearing_close_frees_the_recognizer_and_a_later_use_reloads_it(monkeypatch):
+    made, closed = [], []
+    def make(name):
+        made.append(name)
+        return SimpleNamespace(load=lambda: None, close=lambda: closed.append(name),
+                               transcribe=lambda *a, **kw: name)
+    monkeypatch.setattr(local_inference, "LocalWhisper", make)
+    monkeypatch.setattr(local_inference, "LocalSenseVoice", lambda: make("sensevoice"))
+    hearing = local_inference.LocalHearing()
+    assert hearing.transcribe([], "en") == "large-v3-turbo"
+    assert hearing.close() is True
+    assert closed == ["large-v3-turbo"]
+    assert hearing.close() is False                  # already free: nothing to do
+    assert hearing.transcribe([], "en") == "large-v3-turbo"
+    assert made == ["large-v3-turbo", "large-v3-turbo"]
+
+
+def test_releasing_local_translation_frees_every_resident_model():
+    closed = []
+    class Native:
+        def close(self):
+            closed.append(True)
+    engines = (local_inference.translator, local_inference.qwen_translator, local_inference.hy_mt_translator)
+    for engine in engines:
+        engine._model, engine._tokenizer = Native(), SimpleNamespace()
+    assert local_inference.release_local_translation() is True
+    assert closed == [True, True, True]
+    for engine in engines:
+        assert engine._model is None and engine._tokenizer is None
+    assert local_inference.release_local_translation() is False
+    assert closed == [True, True, True]
+
+
 def test_phowhisper_loads_its_own_download_on_cpu_not_turbo(monkeypatch):
     from engine import stt
     sources = []
@@ -85,7 +118,7 @@ def test_phowhisper_loads_its_own_download_on_cpu_not_turbo(monkeypatch):
     monkeypatch.setattr(stt, "_add_gpu_libraries", lambda: pytest.fail("PhoWhisper must not load CUDA"))
     def create(source, **kwargs):
         sources.append(source)
-        assert kwargs == dict(device="cpu", compute_type="int8", cpu_threads=2)
+        assert kwargs == dict(device="cpu", compute_type="int8", cpu_threads=1, num_workers=1)
         return SimpleNamespace(transcribe=lambda *a, **kw: ([], None))
     monkeypatch.setattr(stt, "whisper_class", lambda: create)
     stt.LocalWhisper("phowhisper-small").load()
@@ -149,7 +182,7 @@ def test_local_translation_prepares_selected_weights_once_without_generating(mon
     model = engine_type()
     model.prepare()
     assert creates == [(str(local_model.model_folder(model_id)),
-                        dict(device="cpu", compute_type="int8", inter_threads=1, intra_threads=2))]
+                        dict(device="cpu", compute_type="int8", inter_threads=1, intra_threads=1))]
     assert not inference
     model.prepare()
     assert model.translate("Hello", "vi", "en") == "Xin chào"
@@ -210,11 +243,85 @@ def test_local_translation_chain_uses_shared_runtime_without_http(monkeypatch):
 def test_translation_switch_routes_all_chains_and_keeps_hearing_selection(monkeypatch):
     monkeypatch.setattr(local_inference.translator, "translate", lambda *a, **kw: "NLLB")
     monkeypatch.setattr(local_inference.qwen_translator, "translate", lambda *a, **kw: "Qwen")
+    monkeypatch.setattr(local_inference.hy_mt_translator, "translate", lambda *a, **kw: "Hy-MT2")
     typed, speech = ServiceChain(lambda: "local"), ServiceChain(lambda: "local")
     local_model.select("sensevoice")
-    for model, expected in (("nllb-200-ct2", "NLLB"), ("qwen3-1.7b-ct2", "Qwen"), ("nllb-200-ct2", "NLLB")):
+    for model, expected in (("nllb-200-ct2", "NLLB"), ("qwen3-1.7b-ct2", "Qwen"),
+                            ("hy-mt2-1.8b", "Hy-MT2"), ("nllb-200-ct2", "NLLB")):
         local_model.select(model)
         for chain in (typed, speech):
             assert chain.translate("Hello", "vi", "en") == expected
             assert chain.last_used == f"local:{model}"
         assert local_model.selected() == "sensevoice"
+
+
+def test_hy_mt_uses_tencents_prompt_and_greedy_llama_cpp(monkeypatch):
+    calls = []
+
+    class FakeLlama:
+        def __init__(self, path, **options):
+            calls.append((path, options))
+
+        def tokenize(self, data, add_bos=False):
+            return list(data[:4])
+
+        def create_chat_completion(self, messages, **options):
+            calls.append((messages, options))
+            return {"choices": [{"finish_reason": "stop", "message": {"content": "  Xin   chào  "}}]}
+
+    monkeypatch.setattr(local_model, "missing", lambda model: "")
+    monkeypatch.setitem(sys.modules, "llama_cpp", SimpleNamespace(Llama=FakeLlama))
+    monkeypatch.setattr(local_inference.translator, "_model", object())
+    engine = local_inference.LocalHyMTTranslator()
+    assert engine.translate("等一下", "vi", "zh") == "Xin chào"
+    path, options = calls[0]
+    assert path == str(local_model.model_folder("hy-mt2-1.8b") / "model.gguf")
+    assert options["n_gpu_layers"] == 0 and options["n_threads"] == options["n_threads_batch"] == 1
+    messages, decoding = calls[1]
+    assert messages == [{"role": "user", "content":
+                         "将以下文本翻译为越南语，注意只需要输出翻译后的结果，不要额外解释：\n\n等一下"}]
+    assert decoding["temperature"] == 0.0 and decoding["top_k"] == 1 and decoding["max_tokens"] == 512
+    assert local_inference.translator._model is None
+    english = local_inference.hy_mt_prompt("Wait", "vi", "en")
+    assert english.startswith("Translate the following text into Vietnamese.")
+
+
+@pytest.mark.parametrize("answer,finish,target,error", [
+    ("Xin chào", "length", "vi", "did not finish"),
+    ("", "stop", "vi", "did not return"),
+    ("你好", "stop", "vi", "instead of translating"),
+    ("Hello", "stop", "ja", "requested language"),
+    ("word " * 64, "stop", "vi", "kept repeating"),
+])
+def test_hy_mt_rejects_an_unfinished_or_wrong_language_answer(monkeypatch, answer, finish, target, error):
+    engine = local_inference.LocalHyMTTranslator()
+    engine._model = SimpleNamespace(
+        tokenize=lambda data, add_bos=False: data.split(),
+        create_chat_completion=lambda *a, **kw: {"choices": [{"finish_reason": finish,
+                                                              "message": {"content": answer}}]})
+    monkeypatch.setattr(local_model, "missing", lambda model: "")
+    with pytest.raises(TranslateError, match=error) as caught:
+        engine.translate("Hello", target, "en")
+    assert caught.value.wait == 0
+
+
+def test_hy_mt_shortcuts_and_input_limit_do_not_generate(monkeypatch):
+    engine = local_inference.LocalHyMTTranslator()
+    engine._model = SimpleNamespace(tokenize=lambda data, add_bos=False: data.split())
+    monkeypatch.setattr(local_model, "missing", lambda model: "")
+    assert engine.translate("Hello", "en", "en") == "Hello"
+    assert engine.translate("。", "vi", "zh") == "。"
+    with pytest.raises(TranslateError, match="too long"):
+        engine.translate("word " * 1100, "vi", "en")
+    monkeypatch.setattr(local_model, "missing", lambda model: "download first")
+    with pytest.raises(TranslateError, match="download first") as caught:
+        engine.translate("Hello", "vi", "en")
+    assert caught.value.wait == 0
+
+
+def test_local_chain_uses_hy_mt_when_selected(monkeypatch):
+    monkeypatch.setattr(local_inference.hy_mt_translator, "translate", lambda *a, **kw: "Hy-MT2")
+    local_model.select("hy-mt2-1.8b")
+    chain = ServiceChain(lambda: "local")
+    assert chain.translate("Hello", "vi", "en") == "Hy-MT2"
+    assert chain.last_used == "local:hy-mt2-1.8b"

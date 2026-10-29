@@ -272,6 +272,24 @@ def test_use_existing_attachment_checks_endpoint_before_changing_selection(app, 
         dialog.close()
 
 
+def test_hidden_idle_dialog_stops_polling_until_shown_or_playing(ready_dialog):
+    dialog = ready_dialog
+    dialog.show()
+    assert dialog._poll_timer.isActive() and dialog._route_timer.isActive()
+    dialog.reject()
+    assert not dialog._route_timer.isActive()
+    dialog.poll()
+    assert not dialog._poll_timer.isActive()
+    dialog.show()
+    assert dialog._poll_timer.isActive() and dialog._route_timer.isActive()
+    dialog.play_button.click()
+    dialog.reject()
+    dialog.poll()
+    assert dialog.player.active and dialog._poll_timer.isActive()
+    assert not dialog._route_timer.isActive()
+    dialog.shutdown()
+
+
 def test_close_or_reject_keeps_music_active(ready_dialog):
     dialog = ready_dialog
     dialog.play_button.click()

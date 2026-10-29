@@ -12,9 +12,11 @@ Three kinds of threads, so that no step waits for another:
 from __future__ import annotations
 
 import dataclasses
+import heapq
 import itertools
 import logging
 import queue
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -34,11 +36,61 @@ FIRST_ID = 1_000_000      # typed lines count from 1: these never collide with t
 # Detector strictness when the window's settings don't say (Settings → Sound has both sliders):
 MIC_THRESHOLD = 0.5       # a microphone is clean: the detector's default is right for it
 SPEAKER_THRESHOLD = 0.7   # game sound has music: stricter
-STALE_S = 10.0            # another player's sentence that waited this long is dropped: stay live
+STALE_S = 10.0            # speech that waited this long is dropped: stay live
+AUDIO_BACKLOG_S = 2.0     # skip capture backlog before spending CPU on voice detection
+MAX_AUDIO_CHUNKS = 128    # bounded even when capture callbacks arrive faster than expected
+MAX_PENDING_SENTENCES = 8
+MAX_PENDING_TRANSLATIONS = 4   # per source, including the translation already running
 REPEAT_S = 15.0           # the same line again within this time is music fooling the model
 REPORT_S = 30             # how often the log says how much sound arrived
 ANNOUNCE_S = 20.0         # "【Speaking Spanish】" is shown again only after this long
 MIC, SPEAKER = "mic", "speaker"
+RELEASE = "__release_local_hearing__"   # queue marker: drop the local hearing weights
+
+
+class _PendingSpeech:
+    """A small priority queue: keep recent speech, reserving control messages and mic priority."""
+
+    def __init__(self, limit=MAX_PENDING_SENTENCES):
+        self.limit = limit
+        self._items = []
+        self._ready = threading.Condition()
+        self._closed = False
+
+    def put(self, item):
+        """Never wait for recognition. Return the discarded sentence, if any."""
+        with self._ready:
+            source = item[2]
+            if self._closed:
+                return item
+            if source is None:
+                self._closed = True
+                self._items.clear()
+            elif source == RELEASE and any(old[2] == RELEASE for old in self._items):
+                return None
+            self._items.append(item)
+            speech = [old for old in self._items if old[2] in (MIC, SPEAKER)]
+            discarded = None
+            if len(speech) > self.limit:
+                # Speakers yield to the microphone; within a source, keep the newest sentence.
+                discarded = max(speech, key=lambda old: (old[0], -old[1]))
+                self._items.remove(discarded)
+            heapq.heapify(self._items)
+            self._ready.notify()
+            return discarded
+
+    def get(self, block=True, timeout=None):
+        with self._ready:
+            if not self._items and (not block or not self._ready.wait_for(lambda: self._items, timeout)):
+                raise queue.Empty
+            return heapq.heappop(self._items)
+
+    def get_nowait(self):
+        return self.get(block=False)
+
+    def qsize(self):
+        with self._ready:
+            return len(self._items)
 
 
 class SpeechEngine:
@@ -53,8 +105,12 @@ class SpeechEngine:
         self._clock = clock
         self._ids = itertools.count(FIRST_ID)
         self._order = itertools.count()
-        self._chunks: queue.Queue = queue.Queue()
-        self._sentences: queue.PriorityQueue = queue.PriorityQueue()
+        self._chunks: queue.Queue = queue.Queue(maxsize=MAX_AUDIO_CHUNKS)
+        self._audio_lock = threading.Lock()
+        self._stopped = threading.Event()
+        self._capture_order = {source: itertools.count() for source in (MIC, SPEAKER)}
+        self._cut_order = {source: -1 for source in (MIC, SPEAKER)}
+        self._sentences = _PendingSpeech()
         vads = vads or {}
         self._segmenters = {
             SPEAKER: Segmenter(lambda s: self._queue(SPEAKER, s), vad=vads.get(SPEAKER),
@@ -69,9 +125,11 @@ class SpeechEngine:
         self._seen = {source: {"seconds": 0.0, "peak": 0.0, "sentences": 0} for source in (SPEAKER, MIC)}
         self._pool: ThreadPoolExecutor | None = None
         self._mic_pool: ThreadPoolExecutor | None = None
+        self._finish_slots = {source: threading.BoundedSemaphore(MAX_PENDING_TRANSLATIONS)
+                              for source in (MIC, SPEAKER)}
         self._threads: list[threading.Thread] = []
-        backend.on_game_audio = lambda mono, rate: self._chunks.put((SPEAKER, mono, rate))
-        backend.on_mic_audio = lambda mono, rate: self._chunks.put((MIC, mono, rate))
+        backend.on_game_audio = lambda mono, rate: self._capture(SPEAKER, mono, rate)
+        backend.on_mic_audio = lambda mono, rate: self._capture(MIC, mono, rate)
 
     # ---- life ---------------------------------------------------------------------------
 
@@ -85,11 +143,24 @@ class SpeechEngine:
             self._threads.append(thread)
 
     def stop(self) -> None:
-        self._chunks.put(None)
+        with self._audio_lock:
+            self._stopped.set()
+            while True:
+                try:
+                    self._chunks.get_nowait()
+                except queue.Empty:
+                    break
+            self._chunks.put_nowait(None)
         self._sentences.put((-1, next(self._order), None, None))
         for pool in (self._pool, self._mic_pool):
             if pool is not None:
                 pool.shutdown(wait=False, cancel_futures=True)
+
+    def release_local_hearing(self) -> None:
+        """Drop the local hearing model after switching to an online engine. The marker runs on
+        the hearing thread, so it never closes a recognizer that is still decoding a sentence."""
+        if not self._stopped.is_set():
+            self._sentences.put((-2, next(self._order), RELEASE, None))
 
     def _typing(self, what: str) -> None:
         """Tell the window that I started talking ("typing_started") or that it came to nothing
@@ -143,6 +214,20 @@ class SpeechEngine:
 
     # ---- cut: sound -> sentences ---------------------------------------------------------
 
+    def _capture(self, source, mono, rate):
+        with self._audio_lock:
+            if self._stopped.is_set():
+                return
+            item = (source, mono, rate, next(self._capture_order[source]), self._clock())
+            try:
+                self._chunks.put_nowait(item)
+            except queue.Full:
+                try:
+                    self._chunks.get_nowait()
+                except queue.Empty:
+                    pass  # The cutter freed a slot between the two calls.
+                self._chunks.put_nowait(item)
+
     def _cut_loop(self) -> None:
         report_at = self._clock() + REPORT_S
         while True:
@@ -153,11 +238,16 @@ class SpeechEngine:
             if item is None:
                 return
             if item:
-                source, mono, rate = item
+                source, mono, rate, order, captured_at = item
+                if self._clock() - captured_at > AUDIO_BACKLOG_S:
+                    continue
                 seen = self._seen[source]
                 seen["seconds"] += len(mono) / rate
                 seen["peak"] = max(seen["peak"], float(abs(mono).max()) if len(mono) else 0.0)
                 try:
+                    if order != self._cut_order[source] + 1:
+                        self._segmenters[source].reset()
+                    self._cut_order[source] = order
                     self.cut(source, mono, rate)
                 except Exception as error:      # the thread must survive, or the app goes deaf
                     log.exception("cutting %s sound failed", source)
@@ -185,6 +275,8 @@ class SpeechEngine:
         segmenter.feed(mono, rate)
 
     def _queue(self, source: str, segment: Segment) -> None:
+        if self._stopped.is_set():
+            return
         self._seen[source]["sentences"] += 1
         self._sentences.put((0 if source == MIC else 1, next(self._order), source, segment))
 
@@ -208,12 +300,14 @@ class SpeechEngine:
         return f"{self._missing}, and {error}" if self._missing else str(error)
 
     def _hear_loop(self) -> None:
-        try:
-            self._status("Loading the speech model…")
-            self._engine().load()
-            self._status("Listening")
-        except SttError as error:
-            self._status(self._problem(error))
+        settings = self.backend.settings
+        if settings.mic_on or settings.subtitles_on:
+            try:
+                self._status("Loading the speech model…")
+                self._engine().load()
+                self._status("Listening")
+            except SttError as error:
+                self._status(self._problem(error))
         while True:
             _, _, source, segment = self._sentences.get()
             if source is None:
@@ -221,6 +315,12 @@ class SpeechEngine:
                     if hasattr(engine, "close"):
                         engine.close()
                 return
+            if source == RELEASE:
+                local = self._engines.get("local")
+                if (self.backend.settings.hearing != "local" and local is not None
+                        and hasattr(local, "close") and local.close()):
+                    log.info("released local hearing weights")
+                continue
             try:
                 self.hear(source, segment)
             except Exception as error:
@@ -230,8 +330,10 @@ class SpeechEngine:
     def hear(self, source: str, segment: Segment) -> None:
         settings = self.backend.settings
         waited = self._clock() - segment.speech_end
-        if source == SPEAKER and waited > STALE_S:
+        if waited > STALE_S:
             log.info("dropped a sentence that waited %.1f s", waited)
+            if source == MIC:
+                self._typing("typing_cancelled")
             return
         languages = settings.spoken_languages(source == MIC)
         lang = languages[0] if len(languages) == 1 and languages[0] != AUTO else None
@@ -241,6 +343,7 @@ class SpeechEngine:
                            (self.backend.last_heard, *settings.spoken_languages(True)) if code))
         engine = self._engine()
         recognition_started = self._clock()
+        fallback_used = False
         try:
             heard = engine.transcribe(segment.samples, lang, prefer=prefer)
         except SttError as error:
@@ -250,6 +353,7 @@ class SpeechEngine:
                     log.warning("hearing failed on cloud, falling back to local: %s", error)
                     try:
                         heard = local_eng.transcribe(segment.samples, lang, prefer=prefer)
+                        fallback_used = True
                         self._request_switch("hearing", getattr(settings, "hearing", ""), str(error))
                     except SttError as local_error:
                         self._status(self._problem(local_error))
@@ -268,13 +372,19 @@ class SpeechEngine:
                 return
         if engine is self._engines.get("local") and getattr(settings, "hearing", "") != "local":
             self._request_switch("hearing", getattr(settings, "hearing", ""), self._missing)
+        if (not fallback_used and engine is not self._engines.get("local")
+                and self.backend.settings.hearing != "local"):
+            # The online engine works again: do not keep the fallback model resident.
+            local = self._engines.get("local")
+            if local is not None and hasattr(local, "close") and local.close():
+                log.info("released local hearing weights")
         log.info("hearing source=%s wait_ms=%d recognition_ms=%d", source, waited * 1000,
                  (self._clock() - recognition_started) * 1000)
         self._status("Listening")
         text = heard.text.strip()
         log.info("%s (%.1f s of sound, %s): %s", source, len(segment.samples) / 16000,
                  heard.lang, text or "(nothing)")
-        if not text:
+        if not text or not re.search(r"\w", text):
             if source == MIC:
                 self._typing("typing_cancelled")
             return
@@ -298,11 +408,27 @@ class SpeechEngine:
                          panel_targets=tuple(settings.panel_languages()),
                          chatbox_targets=tuple(settings.chatbox_languages(self.backend.last_heard))
                          if source == MIC else ())
-        self.backend.utterance.emit(line)          # shown at once, as "translating…"
+        if self._stopped.is_set():
+            return
         pool = self._mic_pool if source == MIC else self._pool
         if pool is not None:
-            pool.submit(self._finish_safely, line, segment)
+            slot = self._finish_slots[source]
+            if not slot.acquire(blocking=False):
+                self._skip_translation(line, segment, "Translation skipped to keep up with live speech")
+                return
+            try:
+                self.backend.utterance.emit(line)          # shown at once, as "translating…"
+                future = pool.submit(self._finish_safely, line, segment)
+            except Exception:
+                slot.release()
+                raise
+            def completed(done):
+                slot.release()
+                if done.cancelled():
+                    self._skip_translation(line, segment, "Translation cancelled")
+            future.add_done_callback(completed)
         else:
+            self.backend.utterance.emit(line)
             self.finish(line, segment)
 
     def _announce(self, lang: str, segment: Segment) -> None:
@@ -325,18 +451,34 @@ class SpeechEngine:
 
     # ---- finish: text -> translation -> window / chatbox ---------------------------------
 
+    def _skip_translation(self, line: Utterance, segment: Segment, note: str) -> None:
+        if line.source == MIC:
+            self._typing("typing_cancelled")
+        self.backend.utterance.emit(dataclasses.replace(
+            line, final=True, note=note, latency_ms=int((self._clock() - segment.speech_end) * 1000)))
+
     def _finish_safely(self, line: Utterance, segment: Segment) -> None:
         try:
+            if self._stopped.is_set():
+                self._skip_translation(line, segment, "Translation cancelled")
+                return
+            if self._clock() - segment.speech_end > STALE_S:
+                self._skip_translation(line, segment, "Translation skipped after waiting too long")
+                return
             self.finish(line, segment)
         except Exception:
             log.exception("finishing a line failed")
+            self._skip_translation(line, segment, "Translation failed")
 
     def finish(self, line: Utterance, segment: Segment) -> None:
+        if self._stopped.is_set():
+            self._skip_translation(line, segment, "Translation cancelled")
+            return
         started = self._clock()
         line = dataclasses.replace(line, final=True)    # a copy: the window holds the first one
         def show_progress(translations):
             ready = tuple((code, translations[code]) for code in line.panel_targets if translations.get(code))
-            if ready:
+            if ready and not self._stopped.is_set():
                 self.backend.utterance.emit(dataclasses.replace(
                     line, final=False, panel_translations=ready,
                     latency_ms=int((self._clock() - segment.speech_end) * 1000)))
@@ -344,6 +486,9 @@ class SpeechEngine:
         translations, errors = translate_targets(
             self._translator, line.original, (*line.panel_targets, line.dst_lang, *line.chatbox_targets),
             line.src_lang if line.src_lang in LANGS else "", heard=True, on_result=show_progress)
+        if self._stopped.is_set():
+            self._skip_translation(line, segment, "Translation cancelled")
+            return
         line.translation = translations.get(line.dst_lang, "")
         if line.dst_lang == line.src_lang and line.translation == line.original:
             line.translation = ""

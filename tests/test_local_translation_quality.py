@@ -97,3 +97,15 @@ def test_normal_repetition_does_not_retry_or_remove_words(fake_translator):
     fake_translator._model = SimpleNamespace(translate_batch=translate)
     assert fake_translator.translate(phrase, "zh", "en").split() == ["走"] * 50
     assert calls == [{"target_prefix": [["zho_Hans"]], "beam_size": 1}]
+
+
+def test_punctuation_only_text_returns_unchanged(fake_translator):
+    assert fake_translator.translate("。", "vi", "zh") == "。"
+    assert fake_translator.translate("...", "vi", "en") == "..."
+
+
+def test_nllb_translation_error_sets_zero_cooldown(fake_translator):
+    fake_translator._model = SimpleNamespace(translate_batch=lambda *a, **kw: [])
+    with pytest.raises(TranslateError) as caught:
+        fake_translator.translate("Hello", "vi", "en")
+    assert caught.value.wait == 0

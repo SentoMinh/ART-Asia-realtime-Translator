@@ -13,6 +13,10 @@ from pathlib import Path
 
 NEEDED = {"onnxruntime": "onnxruntime", "soxr": "soxr", "httpx": "httpx"}
 
+# Native runtimes read these at import/initialization, before any model is loaded.
+from .runtime import configure_native_threads
+configure_native_threads()
+
 
 def log_file() -> Path:
     base = os.environ.get("LOCALAPPDATA") or str(Path.home())

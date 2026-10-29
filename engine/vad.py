@@ -126,6 +126,12 @@ class Segmenter:
             self._emit(forced=True)
         self._drop()
 
+    def reset(self) -> None:
+        """Discard interrupted capture, including resampler history, without emitting speech."""
+        self._drop()
+        self._resampler = None
+        self._resampler_rate = 0
+
     # ---- inside ---------------------------------------------------------------------------
 
     def _to_16k(self, mono: np.ndarray, rate: int) -> np.ndarray:
