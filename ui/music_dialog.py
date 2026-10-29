@@ -150,8 +150,6 @@ class MusicDialog(QDialog):
         self._route_timer = QTimer(self)
         self._route_timer.setInterval(2000)
         self._route_timer.timeout.connect(self._vrchat_microphone.refresh)
-        self._route_timer.start()
-        self._vrchat_microphone.refresh()
         self.refresh()
 
     @property
@@ -286,7 +284,9 @@ class MusicDialog(QDialog):
         chosen = self.apps.currentData()
         playing = self.player.busy or self.test_running
         self.play_button.setEnabled(not self.setup_running and (playing or (ready and bool(chosen))))
-        self.play_button.setIcon(theme.icon("stop" if playing else "play", theme.ON_ACCENT))
+        if playing != getattr(self, "_icon_playing", None):
+            self._icon_playing = playing
+            self.play_button.setIcon(theme.icon("stop" if playing else "play", theme.ON_ACCENT))
         self.play_button.setToolTip(tr("Stop music" if playing else "Start music"))
         self.play_button.setAccessibleName(self.play_button.toolTip())
         self.refresh_button.setEnabled(not busy)
@@ -329,6 +329,7 @@ class MusicDialog(QDialog):
             # ApoPlayer also validates the installed files and live audio callback
             # before sending any audio, including in builds without the test host.
             self.player.start("app", source, microphone)
+            self._poll_timer.start()     # follows playback even if the dialog was closed meanwhile
             self._was_busy = True
             self._set_result("")
         except Exception as error:
@@ -371,6 +372,18 @@ class MusicDialog(QDialog):
             self._set_result(self.player.error)
         self._was_busy = busy
         self._update_controls()
+        if not (self.isVisible() or busy or self.test_running):
+            self._poll_timer.stop()      # hidden and quiet: nothing to show or follow until shown again
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._poll_timer.start()
+        self._route_timer.start()
+        self._vrchat_microphone.refresh()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._route_timer.stop()         # VRChat's microphone is only shown in this dialog
 
     def run_test(self):
         if self.test_running or self.player.busy or self.setup_running:

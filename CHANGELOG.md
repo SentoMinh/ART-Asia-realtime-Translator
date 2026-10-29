@@ -1,5 +1,80 @@
 # Change log
 
+## 1.0.7 — 2026-10-30 — Gaming budget, bounded speech, and an update check that explains itself
+
+The first published build after **0.12.14**. It carries the gaming CPU/GPU budget and bounded-speech work written on 2026-10-27 (kept below, unchanged) plus the update-check changes in this section. Package: `dist/1.0.7/` — one-file EXE and folder ZIP.
+
+### Update check
+
+`ui/updater.py` now writes every failed step of the packaged update check to `engine.log` — no answer, a non-200 answer, an unreadable answer, a damaged download, an answer without a digest — instead of returning nothing. Previously a single empty result could mean "up to date", "rate limited", "GitHub blocked" or "asset not ready", which is exactly what `AGENT_HANDOFF.md` could not tell apart after 0.12.7. `VRCT_UPDATE_API` adds one or more mirror addresses, separated by commas or semicolons, with `{source}` replaced by the repository. GitHub is still asked first; a mirror only answers where GitHub is blocked (mainland China without a VPN). The download link is taken from whatever answer wins, so a mirror needs no code change beyond serving the same JSON as `/releases/latest`.
+
+Two crash paths are fixed. A half-finished download is deleted when the transfer raises, instead of waiting on disk as `.part` until the next start truncates it. A `.old` copy that is still held open by a closing instance no longer blocks the pending update forever: the running program is backed up as `.old2` (then `.old3`…) and the older copies are cleared on the next start. This does not change the rule that only a complete, size- and digest-checked `.new` is ever swapped in.
+
+Validation: **756 source tests passed** on the documented environment (Python 3.12.15, PySide6 6.11.2), with 6 new updater tests (mirror fallback, GitHub still first, `{source}` substitution, interrupted-download cleanup, held-open `.old`, leftover cleanup). The packaged `VRChat-Translator-1.0.7.exe` passed `--selfcheck` with every part reported working, including the music mixer and a live `api.github.com` answer (HTTP 200). Not verified: a real mirror, any mainland-China network, or an actual replace-and-relaunch upgrade from an older EXE. Separately, this checkout's `.venv-app` was copied from another PC and its `pyvenv.cfg` pointed at `C:\Users\Admin\...`, which does not exist here; it was repaired by installing CPython 3.12.15 under `.tools\python` and relinking the environment with `uv venv --allow-existing`.
+
+## 2026-10-27 — Gaming CPU/GPU budget and bounded speech (shipped in 1.0.7)
+
+Written after 1.0.6 (`1efb598`) and shipped in the 1.0.7 package above. It reduces contention with a running game and makes the speech path degrade predictably when recognition or translation falls behind.
+
+### CPU and scheduling
+
+Local inference uses **one thread by default** instead of two: Whisper's CPU side, PhoWhisper, SenseVoice, NLLB/Qwen and Hy-MT2 all read `engine.runtime.cpu_threads()`. `VRCT_CPU_THREADS=2` restores the previous two-thread behavior. Native pools now sleep between work (`OMP_WAIT_POLICY=PASSIVE`, `KMP_BLOCKTIME=0`, one OpenMP/MKL/OpenBLAS/NumExpr thread) and tokenizer parallelism is off, unless those variables were already set. On Windows the process starts below normal priority so game threads run first; `VRCT_PROCESS_PRIORITY=normal` opts out. This reintroduces a setting rejected during the 1.0.5 whole-app replay, which found lower translation throughput when the CPU was saturated. It is a gaming tradeoff, not a measured speed win, and was not re-benchmarked here.
+
+### GPU translation with a game reserve
+
+NLLB and Qwen can use CUDA `int8_float16` when exactly one unmapped CUDA device is visible, both cuBLAS 12 DLLs are present, the runtime supports that compute type, and free VRAM is at least the model estimate plus **3 GiB**. NLLB estimates 1.5 GiB and Qwen 3 GiB, including the CUDA context and decoding workspace. Otherwise the model stays on CPU. `VRCT_LOCAL_DEVICE=cpu` forces CPU.
+
+Free VRAM is checked before loading, immediately after CUDA loading, then before inference and during idle polling at most once every 10 seconds. These checks cannot guarantee a continuous reserve during inference. A CUDA load failure, failed post-load reserve check or pre-inference memory-pressure check switches the current request to CPU. Idle pressure unloads GPU weights without allocating CPU weights until the next request. A CUDA/OOM inference failure reports a `TranslateError` for the current line and loads CPU on the next request; the failed line is not retried automatically. GPU failures/pressure pin that model to CPU until another local model is loaded or the app restarts, avoiding repeated CUDA attempts.
+
+Switching Translating away from Local Model releases its weights, cache and threads on the translate worker; when online hearing recovers after a local fallback, the fallback recognizer is released on the hearing thread. Queued releases recheck the current provider, with the translation check under the shared model lock, so reselecting Local Model before cleanup preserves its weights.
+
+### Bounded speech and honest completion
+
+Capture callbacks never wait for recognition. The audio queue holds at most 128 chunks and drops audio older than 2 seconds, resetting only that source's detector and resampler. Pending sentences are capped at 8, keeping microphone priority and discarding the oldest speaker sentence first. At most 4 translations per source may run or wait. Stale microphone speech is now dropped like speaker speech and cancels the typing dots instead of producing a late chatbox message. When capacity is exhausted, a stale line expires or shutdown arrives, the row is finalized with a localized note and is never sent. Saved settings are applied before speech attachment, so startup respects the selected hearing provider and capture switches. If both the microphone and subtitles are off at startup, the hearing model is not loaded; the first use loads it.
+
+### Display and Settings
+
+The wrist display ticks once a second while disabled or SteamVR is absent, instead of every 50 ms. While look-only hides the wrist, text and appearance changes wait; revealing draws the latest state immediately instead of waiting for the normal debounce. Settings stops its model-label refresh timer while hidden and refreshes on show. NLLB/Qwen model cards now say **GPU / CPU**. The CUDA DLL search path is kept alive without duplicating PATH entries.
+
+### Validation
+
+All **750 source tests passed** (734 before the final regression tests), including fake CUDA runtimes/OOM, VRAM pressure, startup settings, provider-reselection races, queue overload, shutdown, stale audio, online-hearing fallback and wrist idle rendering. An isolated offscreen startup/shutdown passed with `OMP_NUM_THREADS=1` and `KMP_BLOCKTIME=0`. Real installed NLLB/Qwen lifecycle checks matched CPU/CUDA output for one English-to-Vietnamese sentence, unloaded under injected low-memory telemetry, and returned to CPU. The observed free-VRAM decrease was about 1.1 GiB for NLLB and 2.2 GiB for Qwen; this is not isolated process-memory accounting or a real game-pressure test.
+
+One pass over three synthetic lines after loading and an excluded warm-up took NLLB GPU 0.21 s, CPU one thread 1.74 s, CPU two threads 1.06 s (summed wall time); Hy-MT2 took one thread 4.55 s, two threads 2.50 s. These totals exclude model loading and are not per-line averages. Lifecycle timings include loading and are not comparable warm speed measurements. Evidence: `.tools/gaming-validation/`, `.tools/gaming-cpu1.json`, `.tools/gaming-cpu2.json` and `.tools/gaming-gpu.json`; [LATENCY_REPORT.md](LATENCY_REPORT.md) separates load, warm wall time and CPU time. These are component checks, not end-to-end latency, game FPS, live VRChat, headset or Windows 10 checks. The priority tradeoff was not re-measured.
+
+## 1.0.6 — 2026-10-26 — Compact local model list
+
+Local model cards are grouped under Hearing and Translating section headings, with spacing between categories and one shared scrollbar. Native previews verified both groups in English, Chinese and Vietnamese; all 116 UI tests passed.
+
+Removed the model picker's introduction and model explanations. Cards show `Hearing/Translating - model name - GPU/CPU`, supported languages and download status. Download/stop, use and delete/cancel actions use compact icons with translated tooltips and accessible names. Inline delete confirmation remains. Translation model display names omit runtime/vendor suffixes; model IDs and saved selections are unchanged.
+
+Follow-up: removed the duplicate introduction from the parent Models settings card too, including its unused translation entries and empty description space. All 116 UI tests passed; the actual Models page and embedded picker were previewed in all three interface languages.
+
+All 146 focused UI/model tests passed before release preparation. Native Windows previews passed 27 combinations of interface language, width and display scaling, including delete confirmation previews, and closed automatically. Evidence: `.tools/model-list-ui/`. Version 1.0.6 is exported as a new local package with updated English/Chinese/Vietnamese release notices; existing 1.0.5 artifacts are preserved. Release verification is recorded in `.tools/release-1.0.6/`.
+
+## 1.0.5 — 2026-10-26 — Hy-MT2 translation and lower CPU use
+
+Today's combined local release includes the SteamVR wrist integration and responsive main window from 0.12.14, the CPU improvements below, and the existing local speech/translation fixes. The English, Chinese and Vietnamese update notices describe this version. GitHub publication is separate; 0.12.14 remains the published package.
+
+Settings → Models can download Tencent Hy-MT2 1.8B (Q4_K_M, llama.cpp, CPU only) as a translation choice. On 31 local sentences it kept meaning better than the existing Qwen3 1.7B and than Qwen2.5 3B, which also left Chinese untranslated, so Qwen2.5 is not offered. It takes about three times longer than NLLB and more CPU, so NLLB remains the default and the saved selection was not changed. The verified file is already in the local model cache.
+
+### Local translation reliability
+
+Punctuation-only recognition is discarded before translation or chatbox output. Local translators return punctuation-only typed text unchanged. NLLB/Qwen inference failures can retry on the next sentence instead of blocking the model for a long cooldown. Qwen uses a shorter translation-only prompt and rejects common reasoning preambles; existing completed-output, repetition and script checks remain.
+
+### Lower background CPU
+
+The user reported PC lag whenever ART is open with local SenseVoice + Qwen and the voice detector off. A whole-app replay measured Qwen as about 94% of ART's CPU; details and limits are in LATENCY_REPORT.md (26 October).
+
+- Local Qwen passes the target-language instructions as CTranslate2's cached static prompt when they are an exact token prefix; otherwise the whole prompt is sent as before. Output was byte-identical in 45 real calls; CPU per call fell 8.6% (20% for short lines).
+- The local translation chain remembers the last 256 lines per target/source/heard flag. Greedy local decoding repeats its answer, so repeated lines such as "T." skip the model. Errors are not remembered; cooldowns and chain names are unchanged.
+- The Music dialog stops its 50 ms poll when hidden with no music or check running, and checks VRChat's microphone only while shown. The log reader keeps its byte position and scans only appended lines: 61.9 → 0.21 ms per check on an 8 MB log. A new session or truncated log is read again from the last 8 MB.
+- Level bars repaint only when the drawn line changes; the repeated 2-second VRChat status no longer restyles the header; the music glow re-renders its icon only when its size changes.
+- `engine/__init__.py` sets `KMP_BLOCKTIME=1` unless already set: CTranslate2's OpenMP threads no longer spin 200 ms after each step. Output was identical, with the same speed and 15–16% less CPU for the app with SenseVoice + NLLB (0.21 → 0.17 cores in the replay). The 27 October gaming pass later uses `0` with one inference thread.
+- With the user's approval, the saved settings were switched to local NLLB with the voice detector on; SenseVoice, the QQ loopback, languages and other services were kept. GPU hearing/translation was measured and not adopted (see LATENCY_REPORT.md).
+
+Rejected after measurement: below-normal process priority (a third less translation throughput under realistic load, no measurable probe gain) and forced AVX-512/MKL CTranslate2 backends (slower and changed outputs). All **668 source tests passed**, covering Qwen static prompts, local translation caching, growing/truncated logs, hidden/playing music timers, the OpenMP default, Hy-MT2 routing/output validation and punctuation-only recognition. Built from development commit `425b393`. All **495 bundled-code checks** passed; actual EXE self-check, source/privacy/native-asset checks, localized notices and ZIP integrity passed. Bundled Hy-MT2 code and extracted DLLs matched three real-model source outputs in development Python. An isolated packaged **0.12.14 → 1.0.5** replacement/restart/self-check passed. Saved settings were unchanged. Artifacts are in `dist/1.0.5/`, evidence in `.tools/release-1.0.5/`; no push or GitHub publication. Live headset, Windows 10 and fresh-PC checks remain outstanding.
+
 ## 0.12.14 — 2026-10-26 — SteamVR wrist display and main window resizing
 
 The main app now includes the SteamVR wrist display and the resizing fixes below. Its standard EXE keeps the existing GitHub auto-update path. The separate uncommitted local translation/speech experiments are excluded. Saved settings, selected services/models and downloaded model files are preserved. Package and actual GitHub upgrade checks passed.

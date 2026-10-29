@@ -1,4 +1,88 @@
-# ART latency measurements — 22–25 October 2026
+# ART latency measurements — 22–27 October 2026
+
+## Research and optimization record
+
+This file records measurements and rejected performance choices. [CHANGELOG.md](CHANGELOG.md) records the resulting implementation; [AGENT_HANDOFF.md](AGENT_HANDOFF.md) distinguishes current source from built releases. Existing research and validation are indexed below so a completed experiment is not mistaken for an unfinished proposal.
+
+| Work completed | Result / decision | Detailed record and local evidence |
+| --- | --- | --- |
+| Hearing, translation and Cantonese evaluation | Compared recognition/translation engines and detector behavior; results apply to the recorded test sets. | [BENCHMARK.md](BENCHMARK.md), [VOICE_DETECTION.md](VOICE_DETECTION.md), `bench/results/` |
+| Local model and download research | Added PhoWhisper and Qwen3 1.7B, kept Hugging Face with HF-Mirror fallback; the tested Qwen 0.6B conversion was rejected. China connectivity remains unverified. | [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md), `.tools/model-additions/` |
+| Online translation latency | Two concurrent target requests reduced two-target completion time about 46% on five warm paired examples; ordered final chatbox output preserved. | 25 October section below; `.tools/latency-0.12.11/` |
+| Mixed-language correctness and local startup | Mixed CJK text labelled EN/VI reaches translation; installed local weights prepare on the worker. A repeated NLLB example still changes meaning. | 25 October local preparation section below; `.tools/local-translation-diagnosis/` |
+| Whole-app CPU investigation | Kept Qwen prompt caching, repeated-translation caching, OpenMP wait changes and idle/music/log optimizations. Forced AVX-512 and MKL were rejected; earlier priority/GPU tradeoffs remain recorded below. | 26 October section below; `.tools/perf-2026-10-26/` |
+| Hy-MT2 versus NLLB/Qwen candidates | Hy-MT2 Q4 was added as an optional translator after a 31-line comparison; Qwen2.5 3B was rejected. NLLB remains the default, not a claim about the user's saved selection. | [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md), `.tools/model-candidates/results-*.json` |
+| VR and compact UI work | Integrated wrist display, responsive resizing and compact model groups; native rendering/previews checked, live headset behavior outstanding. | [CHANGELOG.md](CHANGELOG.md), `.tools/vr-merge/`, `.tools/resize-ui/`, `.tools/model-list-ui/` |
+| Gaming resource budget | One-thread inference, below-normal priority, guarded NLLB/Qwen CUDA, bounded speech work, model cleanup and idle UI changes implemented in `1efb598`. | 27 October section below; `.tools/gaming-validation/` |
+
+External documentation research for the gaming pass was requested through `/agy` in the terminal, covering CTranslate2 CUDA/threads, faster-whisper host threads, OpenMP waits, ONNX/SenseVoice threading, llama.cpp and Windows priority. The recorded `agy` attempts timed out at two- and three-minute limits without a completed source-backed answer; auto mode also reported that it was unavailable for the account. Do not count these attempts as completed documentation verification. The implemented choices were checked through local code, installed runtime probes, regression tests and the measurements below. The local probe reported CTranslate2 4.8.2 with `int8_float16` support and a CPU-only llama.cpp runtime. Model-card/source links from earlier research remain in [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md).
+
+## 27 October: gaming CPU/GPU budget (source only)
+
+A gaming pass measured local translation on the Ryzen 7 7800X3D / RTX 3080 10 GiB / 32 GB desktop with synthetic text, read-only installed weights and no VRChat/OSC/headset. It changes the defaults but is not a full game benchmark. The following totals cover three warm translations (EN→VI, ZH→EN, VI→ZH), after weight loading and one warm-up translation; loading is recorded separately in each JSON. Each mode was run once, so these are small component samples, not stable median/p95 estimates.
+
+| NLLB, three short lines | Wall total | CPU total | Notes |
+| --- | ---: | ---: | --- |
+| CUDA `int8_float16` | 0.21 s | 0.20 s | about 1.1 GiB extra VRAM |
+| CPU INT8, one thread | 1.74 s | 1.67 s | default CPU fallback budget |
+| CPU INT8, two threads | 1.06 s | 1.92 s | `VRCT_CPU_THREADS=2` |
+
+Hy-MT2 1.8B, the same three warm lines: one thread **4.55 s wall / 4.20 CPU-s**, two threads **2.50 s / 4.53 CPU-s**, with identical output between thread settings. One thread reduced total CPU work about 7% but increased wall time about 82%; its main benefit is using fewer cores at once. Hy-MT2 remains CPU-only and is not the default. GPU NLLB used about 89% less translation CPU time than two-thread CPU NLLB on these three lines; this is not an 89% whole-app or PC CPU reduction. NLLB output matched across all three modes here, but the earlier 26 October comparison changed 4 of 15 CUDA outputs, so equality is not guaranteed for every line.
+
+Real lifecycle checks used installed NLLB and Qwen weights and the synthetic sentence "Please wait for me." (EN→VI). Both matched CPU/CUDA output, released GPU weights under injected low-memory telemetry, and loaded CPU on the next request; an immediate post-load reserve failure also completed on CPU. These checks simulated pressure rather than filling the GPU with a game. Their **load-plus-first-translation** wall times were Qwen CUDA 3.92 s / CPU 4.35 s and NLLB CUDA 1.55 s / CPU 1.74 s; they are not warm latency measurements and must not be compared directly with the three-line table.
+
+Observed system free-VRAM decreases were approximately 1,100 MiB for NLLB and 2,250 MiB for Qwen (about 1.1 and 2.2 GiB), not isolated process-memory accounting. Readings after release within the same process remained roughly 150–260 MiB below the initial free-memory readings; native context retention and uncontrolled background use mean this is not proof of zero residual GPU memory. Production admission allows 1.5 GiB for NLLB or 3 GiB for Qwen, plus a 3 GiB reserve. Actual free memory is rechecked immediately after load, before subsequent inference at most once per 10 seconds, and while the local worker is idle. This is a sampled memory policy, not a continuous reservation or a GPU-utilization limit; it cannot guarantee game FPS. CUDA inference failure reports an error for that request and makes the next request use CPU; it does not silently retry that failed translation.
+
+This pass also sets one inference thread by default, puts the process below normal priority on Windows and bounds speech queues. The earlier whole-app replay rejected below-normal priority because saturated translation throughput fell by about a third. The new default is a gaming-responsiveness choice, not a measured latency win; `VRCT_PROCESS_PRIORITY=normal` and `VRCT_CPU_THREADS=2` restore the earlier priority/thread choices without reverting queue or cleanup fixes. No fresh priority comparison, live game FPS, VRChat, headset or Windows 10 check was run. Evidence: `.tools/gaming-validation/`, `.tools/gaming-cpu1.json`, `.tools/gaming-cpu2.json`, `.tools/gaming-gpu.json`.
+
+### Validation and retained evidence
+
+The latest full suite against committed source passed **750 tests in 38.73 seconds**, with zero failures, errors or skips. The earlier inherited-state run passed 734 tests before the final regressions were added. Coverage includes queue overload/stale audio, shutdown cancellation without late chatbox sends, provider rechecks when Local Model is reselected, saved settings applied before hearing startup, GPU admission/post-load/idle checks, DLL handle lifetime, hidden Settings/wrist work and English/Chinese/Vietnamese completion notes. Fake clocks, telemetry and runtimes in the suite are separate from the real-model checks above. The handoff also records an isolated offscreen startup/shutdown check; it is not a live microphone or headset result.
+
+| Evidence | Contents |
+| --- | --- |
+| `.tools/gaming-cpu-probe.py`, `.tools/gaming-cpu1.json`, `.tools/gaming-cpu2.json`, `.tools/gaming-gpu.json` | NLLB warm translations, separate load times, process CPU time and free VRAM readings |
+| `.tools/gaming-validation/hy-mt-cpu.py`, `hy-mt-cpu1.json`, `hy-mt-cpu2.json` | Hy-MT2 one/two-thread warm translations and separate loading |
+| `.tools/gaming-validation/cuda-lifecycle.py`, `cuda-lifecycle-translator.json`, `cuda-lifecycle-qwen_translator.json` | Real model load/inference, injected idle/post-load pressure, CPU fallback and release readings |
+| `.tools/gaming-validation/final-tests.xml` | Latest 750-test suite, 27 October at 08:55 +07:00 |
+| `.tools/gaming-resume-baseline.xml` | Initial 734-test suite |
+| `.tools/gaming-validation/settings-before.json` | Pre-validation settings hashes; comparison after continuation confirmed unchanged UI, provider/model and VR settings |
+
+Raw artifacts under `.tools/` are local and ignored by Git; the Markdown summaries travel with source exports. Earlier real-model probes read installed weights without modifying them. For future tests, follow current [AGENTS.md](AGENTS.md): isolate AppData and use fakes or independent workspace fixtures, not the user's model cache. No new binary, version bump, push or publication accompanies this source optimization or documentation update.
+
+## 26 October: whole-app CPU and PC impact with local SenseVoice + Qwen (source only)
+
+The user reported the PC lagging whenever ART is open. Saved setup: local SenseVoice hearing, local Qwen3 1.7B translation, **voice detector off**, subtitles from an Elgato loopback, wrist display on. Ryzen 7 7800X3D with SMT off (8 hardware threads); Discord, OBS and QQ were running. The real app (window, engine threads, wrist display) replayed a 167.6 s, 48 kHz track of 12 Chinese speech-over-music clips with music/noise gaps through a fake loopback device, using a copy of the saved settings without provider keys and a fake chatbox (no OSC). `psutil` sampled the process from outside; the first 25 s were excluded. A separate "game" probe ran fixed-work 90 FPS frame loops. Harness and raw results: `.tools/perf-2026-10-26/`.
+
+**Where the time goes.** With the detector off, every 4 s of non-silent sound is transcribed and translated. SenseVoice took about 130 ms per piece; Qwen took 0.6–3.9 s on two threads per line, including junk lines such as "He." or "T.". Native model threads, mostly Qwen, used about 94% of the app's CPU. Qwen spends about 100 ms per generated token versus about 6 ms per prompt token. With continuous speech it cannot keep up with one piece every 4 s: translation delay grew to 15–21 s in the busiest part. The UI thread used about 1% of a core, with p99 timer lateness around 2 ms.
+
+| Same replay, no other load | CPU, average cores of 8 | Lines | Median delay | Peak RAM |
+| --- | ---: | ---: | ---: | ---: |
+| Before (3 runs) | 0.93, 0.98, 0.99 | 29 | 4.5–7.6 s | 2.3 GB |
+| After (final code, 2 runs) | 0.90, 0.94 | 29 | 5.7–6.5 s | 2.3 GB |
+| After, detector on (Qwen) | 0.67 | 9 whole sentences | 8.9 s | 2.4 GB |
+| After, NLLB instead of Qwen | 0.29 | 28 | 0.8 s | 1.2 GB |
+| After, NLLB + detector on | 0.20 | 9 whole sentences | 2.9 s | 1.2 GB |
+
+Translations were identical before and after. Qwen's native compute fell from 113 to 106 CPU-seconds per 125 s (−6%). Prefix caching alone measured −8.6% CPU over 45 isolated Qwen calls (−20% for short lines), with byte-identical output. Exact repeated lines now skip the local model; this replay had few repeats, while the user's log showed "T."/"I." repeatedly. The model choice and detector setting dominate: they are user choices and were not changed. NLLB/Qwen translation quality was not compared here; see LOCAL_TRANSLATION_PLAN.md.
+
+**Rejected after measurement.** Below-normal process priority for model threads cut the app's translation throughput by about a third under a realistic load (10–11 lines instead of 16–18; 55–58 s median delay instead of 9–37 s) without a measurable probe improvement (23% missed frames versus 19–24%). It helped the probe only when the CPU was fully saturated, where translation was already unusable. CTranslate2's forced AVX-512 path was slightly slower and changed 7 of 15 Qwen outputs; Intel MKL was about 10 times slower on this AMD CPU and changed 8 of 15. The default backend is kept. **The 27 October gaming pass above later reintroduced below-normal process priority as a deliberate gaming tradeoff; it has an opt-out and was not re-benchmarked.**
+
+**Music dialog.** After the Music dialog had been opened once, its 50 ms poll and 2 s VRChat-log check ran for the rest of the session. The log check re-read up to 8 MB and scanned it with a regex whenever VRChat wrote to its log: 61.9 ms per check on an 8 MB synthetic log (3.1% of a core, holding Python's lock). Reading only appended lines took 0.21 ms.
+
+Limits: no live VRChat, headset or real QQ call; the probe is a stand-in for a game; Discord/OBS background varied between runs (DWM and probe numbers were noisy, so no game-FPS claim is made).
+
+**Follow-up: the user switched to NLLB with the detector on.** Per sentence, the remaining delay was 0.8 s of intentional end-of-sentence quiet, 0.2–0.5 s of SenseVoice and 0.6–3.2 s of NLLB. Startup is one ~3 s burst of 1–1.4 cores while models load; the window appears at 0.65 s. CTranslate2's bundled Intel OpenMP kept worker threads spinning for 200 ms after each step. `KMP_BLOCKTIME=1` (set by `engine/__init__.py` unless already set) gave identical output on 14 sentences and the same speed (638 vs 649 ms median), with 15% less translation CPU. In the full replay, ART fell from 0.211/0.204 to 0.173/0.176 cores, with identical lines in all four runs and a 2.3–2.5 s median delay either way.
+
+**GPU instead of CPU (RTX 3080, measured, not adopted at the time).** With a 90 FPS CUDA stand-in for the game:
+
+| NLLB + detector on | ART CPU | Extra VRAM | Stand-in late frames | Median delay |
+| --- | ---: | ---: | ---: | ---: |
+| SenseVoice on CPU (current) | 0.21 cores | 0 | 11.3% | 2.7 s |
+| Whisper turbo on GPU | 0.21 cores | +2.4 GB | 16.9% | 3.3 s |
+| Whisper turbo + NLLB on GPU | 0.12 cores | +3.3 GB | 19.4% | 2.5 s |
+
+GPU hearing saved no CPU, because audio preparation and decoding still run on the CPU. All-GPU saved about 1% of an 8-core CPU for 3.3 GB of VRAM, which VRChat needs in VR. In isolation, NLLB on CUDA took 52 ms instead of 266 ms per line, but changed 4 of 15 outputs (mixed, not clearly worse). At that measurement the app had no GPU translation option; the **27 October pass above** later added a reserve-gated CUDA option for NLLB/Qwen with automatic CPU fallback. The stand-in baseline varied (11–13% late frames) with OBS/browser GPU use.
 
 ## 25 October: two online translation destinations (0.12.11)
 
@@ -140,6 +224,6 @@ NLLB stays the default for low latency. Qwen is an optional alternative, not a s
 
 All replay calls completed, but meaning is not perfect: the English “move to VR first” became Vietnamese “try VR first” with Qwen, and “first” was omitted in one Chinese-to-English example. Basic Japanese/Korean/Cantonese output was also exercised separately; naturalness and Cantonese correctness need language-competent review. The tested Qwen3 0.6B community conversion copied source text or altered meaning on basic checks and was rejected. These observations concern the tested files/template, not every quantization or deployment of that model.
 
-PhoWhisper Small CPU INT8/two threads loaded and warmed in 4,877 ms. Two Vietnamese recordings matched reference words, ignoring case. Forced Vietnamese decoding took 2,428 and 2,081 ms; Auto took 4,209 and 3,621 ms. This supports offering PhoWhisper as a Vietnamese CPU specialist, not claiming it is faster than GPU Whisper turbo or validated for mixed speech.
+PhoWhisper Small CPU INT8/two threads (one by default after the 27 October gaming pass) loaded and warmed in 4,877 ms. Two Vietnamese recordings matched reference words, ignoring case. Forced Vietnamese decoding took 2,428 and 2,081 ms; Auto took 4,209 and 3,621 ms. This supports offering PhoWhisper as a Vietnamese CPU specialist, not claiming it is faster than GPU Whisper turbo or validated for mixed speech.
 
 Exact revisions/download hashes are in `engine/assets/local_models.json`; attribution and limits are in [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md). Ignored local evidence: `.tools/model-additions/comparison.json`, `pho-smoke.json`, `qwen-1.7-smoke.json`. The new weights and existing benchmark recordings are not included in source exports or the EXE.

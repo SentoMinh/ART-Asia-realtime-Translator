@@ -382,7 +382,13 @@ class MainWindow(QWidget):
     # ---- from the backend -----------------------------------------------
 
     def show_status(self, status: Status) -> None:
+        if status == self._status and self.status.text():
+            return      # the 2-second VRChat check repeats it; restyling the dot repaints the window
         self._status = status
+        self._draw_status()
+
+    def _draw_status(self) -> None:
+        status = self._status
         color = theme.STATUS_COLORS.get(status.level, theme.WARN)
         self.dot.setStyleSheet(f"background: {color}; border-radius: 4px;")
         self.status.setText("VRChat")
@@ -405,6 +411,7 @@ class MainWindow(QWidget):
             self._music_level = 0.0
             self.music_button.setGraphicsEffect(None)
             self._music_glow_effect = None
+            self._music_icon_size = None
             self.music_button.setIcon(theme.icon("music", theme.TEXT))
             self.music_button.setIconSize(QSize(18, 18))
         else:
@@ -418,8 +425,10 @@ class MainWindow(QWidget):
         self._music_level = level
 
         size = 18 + int(round(level * 4))
-        self.music_button.setIcon(theme.icon("music", theme.OK, size))
-        self.music_button.setIconSize(QSize(size, size))
+        if size != getattr(self, "_music_icon_size", None):   # called 20 times a second while playing
+            self._music_icon_size = size
+            self.music_button.setIcon(theme.icon("music", theme.OK, size))
+            self.music_button.setIconSize(QSize(size, size))
 
         if self._music_glow_effect is None:
             self._music_glow_effect = QGraphicsDropShadowEffect(self.music_button)
@@ -594,7 +603,7 @@ class MainWindow(QWidget):
             action.setText(tr("Auto — follow chatbox languages") if code == AUTO else tr(LANGS[code]))
         for code, action in self.ui_lang_actions.items():
             action.setChecked(code == i18n.lang())
-        self.show_status(self._status)
+        self._draw_status()
         self.log.refresh()
         if self._dialog:            # the settings window is rebuilt in the new language
             visible, page = self._dialog.isVisible(), self._dialog.nav.currentRow()
@@ -680,8 +689,8 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "SteamVR wrist subtitles are now part of the app. Open VR to choose a hand and adjust the display.",
-            "Toolbar controls wrap in narrow windows, and language selectors stay visible when resizing.",
+            "Local models are grouped into Hearing and Translating, with model names, CPU/GPU labels and supported languages.",
+            "Download, use and delete now have compact icon buttons. Hover over an icon to see its action.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))

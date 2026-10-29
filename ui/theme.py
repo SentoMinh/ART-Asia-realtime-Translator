@@ -57,6 +57,8 @@ _SVG = {
     "down":'<path d="M7 10l5 5 5-5"/>',
     "dock": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 16L8 9M8 9h5M8 9v5"/>',
     "trash":'<path d="M5 7h14M10 7V4.5h4V7M7 7l1 12.5h8L17 7"/>',
+    "download": '<path d="M12 3v12M7 10l5 5 5-5M5 16v4h14v-4"/>',
+    "check": '<path d="M5 12l4.5 4.5L19 7"/>',
 }
 
 

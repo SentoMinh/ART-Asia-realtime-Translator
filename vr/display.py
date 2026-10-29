@@ -12,6 +12,7 @@ from .overlay import Lost, WristOverlay
 from .panel import SIZE, WristPanel, cursor_image, rgba
 
 TICK_MS = 50
+IDLE_TICK_MS = 1000   # no poses or pointer to follow while disabled or SteamVR is absent
 RETRY_S = 3.0          # between two tries to join SteamVR
 AFTER_QUIT_S = 15.0    # SteamVR takes a while to close; joining it meanwhile would hold it open
 SETTLE_S = 0.12        # the picture is sent this long after the last change (a line arrives in pieces)
@@ -67,7 +68,10 @@ class WristDisplay(QObject):
         self._timer.timeout.connect(self.tick)
 
     def start(self) -> None:
-        self._timer.start(TICK_MS)
+        self._timer.start(self._tick_interval())
+
+    def _tick_interval(self) -> int:
+        return TICK_MS if self.settings.enabled and self.overlay.connected else IDLE_TICK_MS
 
     def stop(self) -> None:
         self._timer.stop()
@@ -148,6 +152,14 @@ class WristDisplay(QObject):
             self.language_changed.emit(look[5])
 
     def tick(self) -> None:
+        try:
+            self._tick()
+        finally:
+            interval = self._tick_interval()
+            if self._timer.interval() != interval:
+                self._timer.setInterval(interval)
+
+    def _tick(self) -> None:
         self._follow_settings()
         s, now = self.settings, self._clock()
         if not s.enabled:
@@ -195,10 +207,14 @@ class WristDisplay(QObject):
             gaze = pose.looked_at(head, world_panel) if head is not None and world_panel is not None else 0.0
             self._looking = gaze >= (LOOK_LEAVE if self._looking else LOOK_ENTER)
             wanted = float(self._looking) if s.look_only else 1.0
+            was_hidden = self._amount <= 0.01
             self._amount += min(max(wanted - self._amount, -FADE), FADE)
             self._interact(world_panel)
             self._follow_settings()
-            if self._dirty and (self._urgent or self._sent is None or now - self._changed_at >= SETTLE_S):
+            # Keep changes pending while the wrist is out of view. Render the latest text
+            # immediately on reveal, avoiding CPU drawing and GPU uploads the wearer cannot see.
+            if self._amount > 0.01 and self._dirty and (
+                    was_hidden or self._urgent or self._sent is None or now - self._changed_at >= SETTLE_S):
                 picture = self.panel.image(include_pointer=False)
                 data = rgba(picture)
                 if data != self._sent:

@@ -8,14 +8,14 @@ tags:
   - VRChat
   - project
   - architecture
-updated: 2026-10-25
+updated: 2026-10-27
 ---
 
 # ART — Project Structure and User Guide
 
 ART means **Asia realtime Translator**. It is one Windows desktop application for hearing speech, translating it, displaying subtitles and sending text to VRChat's chatbox.
 
-Since 0.12.11, online translation handles two destinations at once per utterance and shows each completed subtitle immediately. Panel destinations run before chatbox-only destinations. Local model CPU limits and recognition settings are unchanged. The chatbox still waits for one complete message. See [[LATENCY_REPORT]] for the measured two-language improvement and its limits.
+Since 0.12.11, online translation handles two destinations at once per utterance and shows each completed subtitle immediately. Panel destinations run before chatbox-only destinations. That release preserved local model CPU limits and recognition settings; the later 27 October source changes the CPU/GPU budget described below. The chatbox still waits for one complete message. See [[LATENCY_REPORT]] for the measured two-language improvement and its limits.
 
 For wrong wording, compare the original transcript with what was spoken first. Wrong original text points to audio/recognition; a correct original with a wrong translation points to the translation model or context. Lower latency does not automatically mean lower accuracy: this update removes waiting between independent requests without shortening speech capture or changing decoding.
 
@@ -106,8 +106,9 @@ An **Online** connection result confirms the model-list/authentication check suc
 | Whisper turbo · Vulkan (AMD) | Hearing | The same six app languages; separate Q5 model download (~547 MiB). Added in 0.12.10 | Vulkan-compatible GPU, including AMD |
 | SenseVoice Small | Hearing | Chinese, Cantonese, English, Japanese and Korean; lightweight automatic detection, no Vietnamese | CPU |
 | PhoWhisper Small | Hearing | Vietnamese specialist trained on diverse accents; use turbo for other languages or mixed conversations | CPU INT8 |
-| NLLB-200 CT2 | Translation | All six app languages; default starting choice for low latency | CPU INT8 |
-| Qwen3 1.7B INT8 | Translation | Alternative for the six app languages, thinking disabled; compare quality for your language pair | CPU INT8 |
+| NLLB-200 CT2 | Translation | All six app languages; default starting choice for low latency | CPU INT8, or CUDA when model + 3 GiB is free |
+| Qwen3 1.7B INT8 | Translation | Alternative for the six app languages, thinking disabled; compare quality for your language pair | CPU INT8, or CUDA when model + 3 GiB is free |
+| Hy-MT2 1.8B | Translation | Tencent translator for the six app languages; better wording on a small comparison but slower | CPU only (llama.cpp Q4_K_M) |
 
 These language lists describe the app's supported choices, not equal accuracy for every language or accent. PhoWhisper does not replace the multilingual choices. Small Qwen can still alter meaning, omit wording or produce less natural Cantonese.
 
@@ -177,7 +178,7 @@ ART/
 
 | Area | Main files | Responsibility |
 | --- | --- | --- |
-| Startup | `app.py`, `ui/main.py` | Apply pending EXE update, create backend/window, start checks |
+| Startup | `app.py`, `ui/main.py` | Apply pending EXE update and saved settings before speech attachment; create window, start checks |
 | Overlay | `ui/main_window.py`, `ui/overlay_backdrop.py` | Position, opacity, click-through, resize, update notice |
 | Settings and model cards | `ui/settings_window.py`, `ui/widgets.py` | Embedded setup, model selection, download/delete controls |
 | Message display | `ui/log_view.py` | Original/translated rows and selection/copy |
@@ -186,8 +187,9 @@ ART/
 | Audio capture | `vrc/audio.py` | Microphone/output/process audio sources |
 | Speech boundaries | `engine/vad.py` | Resampling, voice detection and segmentation |
 | Recognition | `engine/stt.py`, `engine/local_inference.py` | Cloud hearing, Whisper/PhoWhisper and SenseVoice |
-| Speech scheduling | `engine/speech.py` | Hearing/translation queues and microphone ordering |
-| Local translation | `engine/local_inference.py` | NLLB and Qwen, shared lock and weight lifetime |
+| Speech scheduling | `engine/speech.py` | Bounded hearing/translation queues, stale-work dropping and microphone ordering |
+| CPU/GPU budget | `engine/runtime.py`, `engine/gpu_budget.py` | Thread/priority policy and the NVIDIA VRAM reserve |
+| Local translation | `engine/local_inference.py` | NLLB, Qwen and Hy-MT2, shared lock and weight lifetime; NLLB/Qwen CUDA with CPU fallback |
 | Online translation | `engine/translators.py`, `vrc/translate.py` | API requests, prompts, fallback and target reuse |
 | Provider settings | `engine/services.py` | Domains, credentials, model catalogs and errors |
 | API health | `ui/service_health.py` | Background connection checks with stale-result protection |
@@ -198,7 +200,9 @@ ART/
 
 The hearing adapter exposes `load()` and `transcribe(...) → Heard`. A translator exposes `prepare()` and `translate(...) → str`. Failures use `SttError` or `TranslateError` so the rest of the app can report/retry/fall back consistently.
 
-NLLB and Qwen share one translation lock and release the other translator's weights before loading. This avoids keeping both large translators resident after switching. NLLB splits punctuated sentences into a batch and retries excessive repetition once. Qwen uses the non-thinking chat prefix and rejects truncated, repetitive, empty or obviously wrong-script output; those checks cannot prove meaning is correct.
+NLLB, Qwen and Hy-MT2 share one translation lock and release the other translators' weights before loading. This avoids keeping multiple large translators resident after switching. NLLB splits punctuated sentences into a batch and retries excessive repetition once. Qwen uses the non-thinking chat prefix and rejects truncated, repetitive, empty or obviously wrong-script output; those checks cannot prove meaning is correct.
+
+The unreleased 27 October gaming pass uses one inference thread by default and below-normal Windows process priority. NLLB/Qwen use CUDA when one verified device, cuBLAS and memory checks allow a 3 GiB game reserve. The reserve is checked before and immediately after loading, then periodically before inference and while idle. Failed loading/reserve checks use CPU for the current request; a CUDA inference failure reports the current line's error and uses CPU on the next request. The checks cannot guarantee free memory throughout an inference. Speech capture, pending sentences and in-flight translations are bounded, so late work is dropped or finalized with a note instead of delaying the chatbox. `VRCT_CPU_THREADS=2`, `VRCT_LOCAL_DEVICE=cpu` and `VRCT_PROCESS_PRIORITY=normal` override thread count, translation device and process priority. Lower priority can increase translation delay; game FPS and headset behavior have not been validated. See [[CHANGELOG]] and [[LATENCY_REPORT]].
 
 ## 7. Latency: what the numbers mean
 
@@ -209,6 +213,8 @@ In the 23 October replay of six short EN/ZH/VI inputs, warm local medians were *
 PhoWhisper matched two Vietnamese reference recordings, with forced-language runs around 2.1–2.4 seconds. It is a Vietnamese CPU alternative, not a demonstrated speed improvement over GPU turbo.
 
 The priority is **low latency while preserving meaning**. NLLB remains the default. See [[LATENCY_REPORT]] for methodology and [[LOCAL_TRANSLATION_PLAN]] for model choices, pinned sources and quality limits.
+
+The 27 October three-line synthetic comparison measured summed warm translation time after loading and an excluded warm-up: NLLB CUDA 0.21 s, CPU one thread 1.74 s, CPU two threads 1.06 s; Hy-MT2 CPU one thread 4.55 s, two threads 2.50 s. These are single-pass component totals, not per-line latency or game-FPS results. Separate real-model lifecycle checks matched one CPU/CUDA answer per NLLB/Qwen model and exercised fallback with injected low-memory telemetry; CUDA inference failure is covered by fake-runtime tests. Load timings and evidence are recorded in [[LATENCY_REPORT]].
 
 ## 8. Development, testing and release
 

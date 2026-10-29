@@ -45,7 +45,7 @@ if ($MixerBuild) {
     --collect-binaries soxr --collect-binaries onnxruntime `
     --collect-binaries openvr `
     --hidden-import proctap._native --hidden-import engine.speech --hidden-import engine.translators `
-    --collect-all sherpa_onnx --collect-all tokenizers --collect-all ctranslate2 `
+    --collect-all sherpa_onnx --collect-all tokenizers --collect-all ctranslate2 --collect-binaries llama_cpp `
     --hidden-import engine.local_inference --hidden-import engine.local_model --hidden-import ui.local_download --hidden-import ui.switch_dialog `
     --hidden-import http.client --hidden-import queue `
     --exclude-module av --exclude-module hf_xet `

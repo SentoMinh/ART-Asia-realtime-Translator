@@ -7,11 +7,11 @@ import uuid
 from html import escape
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFormLayout, QFrame,
                                QHBoxLayout, QLabel, QLineEdit, QListWidget, QProgressBar,
-                               QPushButton, QMessageBox, QScrollArea, QSlider, QStackedWidget, QVBoxLayout,
+                               QPushButton, QMessageBox, QScrollArea, QSlider, QStackedWidget, QToolButton, QVBoxLayout,
                                QWidget)
 
 from engine import local_model
@@ -31,7 +31,6 @@ except ImportError:      # numpy missing: no microphone list, only the Windows d
 from .widgets import DialogPanel, Switch
 
 LOCAL_MODEL = "Local Model (this PC)"
-LOCAL_NOTE = "Choose a hearing or translation model to download and run on this PC. No API key is needed."
 LOCAL_DOWNLOAD_NOTE = "Download: {size}. The model becomes active when the download finishes. You can close this window while it continues."
 SERVICE_NOTES = {
     "openai": "Whisper hears, GPT translates. Paid per use.",
@@ -236,7 +235,7 @@ class SettingsWindow(QDialog):
         self._page("Models", [
             ("Hearing", self._hearing_desc, hearing_control),
             ("Translating", self._translating_desc, translating_control),
-        ], more=[(LOCAL_MODEL, [(LOCAL_MODEL, LOCAL_NOTE, self._local_row())]),
+        ], more=[(LOCAL_MODEL, [(LOCAL_MODEL, "", self._local_row())]),
                  ("Services", self._domains_host)])
         self.nav.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.nav.setCurrentRow(0)
@@ -244,7 +243,15 @@ class SettingsWindow(QDialog):
         self._model_timer = QTimer(self)
         self._model_timer.setInterval(500)
         self._model_timer.timeout.connect(self._update_model_labels)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._update_model_labels()
         self._model_timer.start()
+
+    def hideEvent(self, event):
+        self._model_timer.stop()
+        super().hideEvent(event)
 
     def _active_hearing_model(self) -> str:
         parent = self.parent()
@@ -700,14 +707,12 @@ class SettingsWindow(QDialog):
             title_label = QLabel(tr(title))
             title_label.setObjectName("title")
             title_label.setWordWrap(True)
-            if isinstance(description, QLabel):
-                description_label = description
-            else:
-                description_label = QLabel(tr(description))
-            description_label.setObjectName("dim")
-            description_label.setWordWrap(True)
             text.addWidget(title_label)
-            text.addWidget(description_label)
+            if isinstance(description, QLabel) or description:
+                description_label = description if isinstance(description, QLabel) else QLabel(tr(description))
+                description_label.setObjectName("dim")
+                description_label.setWordWrap(True)
+                text.addWidget(description_label)
             row.addLayout(text, 1)
             row.addSpacing(16)
             row.addWidget(control, 0, Qt.AlignVCenter)
@@ -973,6 +978,10 @@ class LocalModelDialog(QDialog):
         self._stopping = False
         self._delete_pending = None
         self.rows = {}
+        self._icons = {name: theme.icon(name, color) for name, color in (
+            ("download", theme.ACCENT), ("stop", theme.ACCENT), ("check", theme.ACCENT),
+            ("trash", theme.TEXT), ("close", theme.TEXT))}
+        self._confirm_icon = theme.icon("trash", theme.ERROR)
         self.setAttribute(Qt.WA_DeleteOnClose)
         self.setObjectName("settings")
         self.setWindowTitle(tr(LOCAL_MODEL))
@@ -981,22 +990,31 @@ class LocalModelDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 18, 22, 18)
         layout.setSpacing(10)
-        note = QLabel(tr(LOCAL_NOTE))
-        note.setWordWrap(True)
-        layout.addWidget(note)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
         content = QWidget()
         listing = QVBoxLayout(content)
         listing.setContentsMargins(0, 0, 8, 0)
-        listing.setSpacing(14)
+        listing.setSpacing(18)
+        sections = {}
+        for category, title in (("hearing", "Hearing"), ("translating", "Translating")):
+            section = QVBoxLayout()
+            section.setSpacing(8)
+            heading = QLabel(tr(title))
+            heading.setObjectName("heading")
+            section.addWidget(heading)
+            listing.addLayout(section)
+            sections[category] = section
         for model, (title, category, _, _) in local_model.MODELS.items():
             panel = QFrame()
             panel.setObjectName("card")
             row = QHBoxLayout(panel)
             details = QVBoxLayout()
-            heading = QLabel(f"{tr('Hearing' if category == 'hearing' else 'Translating')} — {tr(title)}")
+            details.setSpacing(4)
+            device = ("GPU" if model in ("large-v3-turbo", "whisper-turbo-vulkan") else
+                      "GPU / CPU" if model in ("nllb-200-ct2", "qwen3-1.7b-ct2") else "CPU")
+            heading = QLabel(f"{tr('Hearing' if category == 'hearing' else 'Translating')} - {tr(title)} - {device}")
             heading.setWordWrap(True)
             details.addWidget(heading)
             model_note = QLabel(tr(local_model.DESCRIPTIONS[model]))
@@ -1011,29 +1029,29 @@ class LocalModelDialog(QDialog):
             bar.setTextVisible(False)
             details.addWidget(bar)
             row.addLayout(details, 1)
-            buttons = QVBoxLayout()
-            action = QPushButton(tr("Download"))
-            action.setAccessibleName(f"{tr('Download')} {title}")
-            action.setToolTip(tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size(model))))
+            buttons = QHBoxLayout()
+            buttons.setSpacing(2)
+            action = QToolButton()
             action.clicked.connect(lambda checked=False, model=model: self.start_or_stop(model))
-            use = QPushButton(tr("Use model"))
-            use.setAccessibleName(f"{tr('Use model')} {title}")
+            use = QToolButton()
+            use.setAccessibleName(f"{tr('Use model')} {tr(title)}")
+            use.setToolTip(use.accessibleName())
             use.clicked.connect(lambda checked=False, model=model: self.use_model(model))
-            buttons.addWidget(action)
-            buttons.addWidget(use)
-            delete = QPushButton(tr("Delete"))
-            delete.setObjectName("plain")
-            delete.setAccessibleName(f"{tr('Delete model')} {title}")
-            delete.setToolTip(tr("Delete this model's downloaded files and unfinished download. Shared NVIDIA libraries are kept."))
+            delete = QToolButton()
             delete.clicked.connect(lambda checked=False, model=model: self.delete_model(model))
-            cancel = QPushButton(tr("Cancel"))
-            cancel.setObjectName("plain")
+            cancel = QToolButton()
+            cancel.setAccessibleName(f"{tr('Cancel')} - {tr(title)}")
+            cancel.setToolTip(cancel.accessibleName())
             cancel.clicked.connect(self.cancel_delete)
-            buttons.addWidget(delete)
-            buttons.addWidget(cancel)
-            buttons.addStretch(1)
+            for button, name in ((action, "download"), (use, "check"), (delete, "trash"), (cancel, "close")):
+                button.setIcon(self._icons[name])
+                button.setIconSize(QSize(18, 18))
+                button.setFixedSize(32, 32)
+                button.setFocusPolicy(Qt.StrongFocus)
+                button.setCursor(Qt.PointingHandCursor)
+                buttons.addWidget(button, alignment=Qt.AlignTop)
             row.addLayout(buttons)
-            listing.addWidget(panel)
+            sections[category].addWidget(panel)
             self.rows[model] = dict(action=action, use=use, result=result, bar=bar, delete=delete, cancel=cancel)
         for model, (title, _) in local_model.REMOVED_MODELS.items():
             if not local_model.has_files(model):
@@ -1044,13 +1062,19 @@ class LocalModelDialog(QDialog):
             result = QLabel(f"{title}\n{tr('Removed model — files still on this PC')}")
             result.setWordWrap(True)
             row.addWidget(result, 1)
-            delete = QPushButton(tr("Delete"))
-            delete.setAccessibleName(f"{tr('Delete model')} {title}")
+            delete = QToolButton()
             delete.clicked.connect(lambda checked=False, model=model: self.delete_model(model))
-            cancel = QPushButton(tr("Cancel"))
+            cancel = QToolButton()
+            cancel.setAccessibleName(f"{tr('Cancel')} - {title}")
+            cancel.setToolTip(cancel.accessibleName())
             cancel.clicked.connect(self.cancel_delete)
-            row.addWidget(delete)
-            row.addWidget(cancel)
+            for button, name in ((delete, "trash"), (cancel, "close")):
+                button.setIcon(self._icons[name])
+                button.setIconSize(QSize(18, 18))
+                button.setFixedSize(32, 32)
+                button.setFocusPolicy(Qt.StrongFocus)
+                button.setCursor(Qt.PointingHandCursor)
+                row.addWidget(button, alignment=Qt.AlignTop)
             listing.addWidget(panel)
             self.rows[model] = dict(delete=delete, cancel=cancel, result=result)
         listing.addStretch(1)
@@ -1071,9 +1095,14 @@ class LocalModelDialog(QDialog):
             self._stopping = False
         for model, row in self.rows.items():
             pending = self._delete_pending == model
+            info = local_model.MODELS.get(model) or local_model.REMOVED_MODELS[model]
+            title = tr(info[0])
             row["delete"].setVisible(local_model.has_files(model))
             row["delete"].setEnabled(not self._download.active)
-            row["delete"].setText(tr("Confirm delete") if pending else tr("Delete"))
+            row["delete"].setIcon(self._confirm_icon if pending else self._icons["trash"])
+            row["delete"].setAccessibleName(f"{tr('Confirm delete' if pending else 'Delete model')} {title}")
+            row["delete"].setToolTip(row["delete"].accessibleName() + "\n" + tr(
+                "Delete this model's downloaded files and unfinished download. Shared NVIDIA libraries are kept."))
             row["cancel"].setVisible(pending)
             if model in local_model.REMOVED_MODELS:
                 row["result"].setText(f"{local_model.REMOVED_MODELS[model][0]}\n" + tr(
@@ -1085,7 +1114,10 @@ class LocalModelDialog(QDialog):
             can_download = (local_model.installed(model)
                             and (model != "large-v3-turbo" or local_model.nvidia_card()))
             needs_download = not local_model.ready(model=model)
-            row["action"].setText(tr("Stop") if active else tr("Download"))
+            row["action"].setIcon(self._icons["stop" if active else "download"])
+            row["action"].setAccessibleName(f"{tr('Stop' if active else 'Download')} {title}")
+            row["action"].setToolTip(row["action"].accessibleName() + ("" if active else "\n" +
+                tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size(model)))))
             row["action"].setEnabled(not self._stopping if active else
                                      not self._download.active and can_download and needs_download)
             row["use"].setVisible(not missing)

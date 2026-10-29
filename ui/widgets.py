@@ -56,8 +56,15 @@ class LevelBar(QWidget):
     def set_level(self, level: float) -> None:
         level = min(max(float(level), 0.0), 1.0)
         # fall slowly so short sounds stay visible
-        self._level = level if level > self._level else max(level, self._level * 0.8)
-        self.update()
+        level = level if level > self._level else max(level, self._level * 0.8)
+        before, self._level = self._drawn(), level
+        if self._drawn() != before:   # 20 times a second: repaint only when the line visibly moves
+            self.update()
+
+    def _drawn(self):
+        if not (self._active and self._level > 0.01):
+            return None
+        return round(self._level * self.width() * 2), self._level >= 0.85
 
     def set_active(self, active: bool) -> None:
         self._active = active

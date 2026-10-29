@@ -68,6 +68,9 @@ class LiveBackend(Backend):
         self._threaded = threaded
         self._jobs: queue.Queue = queue.Queue()
         self._worker: threading.Thread | None = None
+        # The provider names last applied, so a switch away from Local Model can free its weights.
+        self._active_translating = self.settings.translating
+        self._active_hearing = self.settings.hearing
         self._outbox: deque[tuple[Utterance, str]] = deque()   # (line, text for the chatbox)
         self._last_sent = -MIN_GAP_S
         self._next_id = 1
@@ -99,6 +102,15 @@ class LiveBackend(Backend):
 
     def apply_settings(self, settings) -> None:
         self.settings = settings
+        if settings.translating != self._active_translating and settings.translating != "local":
+            # Left Local Model: its weights, cache and CPU threads must not stay resident.
+            self._release_local_translation()
+        if settings.hearing != self._active_hearing and settings.hearing != "local":
+            engine = getattr(self, "speech_engine", None)
+            if engine is not None:
+                engine.release_local_hearing()
+        self._active_translating = settings.translating
+        self._active_hearing = settings.hearing
         if not settings.chatbox_speaker:
             self._outbox = deque((line, text) for line, text in self._outbox if line.source != "speaker")
         if not settings.chatbox_typing or not settings.mic_on:
@@ -239,14 +251,33 @@ class LiveBackend(Backend):
 
     def _work(self) -> None:
         while True:
-            job = self._jobs.get()
+            try:
+                job = self._jobs.get(timeout=10.0)
+            except queue.Empty:
+                if self.settings.translating == "local":
+                    from engine.local_inference import check_local_gpu_budget
+                    check_local_gpu_budget()
+                continue
             if job is None:
                 return
+            self._run(job)
+
+    def _release_local_translation(self) -> None:
+        """Free the local translator's weights on the worker: closing a model can take a moment,
+        and loading the next one must not wait behind it on the window's thread."""
+        job = ("release_local",)
+        if self._threaded and self._worker is not None and self._worker.is_alive():
+            self._jobs.put(job)
+        else:
             self._run(job)
 
     def _run(self, job: tuple) -> None:
         if job[0] == "prepare":
             self._translator.prepare()
+            return
+        if job[0] == "release_local":
+            from engine.local_inference import release_local_translation
+            release_local_translation(should_release=lambda: self.settings.translating != "local")
             return
         _, utterance, target, source = job
         started = time.perf_counter()

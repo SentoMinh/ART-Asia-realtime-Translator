@@ -37,20 +37,28 @@ def process_started(pid):
         kernel.CloseHandle(handle)
 
 
-def logged_microphone(path, started):
-    """Unknown/stopped is empty. Ignore partial lines and earlier game sessions."""
+def latest_microphone(path, started, start=0):
+    """(microphone of the last complete event after byte `start`, or None when there is none;
+    the byte where the complete lines end). At most the last MAX_LOG_BYTES are read."""
     with path.open("rb") as source:
-        source.seek(0, 2)
-        source.seek(max(0, source.tell() - MAX_LOG_BYTES))
-        data = source.read(MAX_LOG_BYTES)
+        end = source.seek(0, 2)
+        start = source.seek(max(start, end - MAX_LOG_BYTES))
+        data = source.read(end - start)
     data = data[:data.rfind(b"\n") + 1]
     text = data.decode("utf-8", errors="replace").replace("\r\n", "\n")
-    for event in reversed(list(_EVENT.finditer(text))):
-        timestamp = datetime.strptime(event[1], "%Y.%m.%d %H:%M:%S").timestamp()
-        if timestamp < started - 1:
-            return ""
-        return event[3].strip() if event[2] == "Start" else ""
-    return ""
+    event = None
+    for event in _EVENT.finditer(text):
+        pass
+    if event is None:
+        return None, start + len(data)
+    timestamp = datetime.strptime(event[1], "%Y.%m.%d %H:%M:%S").timestamp()
+    found = event[3].strip() if event[2] == "Start" and timestamp >= started - 1 else ""
+    return found, start + len(data)
+
+
+def logged_microphone(path, started):
+    """Unknown/stopped is empty. Ignore partial lines and earlier game sessions."""
+    return latest_microphone(path, started)[0] or ""
 
 
 class MicrophoneStatus:
@@ -58,7 +66,8 @@ class MicrophoneStatus:
     def __init__(self):
         self.microphone = ""
         self._thread = None
-        self._signature = None
+        self._session = None
+        self._read_to = 0         # the log grows all the time: only lines after this byte are new
 
     def refresh(self):
         if self._thread is None or not self._thread.is_alive():
@@ -70,7 +79,7 @@ class MicrophoneStatus:
             pids = process_ids()
             if len(pids) != 1:
                 self.microphone = ""
-                self._signature = None
+                self._session = None
                 return
             started = process_started(pids[0])
             if started is None:
@@ -82,11 +91,12 @@ class MicrophoneStatus:
             if path is None:
                 self.microphone = ""
                 return
-            stat = path.stat()
-            signature = (pids[0], started, path, stat.st_mtime_ns, stat.st_size)
-            if signature != self._signature:
-                self.microphone = logged_microphone(path, started)
-                self._signature = signature
+            session = (pids[0], started, path)
+            fresh = session != self._session or path.stat().st_size < self._read_to
+            found, self._read_to = latest_microphone(path, started, 0 if fresh else self._read_to)
+            if found is not None or fresh:
+                self.microphone = found or ""
+            self._session = session
         except (OSError, ValueError, AttributeError):
             self.microphone = ""
-            self._signature = None
+            self._session = None

@@ -98,5 +98,13 @@
       "sha256": "d29d3e99d421082bd6b699394b39b654918000b69f499fdcb1c1492255e38bbd",
       "place": "qwen3-1.7b/model.bin"
     }
+  ],
+  "hy-mt2-1.8b": [
+    {
+      "url": "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/a0c709d9fac510f2c807aa3af52872340dc37a4a/Hy-MT2-1.8B-Q4_K_M.gguf",
+      "size": 1133080448,
+      "sha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+      "place": "hy-mt2-1.8b/model.gguf"
+    }
   ]
 }

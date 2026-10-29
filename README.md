@@ -7,7 +7,13 @@ A small always-on-top window for VRChat (desktop mode) that:
 - **translates text you type** and sends it to the chatbox;
 - **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
 
-Version **[0.12.14](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.14)**. Enter your API URL and key under **Custom domain**, or choose local models.
+Source version **1.0.7**; the package is in `dist/1.0.7/`. The latest published package is **[1.0.7](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v1.0.7)**. Enter your API URL and key under **Custom domain**, or choose local models.
+
+Version 1.0.6 simplifies the local model list into **Hearing** and **Translating** sections. Cards show the model name, CPU/GPU and supported languages, with compact download/use/delete icons and translated tooltips. The introductory text and long descriptions are removed; download progress and delete confirmation remain.
+
+1.0.7 adds a gaming budget: local inference uses one thread by default, NLLB/Qwen may use CUDA when memory checks allow a 3 GiB game reserve, speech queues drop stale work instead of falling behind, and the wrist display idles more cheaply. `VRCT_CPU_THREADS=2`, `VRCT_LOCAL_DEVICE=cpu` and `VRCT_PROCESS_PRIORITY=normal` override thread count, translation device and process priority respectively. CUDA load or reserve-check failures use CPU; an error during CUDA inference fails that line and uses CPU on the next request. The checks do not guarantee free memory throughout a running inference. The update check also logs why it found nothing and accepts a mirror through `VRCT_UPDATE_API`. See the [change log](CHANGELOG.md) for behavior and [latency report](LATENCY_REPORT.md) for measured results and limits; live game FPS has not been validated.
+
+Version 1.0.5 adds optional Hy-MT2 1.8B CPU translation, reduces local translation/background CPU use, and handles punctuation-only recognition and failed local translations without a long cooldown. NLLB remains the faster default; existing model and detector selections are preserved.
 
 Version 0.12.14 includes the SteamVR wrist display through the **VR** button and keeps toolbar controls and language selectors readable when resizing the main window.
 
@@ -17,7 +23,7 @@ See the [change log](CHANGELOG.md) for implementation details, measurements and 
 
 For an Obsidian-ready explanation of the whole project, open [ART Project Guide](ART%20Project%20Guide.md): architecture diagrams, language controls, model storage, folder map, build/update flow and troubleshooting.
 
-Local models now include PhoWhisper Small for Vietnamese hearing and Qwen3 1.7B INT8 for translation. NLLB remains the low-latency default. See [the model plan and checks](LOCAL_TRANSLATION_PLAN.md).
+Local models include PhoWhisper Small for Vietnamese hearing, plus NLLB, Qwen3 1.7B INT8 and Hy-MT2 1.8B for translation. NLLB remains the low-latency default. See [the model plan and checks](LOCAL_TRANSLATION_PLAN.md).
 
 Since version 0.12.4, ART sends your chatbox messages in all selected **They speak** languages. Choose **Custom languages** under Settings → Translation → Chatbox languages to use separate destinations.
 
@@ -29,7 +35,7 @@ Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md
 
 ## Get the app and run it
 
-1. Download the EXE or ZIP from [v0.12.14](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v0.12.14). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
+1. Download the EXE or ZIP from [v1.0.7](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v1.0.7). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
 2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
 3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
 4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
@@ -41,13 +47,15 @@ Builds use `VRChat-Translator-<version>.exe` or `VRChat-Translator-<version>-win
 
 The packaged app checks GitHub for newer releases, downloads updates in the background, and applies them on the next start. A “What’s new” panel appears inside the overlay once per version, including the first start of this release. The app saves the shown version in `ui.json`, so restarting does not repeat it. No provider key is sent to GitHub. A source commit does not publish an application update. The old 0.9.15 EXE did not have an update source configured: download this release manually once to enable future automatic updates. Downloads come from [GitHub Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases).
 
+**Cannot reach GitHub from your network?** Set `VRCT_UPDATE_API` to a mirror that answers with the same JSON as GitHub's `/releases/latest` and names its own download link there, then start the app. Separate several mirrors with commas or semicolons and write `{source}` where the repository belongs, e.g. `https://mirror.example/{source}/latest`. GitHub is always asked first, so the mirror only matters where GitHub is blocked (mainland China without a VPN); nothing is downloaded unless the version is newer and the size, and the SHA-256 when the answer carries one, both match. `%LOCALAPPDATA%\VRChat-Translator\engine.log` now records why a check found nothing: no answer, a refused request, an unreadable answer, a damaged download or a missing digest.
+
 The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run `install_windows.bat` if the Microsoft Visual C++ runtime is needed, or `install_windows.bat --check` for a read-only platform precheck. The script's microphone-permission reminder is general guidance, not detection of blocked access. Live Windows 10 testing remains outstanding. On Windows 10, speaker capture may include other apps sharing the audio output; selected-app music injection currently requires Windows 11.
 
 ### Models: who hears and who translates
 
 | Service | Hears speech | Translates | Good to know |
 |---|---|---|---|
-| Local Model | ✓ SenseVoice or Whisper | ✓ NLLB-200 (CTranslate2) | download the chosen models; no API key |
+| Local Model | ✓ SenseVoice or Whisper | ✓ NLLB, Qwen3 or Hy-MT2 | download the chosen models; no API key |
 | Custom domain | ✓ | ✓ | an OpenAI-compatible API address; add more with **+** |
 
 The **Services** section lists only your custom domains. **Set up…** opens inside Settings with a name, API address, key and **Fetch models**. It moves with Settings; Close or Cancel returns to the Models page. Navigation is disabled while a setup panel is open. Save the API settings, then select models below the Hearing and Translating domain selectors. **Connect** checks the selected API and shows **Connected** when it responds. Use **+** beside a row to add another domain, or **−** to remove an added one. The first domain remains available. Removing a selected domain switches that role back to the first domain. Previously selected, configured providers are preserved as custom domains when upgrading. Several translating models can be listed with commas for fallback.
@@ -68,10 +76,11 @@ Open **Settings → Models → Local Model → Set up…** and choose a model:
 | Whisper turbo · Vulkan (AMD) | Hearing | The six app languages, using whisper.cpp and a separate Q5 model (~547 MiB download). Requires a Vulkan-compatible GPU/driver; supports AMD. Actual AMD performance remains unverified. |
 | SenseVoice Small | Hearing | Lightweight CPU option; Chinese, Cantonese, English, Japanese and Korean. Automatic detection; no Vietnamese. Mixed-language accuracy varies. |
 | PhoWhisper Small | Hearing | Vietnamese specialist trained on diverse accents. CPU INT8, no NVIDIA needed; may be slower than GPU turbo. About 0.9 GiB download. |
-| NLLB-200 · CTranslate2 | Translation | CPU INT8; all six app languages. Default for low latency. |
-| Qwen3 1.7B · INT8 | Translation | Optional CPU language model for all six app languages, thinking disabled. About 1.6 GiB download. Slower than NLLB in our replay; wording and Cantonese quality need comparison. |
+| NLLB-200 · CTranslate2 | Translation | CPU INT8, or CUDA INT8/FP16 when at least model + 3 GiB is free; all six app languages. Default for low latency. |
+| Qwen3 1.7B · INT8 | Translation | Optional CPU or CUDA language model for all six app languages, thinking disabled. About 1.6 GiB download. Slower than NLLB in our replay; wording and Cantonese quality need comparison. |
+| Hy-MT2 1.8B · Tencent | Translation | Optional CPU translator for all six app languages, Q4_K_M through llama.cpp. About 1.1 GiB download. Better wording on the small local comparison, but about three times slower than NLLB; compare your language pair. |
 
-The download panel opens inside Settings and moves with it. Its model list has one scrollbar; the title and single Close button stay at the top. All models are listed directly, each with a **Download** button, download size and progress. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. Only the original NVIDIA Whisper turbo option requires CUDA libraries; Vulkan uses the graphics driver instead. Non-turbo Whisper large-v3 is removed from the list; an old selection falls back to turbo without deleting its downloaded files. Existing hearing and translation choices otherwise stay unchanged. Switching translators releases the previous model before loading the next.
+The download panel opens inside Settings and moves with it. Its model list has one scrollbar; the title and single Close button stay at the top. Cards show download status and the available download/use/delete icon actions with translated tooltips. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. NVIDIA Whisper turbo requires CUDA libraries; NLLB/Qwen use them only when the memory reserve allows; Vulkan uses the graphics driver instead. Non-turbo Whisper large-v3 is removed from the list; an old selection falls back to turbo without deleting its downloaded files. Existing hearing and translation choices otherwise stay unchanged. Switching translators releases the previous weights before loading another local model; leaving Local Model queues cleanup on the translation worker.
 
 **Free disk space:** click **Delete → Confirm delete** on a model card, or Cancel to keep it. This removes app-managed weights and partial downloads; shared NVIDIA libraries, other models and your settings stay intact. Deletion is disabled during downloads. Leftover non-turbo large-v3 files get a cleanup-only card. External Hugging Face caches and loaded model memory are not removed. If a file is in use, stop using the model/restart ART and retry. Available models can be downloaded again.
 
