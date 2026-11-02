@@ -47,9 +47,13 @@ def compose(outer: np.ndarray, inner: np.ndarray) -> np.ndarray:
     return np.column_stack([turn @ inner[:, :3], turn @ inner[:, 3] + outer[:, 3]])
 
 
-def pointer_hit(aim: np.ndarray, panel: np.ndarray, width_m: float,
-                aspect: float) -> tuple[float, float] | None:
-    """Controller -Z ray to the front of the panel; returns top-left based 0–1 coordinates."""
+def pointer_coordinates(aim: np.ndarray, panel: np.ndarray, width_m: float,
+                        aspect: float) -> tuple[float, float] | None:
+    """Front-plane UV coordinates, including misses outside the panel's rectangle."""
+    if (aim.shape != (3, 4) or panel.shape != (3, 4)
+            or not np.isfinite(aim).all() or not np.isfinite(panel).all()
+            or not math.isfinite(width_m) or not math.isfinite(aspect)):
+        return None
     origin = panel[:, :3].T @ (aim[:, 3] - panel[:, 3])
     direction = panel[:, :3].T @ -aim[:, 2]
     if origin[2] <= 0 or direction[2] >= -1e-6 or width_m <= 0 or aspect <= 0:
@@ -59,9 +63,16 @@ def pointer_hit(aim: np.ndarray, panel: np.ndarray, width_m: float,
         return None
     x, y = (origin + distance * direction)[:2]
     u, v = x / width_m + 0.5, 0.5 - y / (width_m * aspect)
-    if 0 <= u < 1 and 0 <= v < 1:
+    if math.isfinite(u) and math.isfinite(v):
         return float(u), float(v)
     return None
+
+
+def pointer_hit(aim: np.ndarray, panel: np.ndarray, width_m: float,
+                aspect: float) -> tuple[float, float] | None:
+    """Controller -Z ray to the front of the panel; strictly inside its rectangle."""
+    uv = pointer_coordinates(aim, panel, width_m, aspect)
+    return uv if uv is not None and 0 <= uv[0] < 1 and 0 <= uv[1] < 1 else None
 
 
 def _ramp(value: float, edges: tuple[float, float]) -> float:
@@ -73,6 +84,9 @@ def looked_at(head: np.ndarray, panel: np.ndarray) -> float:
     """0.0 – 1.0: how much the wearer is looking at the panel (both poses in the room).
     It needs the panel turned towards the face AND the face turned towards the panel, so an
     arm swinging through the view does not flash it."""
+    if (head.shape != (3, 4) or panel.shape != (3, 4)
+            or not np.isfinite(head).all() or not np.isfinite(panel).all()):
+        return 0.0
     to_head = head[:, 3] - panel[:, 3]
     distance = float(np.linalg.norm(to_head))
     if distance < 1e-6:

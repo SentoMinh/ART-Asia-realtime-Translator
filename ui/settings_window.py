@@ -1080,25 +1080,51 @@ class LocalModelDialog(QDialog):
         listing.addStretch(1)
         scroll.setWidget(content)
         layout.addWidget(scroll, 1)
+        footer = QHBoxLayout()
+        download_all = self.download_all_button = QPushButton(tr("Download all"))
+        download_all.setObjectName("plain")
+        download_all.clicked.connect(self.download_all_models)
+        footer.addWidget(download_all, alignment=Qt.AlignLeft)
+        footer.addStretch(1)
         close = self.close_button = QPushButton(tr("Close"))
         close.setObjectName("plain")
         close.clicked.connect(self.accept)
-        layout.addWidget(close, alignment=Qt.AlignRight)
+        footer.addWidget(close, alignment=Qt.AlignRight)
+        layout.addLayout(footer)
         self._download.progress.connect(self.show_progress)
         self._download.finished.connect(self.show_state)
+        if hasattr(self._download, "state"):
+            self._download.state.connect(lambda m, st, prob: self.show_state())
         self.show_state()
         initial = self.rows[local_model.selected(role)]
         (initial["use"] if initial["use"].isEnabled() else initial["action"]).setFocus()
 
-    def show_state(self, problem: str = "") -> None:
+    def download_all_models(self) -> None:
+        if hasattr(self._download, "start_all"):
+            self._download.start_all()
+        else:
+            for model in local_model.MODELS:
+                if not local_model.ready(model=model):
+                    self._download.start(model)
+        self.show_state()
+
+    def show_state(self, *args) -> None:
+        problem = args[2] if len(args) == 3 else (args[0] if len(args) == 1 else "")
         if not self._download.active:
             self._stopping = False
         for model, row in self.rows.items():
             pending = self._delete_pending == model
             info = local_model.MODELS.get(model) or local_model.REMOVED_MODELS[model]
             title = tr(info[0])
+            st = getattr(self._download, "get_state", lambda m: "")(model) if model in local_model.MODELS else ""
+            is_model_active = getattr(self._download, "is_model_active", lambda m: False)(model) if model in local_model.MODELS else False
+            dl_model = getattr(self._download, "model", None)
+            active = is_model_active or (self._download.active and dl_model == model)
+            is_queued = st == "queued"
+            is_stopped = st == "stopped"
+            is_error = st == "error"
             row["delete"].setVisible(local_model.has_files(model))
-            row["delete"].setEnabled(not self._download.active)
+            row["delete"].setEnabled(not self._download.active and not is_model_active and not is_queued)
             row["delete"].setIcon(self._confirm_icon if pending else self._icons["trash"])
             row["delete"].setAccessibleName(f"{tr('Confirm delete' if pending else 'Delete model')} {title}")
             row["delete"].setToolTip(row["delete"].accessibleName() + "\n" + tr(
@@ -1109,43 +1135,70 @@ class LocalModelDialog(QDialog):
                     "Delete downloaded files? You can download available models again." if pending else
                     "Removed model — files still on this PC" if local_model.has_files(model) else "Model deleted"))
                 continue
-            active = self._download.active and self._download.model == model
             missing = local_model.missing(model)
             can_download = (local_model.installed(model)
                             and (model != "large-v3-turbo" or local_model.nvidia_card()))
             needs_download = not local_model.ready(model=model)
-            row["action"].setIcon(self._icons["stop" if active else "download"])
-            row["action"].setAccessibleName(f"{tr('Stop' if active else 'Download')} {title}")
-            row["action"].setToolTip(row["action"].accessibleName() + ("" if active else "\n" +
+            can_queue = hasattr(self._download, "queue")
+            row["action"].setIcon(self._icons["stop" if (active or is_queued) else "download"])
+            row["action"].setAccessibleName(f"{tr('Stop' if (active or is_queued) else 'Download')} {title}")
+            row["action"].setToolTip(row["action"].accessibleName() + ("" if (active or is_queued) else "\n" +
                 tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size(model)))))
-            row["action"].setEnabled(not self._stopping if active else
-                                     not self._download.active and can_download and needs_download)
+            action_enabled = (not self._stopping if (active or is_queued) else
+                              (can_download and needs_download if can_queue else
+                               not self._download.active and can_download and needs_download))
+            row["action"].setEnabled(action_enabled)
             row["use"].setVisible(not missing)
-            row["use"].setEnabled(not missing and not self._download.active)
+            row["use"].setEnabled(not missing and not active and not is_queued and not self._download.active)
             done, total = local_model.arrived(model=model), local_model.size(model)
-            row["bar"].setVisible(active or (needs_download and done > 0))
+            row["bar"].setVisible(active or is_queued or (needs_download and done > 0))
             row["bar"].setValue(round(1000 * done / total) if total else 0)
-            status = (tr("Ready") if not missing and not needs_download else
-                      missing if not can_download else
-                      tr("{done} of {size}").format(done=local_model.gb(done), size=local_model.gb(total)))
+            err = getattr(self._download, "get_error", lambda m: "")(model) or (
+                problem if model == dl_model and problem != local_download.STOPPED else "")
+            if is_error and err:
+                status = "✗ " + err
+            elif is_queued:
+                status = tr("Queued...")
+            elif active and (st == "downloading" or not can_queue):
+                status = tr("{done} of {size}").format(done=local_model.gb(done), size=local_model.gb(total))
+            elif is_stopped and done > 0:
+                status = tr("{done} of {size} (stopped)").format(done=local_model.gb(done), size=local_model.gb(total))
+            elif not missing and not needs_download:
+                status = tr("Ready")
+            elif not can_download:
+                status = missing
+            else:
+                status = tr("{done} of {size}").format(done=local_model.gb(done), size=local_model.gb(total))
             row["result"].setText(status)
             if pending:
                 row["result"].setText(tr("Delete downloaded files? You can download available models again."))
-            if problem and problem != local_download.STOPPED and model == self._download.model:
+            if problem and problem != local_download.STOPPED and model == dl_model:
                 row["result"].setText("✗ " + problem)
 
-    def show_progress(self, done: float, total: float) -> None:
-        self.show_state()
-        row = self.rows[self._download.model]
-        row["bar"].setValue(round(1000 * done / total) if total else 0)
-        row["result"].setText(tr("{done} of {size}").format(done=local_model.gb(done),
-                                                          size=local_model.gb(total)))
+    def show_progress(self, *args) -> None:
+        if len(args) == 3:
+            model, done, total = args
+        elif len(args) == 2:
+            model = getattr(self._download, "model", None) or local_model.selected()
+            done, total = args
+        else:
+            return
+        if model in self.rows and "bar" in self.rows[model]:
+            row = self.rows[model]
+            row["bar"].setVisible(True)
+            row["bar"].setValue(round(1000 * done / total) if total else 0)
+            row["result"].setText(tr("{done} of {size}").format(done=local_model.gb(done),
+                                                              size=local_model.gb(total)))
 
     def start_or_stop(self, model: str) -> None:
         self._delete_pending = None
-        if self._download.active:
-            if self._download.model == model:
-                self._stopping = True
+        dl_model = getattr(self._download, "model", None)
+        is_model_active = getattr(self._download, "is_model_active", lambda m: False)(model)
+        if is_model_active or (self._download.active and dl_model == model):
+            self._stopping = True
+            try:
+                self._download.stop(model)
+            except TypeError:
                 self._download.stop()
         else:
             self._download.start(model)

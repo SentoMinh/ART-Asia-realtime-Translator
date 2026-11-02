@@ -1,5 +1,13 @@
 # Change log
 
+## 1.0.8 — 2026-11-02 — SteamVR cursor response, smooth scrolling and redraw cap
+
+Controller input now uses a precise 16 ms timer while active, with the existing 1000 ms polling while disabled or disconnected. Cursor feedback precedes expensive panel drawing once the first texture exists. Continuous panel redraws are capped at 30 Hz; pending changes remain queued for the next eligible redraw. At a steady 16 ms input cadence the strict redraw interval produces approximately 20.8 panel redraws per second.
+
+Scrolling and fading use elapsed time (600 pixels/second and 5 opacity units/second), with fractional scrolling and a 100 ms stall limit. Repeated or recovered backward timestamps cannot add duplicate motion. Tiny edge misses retain only the last cursor image for up to 75 ms within 3 pixels of the panel; clicks and drags cancel immediately, and a held trigger cannot activate a button on re-entry. Invalid tracking, gaze or geometry hides the cursor immediately. Optional `VRCT_VR_DIAGNOSTICS=1` adds aggregate timing/input-loss summaries to the existing log, at most once every five seconds.
+
+The source passed **810 tests**, including 116 VR cases, and **600 native GPU uploads/readbacks** passed. The backward-clock regression was reproduced by two failing tests before the fix. The packaged EXE passed its isolated self-check and **236 bundled VR/UI tests**, with native/privacy/ZIP/checksum checks. English, Chinese and Vietnamese bundled update notices were rendered and inspected. Artifact: `dist/1.0.8/VRChat-Translator-1.0.8.exe`. Package verification and headset limits are recorded in [VR_OVERLAY_INVESTIGATION.md](VR_OVERLAY_INVESTIGATION.md) and [AGENT_HANDOFF.md](AGENT_HANDOFF.md); evidence is in `.tools/release-1.0.8/`. Models, providers, inference budgets and GPU synchronization are unchanged. Published as v1.0.8 on 2026-11-02. Live headset smoothness and game FPS remain unverified.
+
 ## 1.0.7 — 2026-10-30 — Gaming budget, bounded speech, and an update check that explains itself
 
 The first published build after **0.12.14**. It carries the gaming CPU/GPU budget and bounded-speech work written on 2026-10-27 (kept below, unchanged) plus the update-check changes in this section. Package: `dist/1.0.7/` — one-file EXE and folder ZIP.

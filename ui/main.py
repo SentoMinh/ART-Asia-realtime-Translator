@@ -116,7 +116,10 @@ def run(backend: Backend | None = None) -> int:
     wrist = attach_wrist(window)
     app.aboutToQuit.connect(wrist.stop)
     window.show()
-    QTimer.singleShot(0, window.show_update_notice)
+    if not settings.first_run_done and hasattr(window, "show_first_run"):
+        QTimer.singleShot(0, window.show_first_run)
+    else:
+        QTimer.singleShot(0, window.show_update_notice)
     if isinstance(backend, LiveBackend):
         QTimer.singleShot(0, backend.service_health.start)
     backend.start()

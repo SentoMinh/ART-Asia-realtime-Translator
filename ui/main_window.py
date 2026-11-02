@@ -682,6 +682,28 @@ class MainWindow(QWidget):
     def bars_shown(self) -> bool:
         return not self.bars.isHidden()
 
+    def show_first_run(self) -> None:
+        if self.settings.first_run_done or self._notice:
+            return
+        from .first_run_dialog import FirstRunDialog
+        dialog = FirstRunDialog(self, settings=self.settings, save=self._save_settings)
+        panel = self._notice = DialogPanel(dialog, self)
+        self.log.hide()
+        self.input_bar.hide()
+        self.layout().insertWidget(1, panel, 1)
+        self._show_bars(True)
+
+        def finished(_):
+            self.layout().removeWidget(panel)
+            panel.deleteLater()
+            self._notice = None
+            self.log.show()
+            self.input_bar.setVisible(self.bars_shown())
+            self.show_update_notice()
+
+        dialog.finished.connect(finished)
+        dialog.show()
+
     def show_update_notice(self) -> None:
         if self._notice or self.settings.last_update_notice == __version__:
             return
@@ -689,8 +711,9 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "Local models are grouped into Hearing and Translating, with model names, CPU/GPU labels and supported languages.",
-            "Download, use and delete now have compact icon buttons. Hover over an icon to see its action.",
+            "SteamVR controller input updates more often, with consistent scrolling and fading speeds.",
+            "Brief pointer movements across the panel edge keep the cursor visible while cancelling clicks safely.",
+            "This is a local test build. Please check cursor movement, buttons and scrolling in your headset.",
             "This update notice appears once per version.",
         ):
             label = QLabel("• " + tr(text))

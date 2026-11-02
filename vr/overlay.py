@@ -17,6 +17,8 @@ from .texture import OverlayTextures, TextureError
 KEY = "sentominh.vr-translator.wrist"    # SteamVR knows the overlay by this
 NAME = "VR Translator"
 INPUT_RETRY_S = 3.0
+CURSOR_MOVE_M = 0.0001   # 0.1 mm of aiming jitter is invisible on a hovering cursor
+ALPHA_STEP = 0.01        # smaller see-through changes are not worth a compositor call
 
 
 class Lost(Exception):
@@ -51,6 +53,11 @@ class WristOverlay:
         self._cursor = None
         self._cursor_shown = False
         self._cursor_image = None
+        # what SteamVR was last told about the cursor, so idle ticks need no compositor calls
+        self._cursor_place = None
+        self._cursor_width = None
+        self._cursor_opacity = None
+        self._last_show_opacity = None
         self._input = None
         self._textures = None
         self._input_retry_at = 0.0
@@ -131,6 +138,8 @@ class WristOverlay:
         self._shown = False
         self._cursor = self._cursor_image = None
         self._cursor_shown = False
+        self._cursor_place = self._cursor_width = self._cursor_opacity = None
+        self._last_show_opacity = None
 
         if self._textures is not None:
             self._textures.close()
@@ -148,8 +157,7 @@ class WristOverlay:
         try:
             self._action_sets[0].ulRestrictedToDevice = source
             inputs.updateActionState(self._action_sets)
-            point = inputs.getPoseActionDataRelativeToNow(
-                self._actions["point"], vr.TrackingUniverseStanding, 0, source)
+            point = self._point_pose(inputs, source)
             click = inputs.getDigitalActionData(self._actions["click"], source)
             scroll = inputs.getAnalogActionData(self._actions["scroll"], source)
             self.input_problem = ""
@@ -161,6 +169,22 @@ class WristOverlay:
         except vr.OpenVRError as error:
             self.input_problem = _reason(error)
             return None
+
+    def _point_pose(self, inputs, source):
+        """The aiming controller's pose, preferring the frame SteamVR just composed.
+
+        The frame-matched read needs no predicted time, so the cursor lines up with what the
+        wearer sees. Older bindings and drivers only offer the relative-to-now read.
+        """
+        vr = self._vr
+        next_frame = getattr(inputs, "getPoseActionDataForNextFrame", None)
+        if next_frame is not None:
+            try:
+                return next_frame(self._actions["point"], vr.TrackingUniverseStanding, source)
+            except Exception:      # unsupported by this binding or driver: use the timed read
+                pass
+        return inputs.getPoseActionDataRelativeToNow(
+            self._actions["point"], vr.TrackingUniverseStanding, 0, source)
 
     @_steamvr_call
     def poll(self) -> bool:
@@ -196,6 +220,8 @@ class WristOverlay:
         self._overlay.setOverlayTransformTrackedDeviceRelative(self._handle, device, matrix)
         self._overlay.setOverlayWidthInMeters(self._handle, width_m)
         self._placement = (device, transform.copy(), width_m)
+        # The cursor is placed in this frame; a new one must be sent even at the same spot.
+        self._cursor_place = self._cursor_width = self._cursor_opacity = None
 
     @_steamvr_call
     def set_image(self, rgba: bytes, width: int, height: int) -> None:
@@ -217,6 +243,7 @@ class WristOverlay:
         if self._cursor is None:
             self._cursor = self._overlay.createOverlay(KEY + ".cursor", NAME + " cursor")
             self._overlay.setOverlaySortOrder(self._cursor, 1)
+            self._cursor_place = self._cursor_width = self._cursor_opacity = None   # a fresh overlay
         if rgba != self._cursor_image:
             self._upload(self._cursor, rgba, size, size)
             self._cursor_image = rgba
@@ -227,13 +254,25 @@ class WristOverlay:
                            (0.5 - uv[1]) * width_m * pixels_h / pixels_w, 0.001])
         cursor = transform.copy()
         cursor[:, 3] += transform[:, :3] @ offset
-        matrix = self._vr.HmdMatrix34_t()
-        for row in range(3):
-            for column in range(4):
-                matrix.m[row][column] = float(cursor[row][column])
-        self._overlay.setOverlayTransformTrackedDeviceRelative(self._cursor, device, matrix)
-        self._overlay.setOverlayWidthInMeters(self._cursor, width_m * size / pixels_w)
-        self._overlay.setOverlayAlpha(self._cursor, min(float(opacity), 1.0))
+        width = width_m * size / pixels_w
+        alpha = min(float(opacity), 1.0)
+        # Each of these is a call into the compositor; a cursor that has not visibly moved,
+        # resized or faded since the last one is left alone.
+        unchanged = (self._cursor_place is not None
+                     and np.linalg.norm(cursor[:, 3] - self._cursor_place) < CURSOR_MOVE_M
+                     and abs(alpha - self._cursor_opacity) < ALPHA_STEP
+                     and width == self._cursor_width)
+        if not unchanged:
+            matrix = self._vr.HmdMatrix34_t()
+            for row in range(3):
+                for column in range(4):
+                    matrix.m[row][column] = float(cursor[row][column])
+            self._overlay.setOverlayTransformTrackedDeviceRelative(self._cursor, device, matrix)
+            self._overlay.setOverlayWidthInMeters(self._cursor, width)
+            self._overlay.setOverlayAlpha(self._cursor, alpha)
+            self._cursor_place = cursor[:, 3].copy()
+            self._cursor_width = width
+            self._cursor_opacity = alpha
         if not self._cursor_shown:
             self._overlay.showOverlay(self._cursor)
             self._cursor_shown = True
@@ -242,6 +281,8 @@ class WristOverlay:
         if self._cursor_shown:
             self._overlay.hideOverlay(self._cursor)
             self._cursor_shown = False
+        # Nothing is placed while hidden, so showing it again must send the cursor afresh.
+        self._cursor_place = self._cursor_width = self._cursor_opacity = None
 
     @_steamvr_call
     def show(self, opacity: float) -> None:
@@ -252,7 +293,11 @@ class WristOverlay:
                 self._overlay.hideOverlay(self._handle)
                 self._shown = False
             return
-        self._overlay.setOverlayAlpha(self._handle, min(float(opacity), 1.0))
+        alpha = min(float(opacity), 1.0)
+        if (not self._shown or self._last_show_opacity is None
+                or abs(alpha - self._last_show_opacity) >= ALPHA_STEP):
+            self._overlay.setOverlayAlpha(self._handle, alpha)
+            self._last_show_opacity = alpha
         if not self._shown:
             self._overlay.showOverlay(self._handle)
             self._shown = True

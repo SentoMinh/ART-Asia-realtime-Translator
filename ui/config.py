@@ -63,6 +63,7 @@ class Settings:
     chatbox_typing: bool = True     # show the "typing" dots in VRChat while I talk
     chatbox_original: bool = False  # chatbox gets "translation (original)"
     chatbox_speaker: bool = False   # also send other players' translation and original to my chatbox
+    first_run_done: bool = False    # true once the initial setup dialog was shown or skipped
     x: int = -1
     y: int = -1
     w: int = 560
@@ -136,6 +137,8 @@ def load(path: Path | None = None) -> Settings:
     picked = {}
     if data.get("stt_engine") == "local" and "hearing" not in data:
         picked["hearing"] = "local"     # saved by version 0.9.7 or older
+    if "first_run_done" not in data:
+        picked["first_run_done"] = True  # existing config files were already set up
     for name, value in data.items():
         # a wrong type in the file (edited by hand) falls back to the default
         if name in names and type(value) is type(getattr(defaults, name)):

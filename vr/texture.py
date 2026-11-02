@@ -11,6 +11,13 @@ class TextureError(RuntimeError):
     """The graphics context or texture could not be used."""
 
 
+def _clear_gl_errors(functions) -> None:
+    """Drops errors left by earlier calls so the next check reports only this upload."""
+    for _ in range(16):        # a lost context reports the same error forever; never loop on it
+        if not functions.glGetError():
+            return
+
+
 class OverlayTextures:
     def __init__(self):
         self._textures = {}
@@ -49,13 +56,15 @@ class OverlayTextures:
             # Keep the texture/storage alive; only its pixels change during interaction.
             # Qt images start at the top; OpenGL textures start at the bottom.
             pixels = np.frombuffer(rgba, dtype=np.uint8).reshape(height, width, 4)[::-1].tobytes()
-            texture.setData(QOpenGLTexture.RGBA, QOpenGLTexture.UInt8, pixels)
             functions = self._context.functions()
-            functions.glFinish()
+            _clear_gl_errors(functions)        # only this upload's failures are reported
+            texture.setData(QOpenGLTexture.RGBA, QOpenGLTexture.UInt8, pixels)
             if functions.glGetError():
                 raise TextureError("Could not upload the wrist display texture")
             descriptor = vr.Texture_t(texture.textureId(), vr.TextureType_OpenGL, vr.ColorSpace_Gamma)
             overlay.setOverlayTexture(handle, descriptor)
+            # Hand the upload to the driver instead of waiting for it: glFinish() blocked the
+            # wrist loop whenever SteamVR's compositor or the GPU was busy.
             functions.glFlush()
         finally:
             self._context.doneCurrent()

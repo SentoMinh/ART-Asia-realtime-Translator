@@ -1,4 +1,4 @@
-# ART latency measurements — 22–27 October 2026
+# ART latency measurements — 22–30 October 2026
 
 ## Research and optimization record
 
@@ -14,6 +14,7 @@ This file records measurements and rejected performance choices. [CHANGELOG.md](
 | Hy-MT2 versus NLLB/Qwen candidates | Hy-MT2 Q4 was added as an optional translator after a 31-line comparison; Qwen2.5 3B was rejected. NLLB remains the default, not a claim about the user's saved selection. | [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md), `.tools/model-candidates/results-*.json` |
 | VR and compact UI work | Integrated wrist display, responsive resizing and compact model groups; native rendering/previews checked, live headset behavior outstanding. | [CHANGELOG.md](CHANGELOG.md), `.tools/vr-merge/`, `.tools/resize-ui/`, `.tools/model-list-ui/` |
 | Gaming resource budget | One-thread inference, below-normal priority, guarded NLLB/Qwen CUDA, bounded speech work, model cleanup and idle UI changes implemented in `1efb598`. | 27 October section below; `.tools/gaming-validation/` |
+| SteamVR cursor input | Local 1.0.8 test build adds 16 ms input, bounded redraws, elapsed-time scrolling/fading and safe visual edge grace. 789 source tests, 236 bundled checks, EXE self-check and 600 GPU uploads/readbacks passed; live smoothness remains unverified. | [VR_OVERLAY_INVESTIGATION.md](VR_OVERLAY_INVESTIGATION.md), `.tools/vr-overlay-investigation/`, `.tools/release-1.0.8/` |
 
 External documentation research for the gaming pass was requested through `/agy` in the terminal, covering CTranslate2 CUDA/threads, faster-whisper host threads, OpenMP waits, ONNX/SenseVoice threading, llama.cpp and Windows priority. The recorded `agy` attempts timed out at two- and three-minute limits without a completed source-backed answer; auto mode also reported that it was unavailable for the account. Do not count these attempts as completed documentation verification. The implemented choices were checked through local code, installed runtime probes, regression tests and the measurements below. The local probe reported CTranslate2 4.8.2 with `int8_float16` support and a CPU-only llama.cpp runtime. Model-card/source links from earlier research remain in [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md).
 

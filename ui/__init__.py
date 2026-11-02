@@ -1,3 +1,3 @@
 """Desktop window of the VRChat translator (PySide6). The engine plugs in through ui.backend."""
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
