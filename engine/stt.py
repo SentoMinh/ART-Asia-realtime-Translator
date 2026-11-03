@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import logging
 import math
 import os
 import sys
@@ -28,7 +29,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import local_model, services
+from . import gpu_budget, local_model, services
 
 RATE = 16000
 MAIN_LANGS = ("en", "zh", "yue", "vi", "ja", "ko")
@@ -186,16 +187,37 @@ class LocalWhisper:
         self._model_id = model
         self._model = None
 
+    def _device(self) -> str:
+        """GPU when this PC has one with memory left over for the game; the CPU otherwise.
+        Every faster-whisper model shares this rule, so a busy GPU slows one down instead of
+        breaking it."""
+        try:
+            import ctranslate2
+            device, reason = gpu_budget.select_device(ctranslate2, self._model_id)
+        except Exception as error:
+            device, reason = "cpu", f"CUDA could not be checked: {error}"
+        if device != "cuda":
+            logging.getLogger(__name__).info("local hearing model=%s device=cpu reason=%s",
+                                             self._model_id, reason)
+        return device
+
+    def _options(self, device: str) -> dict:
+        from .runtime import cpu_threads
+        options = (dict(device="cuda", compute_type="float16") if device == "cuda"
+                   else dict(device="cpu", compute_type="int8"))
+        # CUDA still performs feature preparation on the host. Cap both backends.
+        options.update(cpu_threads=cpu_threads(), num_workers=1)
+        return options
+
     def load(self) -> None:
         if self._model is not None:
             return
         problem = local_model.missing(self._model_id)
         if problem:
             raise SttError(problem)
+        vietnamese = self._model_id == "phowhisper-small"
         try:
-            vietnamese = self._model_id == "phowhisper-small"
-            if not vietnamese:
-                _add_gpu_libraries()
+            device = self._device()
             if local_model.ready(model=self._model_id):
                 source = str(local_model.model_folder(self._model_id))     # the program's own download
             else:
@@ -204,16 +226,26 @@ class LocalWhisper:
                 # library's own check for that is not thread-safe: always copy instead.
                 download.are_symlinks_supported = lambda cache_dir=None: False
                 source = self._model_id                            # faster-whisper fetches it
-            from .runtime import cpu_threads
-            options = dict(device="cpu", compute_type="int8") if vietnamese else dict(device="cuda", compute_type="float16")
-            # CUDA still performs feature preparation on the host. Cap both backends.
-            options.update(cpu_threads=cpu_threads(), num_workers=1)
-            model = whisper_class()(source, **options)
-            # the first run on a GPU is slow (2 s instead of 0.6 s): spend it on silence now
-            list(model.transcribe(np.zeros(RATE, dtype="float32"), language="vi" if vietnamese else "en", beam_size=1)[0])
-            self._model = model
+            self._model = self._build(source, device, vietnamese)
         except Exception as error:
             raise SttError(f"the speech model could not be loaded: {error}") from error
+
+    def _build(self, source: str, device: str, vietnamese: bool):
+        """Load on the chosen device; a GPU that cannot take it falls back to the CPU once."""
+        if device == "cuda":
+            _add_gpu_libraries()
+        try:
+            model = whisper_class()(source, **self._options(device))
+        except Exception as error:
+            if device != "cuda":
+                raise
+            logging.getLogger(__name__).warning(
+                "local hearing model=%s could not use the GPU (%s); using the CPU", self._model_id, error)
+            model = whisper_class()(source, **self._options("cpu"))
+        # the first run on a GPU is slow (2 s instead of 0.6 s): spend it on silence now
+        list(model.transcribe(np.zeros(RATE, dtype="float32"),
+                              language="vi" if vietnamese else "en", beam_size=1)[0])
+        return model
 
     def close(self) -> None:
         """Free the loaded weights and any CUDA/CPU worker threads. The next use reloads."""

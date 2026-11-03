@@ -138,6 +138,32 @@ class Chain:
         raise problem or TranslateError("every translator is resting after an error; try again soon")
 
 
+    def translate_many(self, text, targets, likely_source="", heard=False):
+        """Every target in one call when this translator can batch. None means the caller should
+        fall back to translate() one target at a time (other models, or an error here)."""
+        if len(self._translators) != 1:
+            return None
+        name, translator = self._translators[0]
+        batch = getattr(translator, "translate_many", None)
+        if batch is None:
+            return None
+        with self._state_lock:
+            if self._clock() < self._skip_until.get(name, 0.0):
+                return None
+        try:
+            values, errors = batch(text, targets, likely_source, heard)
+        except Exception:
+            return None
+        with self._state_lock:
+            if self._clock() >= self._skip_until.get(name, 0.0):
+                self._errors.pop(name, None)
+            prev_used = self.last_used
+            self.last_used = name
+        if self.on_switch and (prev_used != name or not prev_used):
+            self.on_switch(name)
+        return values, errors
+
+
 class Remembered:
     """A local model decodes greedily, so the same line always gets the same translation: a line
     heard again (music, a greeting, a cough the hearing model writes as "T.") skips the model."""
@@ -163,6 +189,31 @@ class Remembered:
             if len(self._answers) > self._size:
                 self._answers.popitem(last=False)
         return answer
+
+    def translate_many(self, text, targets, likely_source="", heard=False):
+        """Answers already remembered cost nothing; the misses go to the model in one call."""
+        batch = getattr(self._translator, "translate_many", None)
+        if batch is None:
+            return None
+        values, errors, missing = {}, {}, []
+        with self._lock:
+            for target in targets:
+                key = (text, target, likely_source, heard)
+                if key in self._answers:
+                    self._answers.move_to_end(key)
+                    values[target] = self._answers[key]
+                elif target not in missing:
+                    missing.append(target)
+        if missing:
+            answers, problems = batch(text, missing, likely_source, heard)
+            values.update(answers)
+            errors.update(problems)
+            with self._lock:
+                for target, answer in answers.items():
+                    self._answers[(text, target, likely_source, heard)] = answer
+                    if len(self._answers) > self._size:
+                        self._answers.popitem(last=False)
+        return values, errors
 
 
 class ServiceChain:
@@ -207,6 +258,23 @@ class ServiceChain:
         self.last_used = name
         if self.on_switch:
             self.on_switch(name)
+
+    def translate_many(self, text: str, targets, likely_source: str = "", heard: bool = False):
+        """Every target in one model call when the selected service can batch (local NLLB);
+        None means: translate one target at a time, which also handles fallback between them."""
+        chain = self._chain()
+        if not chain._translators:
+            return None
+        values = chain.translate_many(text, targets, likely_source, heard)
+        if values is None:
+            return None
+        service = self._pick() or services.default_service()
+        models = tuple(services.translate_models(service))
+        self.last_used = chain.last_used
+        self.last_result = (time.monotonic(), service, models, self.last_used)
+        if self.on_switch and self.last_used:
+            self.on_switch(self.last_used)
+        return values
 
     def names(self) -> list[str]:
         return [name for name, _ in self._chain()._translators]

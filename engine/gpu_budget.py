@@ -11,7 +11,8 @@ from . import local_model
 RESERVE_MIB = 3072
 PROBE_INTERVAL_S = 10.0
 # Include CUDA context and decoding workspace above the quantized weights.
-MODEL_MIB = {"nllb-200-ct2": 1536, "qwen3-1.7b-ct2": 3072}
+MODEL_MIB = {"nllb-200-ct2": 1536, "qwen3-1.7b-ct2": 3072, "hy-mt2-1.8b": 1536,
+             "large-v3-turbo": 1792, "phowhisper-small": 768, "sensevoice": 768}
 
 
 def free_vram_mib() -> int | None:

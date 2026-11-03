@@ -54,11 +54,14 @@ _SVG = {
     "swap": '<path d="M6 8.5h12l-3-3M18 15.5H6l3 3"/>',
     "globe": '<circle cx="12" cy="12" r="8.5"/>'
              '<path d="M3.5 12h17M12 3.5c-3.2 2.6-3.2 14.4 0 17M12 3.5c3.2 2.6 3.2 14.4 0 17"/>',
+    "vr": '<rect x="2.8" y="7" width="18.4" height="10" rx="4"/>'
+          '<path d="M8.5 12h.01M15.5 12h.01"/>',
     "down":'<path d="M7 10l5 5 5-5"/>',
     "dock": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 16L8 9M8 9h5M8 9v5"/>',
     "trash":'<path d="M5 7h14M10 7V4.5h4V7M7 7l1 12.5h8L17 7"/>',
     "download": '<path d="M12 3v12M7 10l5 5 5-5M5 16v4h14v-4"/>',
     "check": '<path d="M5 12l4.5 4.5L19 7"/>',
+    "warning": '<path d="M12 3.2 21.5 20H2.5Z"/><path d="M12 9v5M12 17h.01"/>',
 }
 
 
@@ -92,6 +95,7 @@ def style_sheet() -> str:
     QComboBox::down-arrow {{ image: none; width: 0px; }}
     QComboBox QAbstractItemView {{ background: {PANEL}; border: 1px solid {LINE};
                  selection-background-color: {ACCENT}; outline: none; }}
+    QComboBox QAbstractItemView::item:disabled {{ color: {DIM}; }}
     QLineEdit {{ background: transparent; border: none; border-bottom: 1px solid {LINE};
                  padding: 5px 2px; selection-background-color: {ACCENT}; }}
     QLineEdit:focus {{ border-bottom: 1px solid {ACCENT}; }}
@@ -133,4 +137,12 @@ def style_sheet() -> str:
     QFrame#card {{ background: #2b2b31; border-radius: 10px; }}
     QLabel#title {{ font-size: 14px; font-weight: 600; }}
     QLabel#heading {{ font-size: 17px; font-weight: 600; }}
+    QLabel#warning {{ color: {ERROR}; font-size: 12px; }}
+    QPushButton#languageChoice {{ background: {PANEL_HI}; color: {TEXT}; text-align: left;
+                                  padding: 10px 16px; font-size: 15px; font-weight: 500; }}
+    QPushButton#languageChoice:hover {{ background: {LINE}; border: 1px solid {ACCENT}; }}
+    QFrame#tourCard {{ background: #202024; border: 1px solid {LINE}; border-radius: 12px; }}
+    QLabel#tourStep {{ color: {DIM}; font-size: 11px; }}
+    QLabel#tourTitle {{ font-size: 15px; font-weight: 600; }}
+    QLabel#tourBody {{ color: #c9c9d2; font-size: 12px; }}
     """

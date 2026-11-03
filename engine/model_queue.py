@@ -152,7 +152,7 @@ class ModelQueue:
         candidates = models or list(local_model.MODELS.keys())
         for model in candidates:
             if not self._is_ready(model):
-                if local_model.installed(model) and (model != "large-v3-turbo" or local_model.nvidia_card()):
+                if local_model.installed(model) and local_model.wanted(model):
                     self.enqueue(model)
 
     def stop(self, model: str) -> None:

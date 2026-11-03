@@ -1,5 +1,34 @@
 # Change log
 
+## 1.1.0 - 2026-11-04 - First-run language picker, guided manual and server setup
+
+The first launch now asks for **中文, Tiếng Việt or English** before setup, and the
+rest of the first-run flow uses that language. Local AI models are selected by
+default with **Whisper large-v3-turbo** and **NLLB-200** marked Recommended. The
+Whisper build that does not match the installed graphics card is disabled, and
+the selected local models are equipped immediately while their downloads continue
+in the background.
+
+Choosing Self-hosted shows the online setup instead: enter the server URL, an
+optional API key, and fetch the model list. A small name window then saves the
+service under **Services/API** with the selected hearing and translation models.
+Changing those model choices updates the saved service. The setup dialog now fits
+narrow windows without a horizontal scrollbar.
+
+A guided manual explains the main controls with a dimmed window and a bright
+target. It has **Skip** and **Next**, keeps highlighted controls clickable, and
+no longer includes the minimise, maximise or close buttons. The blue ring was
+removed so only the highlighted control area stays bright. Toolbar utilities
+moved into the **More actions** arrow at the right of the language row; the
+Settings gear remains beside the pin. The music dialog now shows a red warning
+under the volume slider when very loud music may affect translation.
+
+Validation: **844 source tests passed in 49.80 s**. The packaged
+`VRChat-Translator-1.1.0.exe` passed `--selfcheck` with all parts working,
+including the local runtimes, mixer files, VR texture path and a live HTTPS
+answer, using isolated AppData. Artifacts are in `dist/1.1.0/`; live VRChat,
+headset, game-FPS, Windows 10 and fresh-PC behavior were not tested.
+
 ## 1.0.8 — 2026-11-02 — SteamVR cursor response, smooth scrolling and redraw cap
 
 Controller input now uses a precise 16 ms timer while active, with the existing 1000 ms polling while disabled or disconnected. Cursor feedback precedes expensive panel drawing once the first texture exists. Continuous panel redraws are capped at 30 Hz; pending changes remain queued for the next eligible redraw. At a steady 16 ms input cadence the strict redraw interval produces approximately 20.8 panel redraws per second.

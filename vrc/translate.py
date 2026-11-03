@@ -53,7 +53,24 @@ def translate_targets(translator, text, targets, source="", heard=False, on_resu
             logging.getLogger("engine.translation").info("translation target=%s duration_ms=%d", target,
                                                        (time.perf_counter() - started) * 1000)
 
-    # Only online adapters opt in. Local inference retains its shared model/CPU budget.
+    # One model call for every language, when the selected model can batch them: a line then
+    # costs one pass instead of one per target, which is what keeps it from going stale.
+    batch = getattr(translator, "translate_many", None)
+    if len(pending) > 1 and batch is not None:
+        started = time.perf_counter()
+        try:
+            batched = batch(text, pending, source, heard)
+        except Exception:
+            batched = None                      # fall back to one target at a time
+        if batched is not None:
+            values, problems = batched
+            for target in pending:
+                logging.getLogger("engine.translation").info(
+                    "translation target=%s duration_ms=%d batched=1", target,
+                    (time.perf_counter() - started) * 1000)
+                ready(target, values.get(target, ""), problems.get(target))
+            return ({target: translations[target] for target in targets},
+                    {target: errors[target] for target in targets if target in errors})
     if len(pending) > 1 and getattr(translator, "parallel_targets", False):
         with ThreadPoolExecutor(max_workers=2, thread_name_prefix="translate-target") as pool:
             jobs = {pool.submit(run, target): target for target in pending}

@@ -64,6 +64,8 @@ class Settings:
     chatbox_original: bool = False  # chatbox gets "translation (original)"
     chatbox_speaker: bool = False   # also send other players' translation and original to my chatbox
     first_run_done: bool = False    # true once the initial setup dialog was shown or skipped
+    ui_lang_chosen: bool = False    # true once the first-run language screen was answered
+    tour_done: bool = False         # true once the guided tour was finished or skipped
     x: int = -1
     y: int = -1
     w: int = 560

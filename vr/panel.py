@@ -320,6 +320,12 @@ class WristPanel(QWidget):
 
     def image(self, include_pointer: bool = True) -> QImage:
         """The panel as it looks now, see-through where nothing is drawn."""
+        # A tap changes the language buttons and the wrist picture is drawn in the same
+        # tick, before Qt's event loop would run the row layout. Settle it first so a
+        # wider box never shows up in its old place for a frame, waiting for a later update.
+        layout = self.layout()
+        if layout is not None:
+            layout.activate()
         picture = QImage(self.size(), QImage.Format_ARGB32_Premultiplied)
         picture.fill(Qt.transparent)
         self.render(picture)

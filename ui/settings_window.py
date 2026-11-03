@@ -270,6 +270,10 @@ class SettingsWindow(QDialog):
         backend = getattr(parent, "backend", None) if parent else None
         svc = self.settings.translating
         title = tr(services.title(svc))
+        device = ""
+        if svc == "local":
+            from engine import local_inference
+            device = local_inference.translation_device()
         configured = tuple(services.translate_models(svc))
         chains = (getattr(backend, "_translator", None),
                   getattr(getattr(backend, "speech_engine", None), "_translator", None))
@@ -280,7 +284,7 @@ class SettingsWindow(QDialog):
             name = max(results, key=lambda result: result[0])[3]
             used_service, separator, model = name.partition(":")
             if separator and used_service == svc:
-                return f"{model} ({title})"
+                return _on_device(f"{model} ({title})", device)
             return name
         current_model = getattr(backend, "current_translating_model", "")
         current_svc = getattr(backend, "current_translating_service", "")
@@ -289,7 +293,7 @@ class SettingsWindow(QDialog):
         else:
             model = configured[0] if configured else services.setting(svc, "translate_model")
         model = model or title
-        return f"{model} ({title})" if model != title else title
+        return _on_device(f"{model} ({title})" if model != title else title, device)
 
     def _update_model_labels(self) -> None:
         self._sync_model_controls()
@@ -337,8 +341,12 @@ class SettingsWindow(QDialog):
         for role, picker in self.model_pickers.items():
             service = getattr(self.settings, role)
             field = "hear_model" if role == "hearing" else "translate_model"
-            selected = services.setting(service, field)
-            models = (tuple(m for m, info in local_model.MODELS.items() if info[1] == role)
+            # The selected local model is the one that will actually run, which may already
+            # have fallen back to a downloaded model.
+            selected = (local_model.selected(role) if service == "local"
+                        else services.setting(service, field))
+            models = (tuple(m for m, info in local_model.MODELS.items()
+                            if info[1] == role and not local_model.missing(m))
                       if service == "local" else tuple(services.catalog(service)))
             signature = (service, selected, models)
             if self._model_choices.get(role) != signature:
@@ -967,6 +975,18 @@ class ServiceDialog(QDialog):
         self.accept()
 
 
+def _on_device(label: str, device: str) -> str:
+    """"… (Local Model) · CPU": the local model fell back to the CPU, which is why it is slower."""
+    return f"{label} · {device.upper()}" if device else label
+
+
+def _language_note(model: str) -> str:
+    """"English, Chinese, … Japanese, Korean +93 languages": a sample named, the rest counted."""
+    note = tr(local_model.DESCRIPTIONS[model])
+    extra = local_model.extra_languages(model)
+    return f"{note} · {tr('+{n} languages').format(n=extra)}" if extra else note
+
+
 class LocalModelDialog(QDialog):
     """Every local model has its own download, progress and activation controls."""
     selected = Signal(str)
@@ -981,6 +1001,7 @@ class LocalModelDialog(QDialog):
         self._icons = {name: theme.icon(name, color) for name, color in (
             ("download", theme.ACCENT), ("stop", theme.ACCENT), ("check", theme.ACCENT),
             ("trash", theme.TEXT), ("close", theme.TEXT))}
+        self._icons["for_other_card"] = theme.icon("close", theme.ERROR)
         self._confirm_icon = theme.icon("trash", theme.ERROR)
         self.setAttribute(Qt.WA_DeleteOnClose)
         self.setObjectName("settings")
@@ -1013,11 +1034,12 @@ class LocalModelDialog(QDialog):
             details = QVBoxLayout()
             details.setSpacing(4)
             device = ("GPU" if model in ("large-v3-turbo", "whisper-turbo-vulkan") else
-                      "GPU / CPU" if model in ("nllb-200-ct2", "qwen3-1.7b-ct2") else "CPU")
+                      "GPU / CPU" if model in ("nllb-200-ct2", "qwen3-1.7b-ct2", "hy-mt2-1.8b",
+                                               "phowhisper-small") else "CPU")
             heading = QLabel(f"{tr('Hearing' if category == 'hearing' else 'Translating')} - {tr(title)} - {device}")
             heading.setWordWrap(True)
             details.addWidget(heading)
-            model_note = QLabel(tr(local_model.DESCRIPTIONS[model]))
+            model_note = QLabel(_language_note(model))
             model_note.setObjectName("dim")
             model_note.setWordWrap(True)
             details.addWidget(model_note)
@@ -1052,7 +1074,8 @@ class LocalModelDialog(QDialog):
                 buttons.addWidget(button, alignment=Qt.AlignTop)
             row.addLayout(buttons)
             sections[category].addWidget(panel)
-            self.rows[model] = dict(action=action, use=use, result=result, bar=bar, delete=delete, cancel=cancel)
+            self.rows[model] = dict(action=action, use=use, result=result, bar=bar, delete=delete,
+                                    cancel=cancel, note=model_note)
         for model, (title, _) in local_model.REMOVED_MODELS.items():
             if not local_model.has_files(model):
                 continue
@@ -1108,6 +1131,16 @@ class LocalModelDialog(QDialog):
                     self._download.start(model)
         self.show_state()
 
+    @staticmethod
+    def _other_card(model: str) -> str:
+        """Why this build is not for this PC ("For AMD graphics cards"), or "" when it is.
+        The row shows a red X with this as its tooltip instead of a download button."""
+        if model == "whisper-turbo-vulkan" and local_model.nvidia_card():
+            return tr("For AMD graphics cards")
+        if model == "large-v3-turbo" and not local_model.nvidia_card():
+            return tr("For NVIDIA graphics cards")
+        return ""
+
     def show_state(self, *args) -> None:
         problem = args[2] if len(args) == 3 else (args[0] if len(args) == 1 else "")
         if not self._download.active:
@@ -1136,18 +1169,26 @@ class LocalModelDialog(QDialog):
                     "Removed model — files still on this PC" if local_model.has_files(model) else "Model deleted"))
                 continue
             missing = local_model.missing(model)
-            can_download = (local_model.installed(model)
-                            and (model != "large-v3-turbo" or local_model.nvidia_card()))
+            can_download = local_model.installed(model) and local_model.wanted(model)
             needs_download = not local_model.ready(model=model)
             can_queue = hasattr(self._download, "queue")
-            row["action"].setIcon(self._icons["stop" if (active or is_queued) else "download"])
-            row["action"].setAccessibleName(f"{tr('Stop' if (active or is_queued) else 'Download')} {title}")
-            row["action"].setToolTip(row["action"].accessibleName() + ("" if (active or is_queued) else "\n" +
-                tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size(model)))))
+            other_card = self._other_card(model)          # "" unless this build is for another GPU
+            if other_card:
+                row["action"].setIcon(self._icons["for_other_card"])
+                row["action"].setAccessibleName(f"{title}: {other_card}")
+                row["action"].setToolTip(other_card)
+            else:
+                row["action"].setIcon(self._icons["stop" if (active or is_queued) else "download"])
+                row["action"].setAccessibleName(f"{tr('Stop' if (active or is_queued) else 'Download')} {title}")
+                row["action"].setToolTip(row["action"].accessibleName() + ("" if (active or is_queued) else "\n" +
+                    tr(LOCAL_DOWNLOAD_NOTE).format(size=local_model.gb(local_model.size(model)))))
+            # A downloaded model needs no download button; a model for another card shows a
+            # red X you can hover for the reason.
+            row["action"].setVisible(bool(other_card) or needs_download or active or is_queued or is_error)
             action_enabled = (not self._stopping if (active or is_queued) else
                               (can_download and needs_download if can_queue else
                                not self._download.active and can_download and needs_download))
-            row["action"].setEnabled(action_enabled)
+            row["action"].setEnabled(True if other_card else action_enabled)
             row["use"].setVisible(not missing)
             row["use"].setEnabled(not missing and not active and not is_queued and not self._download.active)
             done, total = local_model.arrived(model=model), local_model.size(model)
@@ -1166,7 +1207,7 @@ class LocalModelDialog(QDialog):
             elif not missing and not needs_download:
                 status = tr("Ready")
             elif not can_download:
-                status = missing
+                status = "" if other_card else missing
             else:
                 status = tr("{done} of {size}").format(done=local_model.gb(done), size=local_model.gb(total))
             row["result"].setText(status)
@@ -1191,6 +1232,8 @@ class LocalModelDialog(QDialog):
                                                               size=local_model.gb(total)))
 
     def start_or_stop(self, model: str) -> None:
+        if self._other_card(model):
+            return                      # a build for another graphics card is only an indicator
         self._delete_pending = None
         dl_model = getattr(self._download, "model", None)
         is_model_active = getattr(self._download, "is_model_active", lambda m: False)(model)

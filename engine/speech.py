@@ -454,6 +454,8 @@ class SpeechEngine:
     def _skip_translation(self, line: Utterance, segment: Segment, note: str) -> None:
         if line.source == MIC:
             self._typing("typing_cancelled")
+        log.info("%s line %d skipped after %d ms waiting at the detector: %s", line.source, line.id,
+                 (self._clock() - segment.speech_end) * 1000, note)
         self.backend.utterance.emit(dataclasses.replace(
             line, final=True, note=note, latency_ms=int((self._clock() - segment.speech_end) * 1000)))
 

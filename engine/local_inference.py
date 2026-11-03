@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import Counter
 import logging
+import os
 import re
 import threading
 import time
@@ -55,6 +56,21 @@ class LocalSenseVoice:
         """Free the ONNX session (and its CPU threads) without touching the downloaded files."""
         self._recognizer = None
 
+    def _provider(self) -> str:
+        """CUDA when this ONNX runtime was built with it and the game keeps its memory;
+        otherwise the CPU, which is what SenseVoice has always used."""
+        if os.environ.get("VRCT_LOCAL_DEVICE", "auto").strip().lower() != "auto":
+            return "cpu"
+        try:
+            import onnxruntime
+            if "CUDAExecutionProvider" not in onnxruntime.get_available_providers():
+                return "cpu"
+        except Exception:
+            return "cpu"
+        free = gpu_budget.free_vram_mib()
+        needed = gpu_budget.MODEL_MIB.get("sensevoice", 0) + gpu_budget.RESERVE_MIB
+        return "cuda" if free is not None and free >= needed else "cpu"
+
     def load(self):
         if self._recognizer is not None:
             return
@@ -66,7 +82,8 @@ class LocalSenseVoice:
             root = local_model.model_folder("sensevoice")
             self._recognizer = sherpa_onnx.OfflineRecognizer.from_sense_voice(
                 model=str(root / "model.int8.onnx"), tokens=str(root / "tokens.txt"),
-                language="auto", use_itn=True, num_threads=runtime.cpu_threads(), provider="cpu")
+                language="auto", use_itn=True, num_threads=runtime.cpu_threads(),
+                provider=self._provider())
         except Exception as error:
             raise SttError(f"SenseVoice could not be loaded: {error}") from error
 
@@ -87,6 +104,7 @@ class LocalSenseVoice:
 
 LANGUAGES = {"en": "eng_Latn", "vi": "vie_Latn", "zh": "zho_Hans", "yue": "yue_Hant",
              "ja": "jpn_Jpan", "ko": "kor_Hang"}
+BATCH_ROWS = 8             # sentences x targets per call: a long line stays inside the VRAM reserve
 _translation_lock = threading.Lock()
 
 
@@ -140,6 +158,15 @@ def check_local_gpu_budget() -> None:
             engine._check_gpu_budget()
     finally:
         _translation_lock.release()
+
+
+def translation_device() -> str:
+    """The device the loaded local translation model runs on ("cuda" or "cpu"), or "" when no
+    local model is loaded. The window says so when a busy GPU pushed translation onto the CPU."""
+    for engine in (translator, qwen_translator, hy_mt_translator):
+        if engine._model is not None:
+            return engine._device
+    return ""
 
 
 def translation_sentences(text):
@@ -252,49 +279,82 @@ class LocalTranslator:
             logging.getLogger(__name__).info("local translation model=%s device=%s threads=%s reason=%s",
                                              self.model_id, device, options["intra_threads"], reason)
 
-    def translate(self, text, target, likely_source="", heard=False):
+    def translate_many(self, text, targets, likely_source="", heard=False):
+        """Translate every target in one batched call.
+
+        NLLB takes the sentences and the targets together, so a line costs one lock and one
+        pass instead of one pass per language. That keeps live speech from queueing behind
+        older lines long enough to be dropped as stale."""
         source = likely_source or guess_language(text)
-        if source not in LANGUAGES or target not in LANGUAGES:
-            raise TranslateError("Local NLLB does not support this language in the app")
-        if can_reuse_original(text, source, target) or not re.search(r"\w", text):
-            return text
+        targets = [target for target in dict.fromkeys(targets) if target]
+        answers, errors = {}, {}
+        for target in targets:
+            if source not in LANGUAGES or target not in LANGUAGES:
+                errors[target] = TranslateError("Local NLLB does not support this language in the app")
+            elif can_reuse_original(text, source, target) or not re.search(r"\w", text):
+                answers[target] = text
+        todo = [target for target in targets if target not in answers and target not in errors]
+        if not todo:
+            return answers, errors
         problem = local_model.missing("nllb-200-ct2")
         if problem:
             error = TranslateError(problem)
             error.wait = 0
             raise error
+        sentences = translation_sentences(text)
+        if not sentences:
+            error = TranslateError("Local NLLB could not translate: the translation came back empty")
+            error.wait = 0
+            raise error
+        jobs = [(target, sentence) for target in todo for sentence in sentences]
         with self._lock:
             try:
                 self._load()
-                # NLLB's source format is language token + text + EOS.
-                tokens = [[LANGUAGES[source], *self._tokenizer.encode(sentence, add_special_tokens=False).tokens, "</s>"]
-                          for sentence in translation_sentences(text)]
-                if not tokens:
-                    raise ValueError("the translation came back empty")
-                results = self._model.translate_batch(tokens, target_prefix=[[LANGUAGES[target]]] * len(tokens), beam_size=1)
-                if len(results) != len(tokens):
-                    raise ValueError("the translation omitted a sentence")
-                answers = []
-                for original, result in zip(tokens, results):
-                    translated = result.hypotheses[0][1:]
-                    if translation_loop(translated, original):
-                        logging.getLogger(__name__).warning("Local NLLB repetition detected (%s -> %s); retrying sentence once", source, target)
-                        retry = self._model.translate_batch([original], target_prefix=[[LANGUAGES[target]]],
-                                                            beam_size=1, no_repeat_ngram_size=4)
-                        translated = retry[0].hypotheses[0][1:]
-                        if translation_loop(translated, original):
-                            raise ValueError("the translation kept repeating")
-                    ids = [self._tokenizer.token_to_id(token) for token in translated]
-                    answer = self._tokenizer.decode(ids, skip_special_tokens=True).strip()
-                    if not answer:
-                        raise ValueError("a sentence translation came back empty")
-                    answers.append(answer)
-                return " ".join(answers)
+                parts = {target: [] for target in todo}
+                for start in range(0, len(jobs), BATCH_ROWS):
+                    for target, answer in self._translate_jobs(jobs[start:start + BATCH_ROWS], source):
+                        parts[target].append(answer)
             except Exception as error:
                 self._gpu_failed(error)
                 err = TranslateError(f"Local NLLB could not translate: {error}")
                 err.wait = 0
                 raise err from error
+        for target in todo:
+            answers[target] = " ".join(parts[target])
+        return answers, errors
+
+    def _translate_jobs(self, jobs, source):
+        """One model call for these (target, sentence) jobs, in order: [(target, answer)]."""
+        # NLLB's source format is language token + text + EOS.
+        tokens = [[LANGUAGES[source], *self._tokenizer.encode(sentence, add_special_tokens=False).tokens, "</s>"]
+                  for _, sentence in jobs]
+        results = self._model.translate_batch(
+            tokens, target_prefix=[[LANGUAGES[target]] for target, _ in jobs], beam_size=1)
+        if len(results) != len(jobs):
+            raise ValueError("the translation omitted a sentence")
+        answers = []
+        for (target, _), original, result in zip(jobs, tokens, results):
+            translated = result.hypotheses[0][1:]
+            if translation_loop(translated, original):
+                logging.getLogger(__name__).warning(
+                    "Local NLLB repetition detected (%s -> %s); retrying sentence once", source, target)
+                retry = self._model.translate_batch([original], target_prefix=[[LANGUAGES[target]]],
+                                                    beam_size=1, no_repeat_ngram_size=4)
+                translated = retry[0].hypotheses[0][1:]
+                if translation_loop(translated, original):
+                    raise ValueError("the translation kept repeating")
+            ids = [self._tokenizer.token_to_id(token) for token in translated]
+            answer = self._tokenizer.decode(ids, skip_special_tokens=True).strip()
+            if not answer:
+                raise ValueError("a sentence translation came back empty")
+            answers.append((target, answer))
+        return answers
+
+    def translate(self, text, target, likely_source="", heard=False):
+        answers, errors = self.translate_many(text, (target,), likely_source, heard)
+        if target in errors:
+            raise errors[target]
+        return answers[target]
 
 
 def qwen_messages(text: str, target: str, likely_source: str = "") -> list[dict]:
@@ -308,6 +368,7 @@ def qwen_messages(text: str, target: str, likely_source: str = "") -> list[dict]
 
 class LocalQwenTranslator(LocalTranslator):
     model_id = "qwen3-1.7b-ct2"
+    translate_many = None       # a chat model answers one target at a time
 
     def _load(self):
         self._load_ct2("Generator")
@@ -385,6 +446,23 @@ def hy_mt_prompt(text: str, target: str, source: str) -> str:
 
 class LocalHyMTTranslator(LocalTranslator):
     model_id = "hy-mt2-1.8b"
+    translate_many = None       # a chat model answers one target at a time
+
+    def _gpu_layers(self) -> int:
+        """Every layer on the GPU when this llama.cpp build has CUDA and the game keeps its
+        reserve; otherwise 0, which is the CPU-only path Hy-MT2 has always used."""
+        if os.environ.get("VRCT_LOCAL_DEVICE", "auto").strip().lower() != "auto":
+            return 0
+        try:
+            from llama_cpp import llama_cpp as backend
+            supports = getattr(backend, "llama_supports_gpu_offload", None)
+            if not callable(supports) or not supports():
+                return 0
+        except Exception:
+            return 0
+        free = gpu_budget.free_vram_mib()
+        needed = gpu_budget.MODEL_MIB.get(self.model_id, 0) + gpu_budget.RESERVE_MIB
+        return -1 if free is not None and free >= needed else 0
 
     def _load(self):
         if self._model is None:
@@ -392,8 +470,13 @@ class LocalHyMTTranslator(LocalTranslator):
             from llama_cpp import Llama
             path = local_model.model_folder(self.model_id) / "model.gguf"
             threads = runtime.cpu_threads()
-            self._model = Llama(str(path), n_ctx=2048, n_threads=threads, n_threads_batch=threads, n_gpu_layers=0,
-                                verbose=False)
+            layers = self._gpu_layers()
+            self._model = Llama(str(path), n_ctx=2048, n_threads=threads, n_threads_batch=threads,
+                                n_gpu_layers=layers, verbose=False)
+            self._device = "cpu" if layers == 0 else "cuda"
+            logging.getLogger(__name__).info(
+                "local translation model=%s device=%s layers=%s threads=%s", self.model_id,
+                self._device, layers, threads)
 
     def _tokens(self, text):
         return self._model.tokenize(text.encode("utf-8"), add_bos=False)

@@ -254,6 +254,9 @@ class WristDisplay(QObject):
             return
         language_changed = self._look is not None and look[5] != self._look[5]
         self._look = look
+        # Languages, switches and text size are discrete settings: draw them now rather
+        # than waiting for the settle delay that batches arriving subtitle text.
+        self._urgent = True
         self.panel.set_look(look[0], look[2], look[1])
         self.panel.set_switches(look[3], look[4])
         self.panel.set_languages(list(look[6]), list(look[7]))

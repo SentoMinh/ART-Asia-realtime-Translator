@@ -2,9 +2,10 @@
 
 The app carries runtimes, while Settings downloads each model separately. Pinned files are
 checked against SHA-256 before use and interrupted downloads resume. Whisper turbo uses
-cuBLAS or the separately selected whisper.cpp Vulkan runtime. NLLB/Qwen may use CUDA when
-libraries and GPU memory are available; PhoWhisper, SenseVoice and Hy-MT2 run on CPU. Source installs can use faster-whisper's
-own turbo cache with the NVIDIA packages installed through requirements.txt.
+cuBLAS or the separately selected whisper.cpp Vulkan runtime. Every model that can use CUDA
+does so only while the GPU keeps the game's reserve: NLLB, Qwen and Hy-MT2 translate, turbo,
+PhoWhisper and SenseVoice hear. The CPU is the fallback everywhere. Source installs can use
+faster-whisper's own turbo cache with the NVIDIA packages installed through requirements.txt.
 """
 from __future__ import annotations
 
@@ -93,15 +94,42 @@ DESCRIPTIONS = {
     "qwen3-1.7b-ct2": "English, Chinese, Cantonese, Vietnamese, Japanese, Korean",
     "hy-mt2-1.8b": "English, Chinese, Cantonese, Vietnamese, Japanese, Korean",
 }
+# Languages each model knows in total. DESCRIPTIONS names a sample of them; the rest are
+# written as "+93 languages" so one card stays one card. The translating models are capped
+# by the languages the app itself offers (engine/translators.LANGUAGES), not by the weights.
+LANGUAGE_TOTALS = {
+    "large-v3-turbo": 99,
+    "whisper-turbo-vulkan": 99,
+    "sensevoice": 5,
+    "phowhisper-small": 1,
+    "nllb-200-ct2": 6,
+    "qwen3-1.7b-ct2": 6,
+    "hy-mt2-1.8b": 6,
+}
 _MODEL_FILES = json.loads((Path(__file__).parent / "assets" / "local_models.json").read_text(encoding="utf-8"))
 REMOVED_MODELS = {"large-v3": ("Whisper large-v3", "whisper-v3")}
+
+
+def extra_languages(model: str) -> int:
+    """How many languages this model knows beyond the ones DESCRIPTIONS names, so a card can
+    end in "+93 languages" instead of listing all 99."""
+    sample = [part for part in DESCRIPTIONS[model].split(",") if part.strip()]
+    return max(0, LANGUAGE_TOTALS.get(model, len(sample)) - len(sample))
 
 
 def selected(role: str = "hearing") -> str:
     from . import services
     default = "large-v3-turbo" if role == "hearing" else "nllb-200-ct2"
     name = services.setting("local", "hear_model" if role == "hearing" else "translate_model")
-    return name if name in MODELS and MODELS[name][1] == role else default
+    if name not in MODELS or MODELS[name][1] != role:
+        name = default
+    if ready(model=name):
+        return name
+    # One downloaded model is enough to work: use it instead of asking for another download.
+    for candidate, info in MODELS.items():
+        if info[1] == role and ready(model=candidate) and not missing(candidate):
+            return candidate
+    return name
 
 
 def select(model: str) -> str:
@@ -116,6 +144,25 @@ def parts(model: str | None = None) -> tuple[Part, ...]:
     if model == "large-v3-turbo":
         return PARTS
     return tuple(Part(**part) for part in _MODEL_FILES[model])
+
+
+CUDA_MODELS = ("nllb-200-ct2", "qwen3-1.7b-ct2", "phowhisper-small")
+
+
+def shared_gpu_parts() -> tuple[Part, ...]:
+    """cuBLAS lives once, in gpu/, and serves every model that can use CUDA."""
+    return tuple(part for part in PARTS
+                 if any(place.startswith("gpu/") for _, place, _ in part.unzip))
+
+
+def payload(model: str | None = None) -> tuple[Part, ...]:
+    """What a download of this model fetches: the model's own files, plus the shared GPU
+    libraries when CUDA can be used here. A model downloaded alone still gets them, and the
+    second model finds them already in place."""
+    model = model or selected()
+    if model in CUDA_MODELS and nvidia_card():
+        return shared_gpu_parts() + parts(model)
+    return parts(model)
 
 
 def model_folder(model: str | None = None) -> Path:
@@ -145,8 +192,8 @@ def ready(root: Path | None = None, *, model: str | None = None) -> bool:
 
 
 def size(model: str | None = None) -> int:
-    """Bytes of the whole download."""
-    return sum(part.size for part in parts(model))
+    """Bytes of the whole download, including the shared GPU libraries when they are fetched."""
+    return sum(part.size for part in payload(model))
 
 
 def arrived(root: Path | None = None, *, model: str | None = None) -> int:
@@ -155,7 +202,7 @@ def arrived(root: Path | None = None, *, model: str | None = None) -> int:
     model = model or selected()
     waiting = root / WAITING if model == "large-v3-turbo" else root / WAITING / model
     count = 0
-    for part in parts(model):
+    for part in payload(model):
         if _has(part, root):
             count += part.size
         else:
@@ -238,6 +285,16 @@ def nvidia_card() -> bool:
     return True
 
 
+def wanted(model: str) -> bool:
+    """Whether this PC can use the model at all, so "Download all" never fetches the AMD
+    build on an NVIDIA card, nor the CUDA build on a PC without one."""
+    if model == "large-v3-turbo":
+        return nvidia_card()
+    if model == "whisper-turbo-vulkan":
+        return not nvidia_card()
+    return True
+
+
 def gpu_folders() -> list[str]:
     """The folders that hold cuBLAS: the pip packages nvidia-cublas-cu12 / nvidia-cudnn-cu12 or
     PyTorch (from source), and this download."""
@@ -282,7 +339,7 @@ def download(progress=lambda done, total: None, stop=lambda: False, http=None,
     model = model or selected()
     waiting = root / WAITING if model == "large-v3-turbo" else root / WAITING / model
     total = size(model)
-    todo = [part for part in parts(model) if not _has(part, root)]
+    todo = [part for part in payload(model) if not _has(part, root)]
     done = total - sum(part.size for part in todo)
     try:
         waiting.mkdir(parents=True, exist_ok=True)

@@ -116,7 +116,9 @@ def run(backend: Backend | None = None) -> int:
     wrist = attach_wrist(window)
     app.aboutToQuit.connect(wrist.stop)
     window.show()
-    if not settings.first_run_done and hasattr(window, "show_first_run"):
+    if hasattr(window, "begin_onboarding"):
+        QTimer.singleShot(0, window.begin_onboarding)
+    elif not settings.first_run_done and hasattr(window, "show_first_run"):
         QTimer.singleShot(0, window.show_first_run)
     else:
         QTimer.singleShot(0, window.show_update_notice)

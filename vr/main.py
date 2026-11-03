@@ -45,6 +45,7 @@ def add_vr_button(window: MainWindow, wrist: WristDisplay) -> QToolButton:
     button.setText("VR")
     button.setFixedWidth(36)
     button.setCursor(Qt.PointingHandCursor)
+    button.hide()                       # reached through the More-actions arrow
     dialog: list[VrDialog] = []
 
     def open_settings() -> None:

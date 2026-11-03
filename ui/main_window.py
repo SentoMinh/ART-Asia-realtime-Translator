@@ -10,7 +10,7 @@ from PySide6.QtCore import QEvent, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QColor, QCursor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFrame, QGraphicsDropShadowEffect, QGridLayout,
                                QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton,
-                               QSizeGrip, QToolButton, QToolTip, QVBoxLayout, QWidget)
+                               QToolButton, QToolTip, QVBoxLayout, QWidget)
 
 from engine import local_model
 
@@ -26,10 +26,19 @@ from .widgets import DialogPanel, LevelBar
 from vrc.audio import input_devices, output_devices
 from vrc.chatbox import vrchat_window_origin
 
-GRIP = 6          # px along the top edge and corners that resize the window
+GRIP = 6          # px along every edge and corner that resize the window
+RESIZE_GRACE = 0.4  # seconds auto-hide waits after a native resize or move ends
 SHADOW_BELOW = 50  # backdrop % under which the letters get a dark shadow instead of a background
 WM_NCHITTEST = 0x0084
-HT = {(-1, -1): 13, (0, -1): 12, (1, -1): 14}  # HTTOPLEFT, HTTOP, HTTOPRIGHT
+WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE = 0x0231, 0x0232
+HTLEFT, HTRIGHT, HTTOP, HTTOPLEFT, HTTOPRIGHT = 10, 11, 12, 13, 14
+HTBOTTOM, HTBOTTOMLEFT, HTBOTTOMRIGHT = 15, 16, 17
+HT = {(-1, -1): HTTOPLEFT, (0, -1): HTTOP, (1, -1): HTTOPRIGHT,
+      (-1, 0): HTLEFT, (1, 0): HTRIGHT,
+      (-1, 1): HTBOTTOMLEFT, (0, 1): HTBOTTOM, (1, 1): HTBOTTOMRIGHT}
+METER_WIDE, METER_TIGHT = 38, 16   # px width of the two level meters
+GAP = 2            # px between toolbar controls
+DELAY_BAND = 24    # px dead band before the latency readout appears or hides
 
 
 class TitleBar(QWidget):
@@ -120,6 +129,7 @@ class MainWindow(QWidget):
         self._save = save
         self._dialog: SettingsWindow | None = None
         self._notice = None
+        self._tour = None
         self._music_dialog = None
         self._music_active = False
         self._music_level = 0.0
@@ -127,6 +137,8 @@ class MainWindow(QWidget):
         self._tips: list[tuple[QWidget, str]] = []     # (widget, English tooltip), for retranslating
         self._labels: list[tuple[QLabel, str]] = []
         self._status = Status("warn", "Starting…", "")
+        self._resizing = False
+        self._resize_until = 0.0
         i18n.set_lang(settings.ui_lang)
         self.setWindowTitle("VRChat Translator")
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
@@ -134,7 +146,7 @@ class MainWindow(QWidget):
         self.setMinimumSize(*config.MIN_SIZE)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(GRIP + 4, GRIP + 2, GRIP + 4, 18)
+        root.setContentsMargins(GRIP + 2, GRIP + 2, GRIP + 2, 18)
         root.setSpacing(6)
         self.bars = QFrame()
         self.bars.setObjectName("bars")
@@ -147,10 +159,6 @@ class MainWindow(QWidget):
         root.addWidget(self.bars)
         root.addWidget(self.log, 1)
         root.addWidget(self._build_input_bar())
-        self.resize_grip = QSizeGrip(self)
-        self.resize_grip.setFixedSize(16, 16)
-        self.resize_grip.setAccessibleName(tr("Resize window"))
-        self._tips.append((self.resize_grip, "Drag to resize the window"))
 
         self._declined_switches: dict[tuple[str, str], float] = {}
         self._switch_dialog = None
@@ -166,9 +174,11 @@ class MainWindow(QWidget):
         self._hover.timeout.connect(self._check_hover)
         self._hover.start(250)
 
-        self.resize(settings.w, settings.h)
-        self._place()
         self.setWindowFlag(Qt.WindowStaysOnTopHint, settings.always_on_top)
+        self.resize(settings.w, settings.h)
+        self._fit_header()   # the toolbar has no second row, so its width sets the minimum
+        self.resize(max(settings.w, self.minimumWidth()), settings.h)
+        self._place()
         self._retranslate()
         self._apply()
         backend.apply_settings(settings)
@@ -194,17 +204,17 @@ class MainWindow(QWidget):
         bar = TitleBar()
         self._header = QGridLayout(bar)
         self._header.setContentsMargins(4, 0, 0, 0)
-        self._header.setSpacing(4)
+        self._header.setSpacing(GAP)
         self._header_status = QHBoxLayout()
         self._header_status.setSpacing(4)
         self._capture_bar = QWidget()
         row = self._capture_controls = QHBoxLayout(self._capture_bar)
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(4)
+        row.setSpacing(GAP)
         self._title_actions = QWidget()
         self.title_buttons = QHBoxLayout(self._title_actions)
         self.title_buttons.setContentsMargins(0, 0, 0, 0)
-        self.title_buttons.setSpacing(4)
+        self.title_buttons.setSpacing(GAP)
         self.title_buttons.addStretch(1)
         self.dot = QLabel()
         self.dot.setFixedSize(8, 8)
@@ -213,22 +223,29 @@ class MainWindow(QWidget):
         self.status.setFixedWidth(self.status.fontMetrics().horizontalAdvance("VRChat") + 4)
         self.music_button = self._button("music", "Music to microphone", self.open_music)
         self.music_button.setFixedSize(28, 28)
+        self.music_button.hide()
         self.mic_button = self._button("mic", "", lambda: self._flip("mic_on"))
         self.mic_device_button = self._audio_picker("mic_device", "Microphone input")
         self.mic_bar = LevelBar()
-        self.mic_bar.setFixedWidth(38)
+        self.mic_bar.setFixedWidth(METER_WIDE)
         self.speaker_button = self._button("speaker", "", lambda: self._flip("subtitles_on"))
         self.speaker_device_button = self._audio_picker("speaker_device", "Subtitle audio source")
         self.speaker_bar = LevelBar()
-        self.speaker_bar.setFixedWidth(38)
+        self.speaker_bar.setFixedWidth(METER_WIDE)
         self.vad_button = self._button("wave", "", lambda: self._flip("vad_on"))
+        self.vad_button.hide()
         self.delay = QLabel()
         self.delay.setObjectName("dim")
+        # Reserve the widest reading so a new time never shifts the toolbar.
+        self._delay_allowance = self.delay.fontMetrics().horizontalAdvance("99.9 s")
+        self.delay.setMinimumWidth(self._delay_allowance)
         self._tips.append((self.delay, "How long the last translation took"))
+        self.delay.setVisible(False)   # only shown when the row has room for it
         # the globe: the language of the window itself
         self.ui_lang_button = self._button("globe", "Language of the window", None)
         self.ui_lang_button.setPopupMode(QToolButton.InstantPopup)
         self.ui_lang_button.setStyleSheet("QToolButton::menu-indicator { image: none; }")
+        self.ui_lang_button.hide()
         menu = QMenu(self.ui_lang_button)
         group = QActionGroup(menu)
         self.ui_lang_actions: dict[str, QAction] = {}
@@ -243,9 +260,9 @@ class MainWindow(QWidget):
         self._header_status.addWidget(self.dot)
         self._header_status.addWidget(self.status)
         self.dock_button = self._button("dock", "Move to VRChat's top-left corner", self.move_to_vrchat)
+        self.dock_button.hide()
         row.addWidget(self.dock_button)
         row.addWidget(self.music_button)
-        row.addSpacing(8)
         row.addWidget(self.mic_device_button)
         row.addWidget(self.mic_button)
         row.addWidget(self.mic_bar)
@@ -253,22 +270,27 @@ class MainWindow(QWidget):
         row.addWidget(self.speaker_device_button)
         row.addWidget(self.speaker_button)
         row.addWidget(self.speaker_bar)
-        row.addSpacing(6)
         row.addWidget(self.vad_button)
         row.addStretch(1)
         row.addWidget(self.delay)
         row.addSpacing(4)
         self.title_buttons.addWidget(self.ui_lang_button)
         self.title_buttons.addWidget(self.pin_button)
-        self.title_buttons.addWidget(self._button("gear", "Settings", self.open_settings))
-        self.title_buttons.addWidget(self._button("min", "Minimise", self.showMinimized))
-        self.title_buttons.addWidget(self._button("max", "Maximise", self.toggle_maximized))
-        self.title_buttons.addWidget(self._button("close", "Close", self.close, "close"))
+        self.gear_button = self._button("gear", "Settings", self.open_settings)
+        self.min_button = self._button("min", "Minimise", self.showMinimized)
+        self.max_button = self._button("max", "Maximise", self.toggle_maximized)
+        self.close_button = self._button("close", "Close", self.close, "close")
+        self.title_buttons.addWidget(self.gear_button)
+        self.title_buttons.addWidget(self.min_button)
+        self.title_buttons.addWidget(self.max_button)
+        self.title_buttons.addWidget(self.close_button)
         self._header.addLayout(self._header_status, 0, 0)
         self._header.addWidget(self._capture_bar, 0, 1)
         self._header.addWidget(self._title_actions, 0, 2)
         self._header.setColumnStretch(1, 1)
-        self._header_compact = False
+        self._delay_shown = False
+        self._meter_width = METER_WIDE
+        self._fitting = False
         bar.enable_child_dragging()
         return bar
 
@@ -335,9 +357,53 @@ class MainWindow(QWidget):
             else:
                 row.addWidget(widget, 0, Qt.AlignBottom)
         row.addStretch(1)
-        row.addWidget(self._button("trash", "Clear the chat log", self.log.clear))
+        self.more_button = self._button("down", "More actions", None)
+        self.more_button.setPopupMode(QToolButton.InstantPopup)
+        self.more_button.setStyleSheet("QToolButton::menu-indicator { image: none; }")
+        self.more_menu = QMenu(self.more_button)
+        self.more_menu.aboutToShow.connect(lambda: self._fill_more_menu(self.more_menu))
+        self.more_button.setMenu(self.more_menu)
+        row.addWidget(self.more_button)
         box.enable_child_dragging()
         return box
+
+    def _fill_more_menu(self, menu: QMenu) -> None:
+        menu.clear()
+
+        def action(icon: str, text: str, slot):
+            item = menu.addAction(theme.icon(icon), tr(text))
+            item.triggered.connect(lambda _checked=False, slot=slot: slot())
+            return item
+
+        action("dock", "Move to VRChat", self.move_to_vrchat)
+        action("music", "Music to microphone", self.open_music)
+        vad = menu.addAction(theme.icon("wave" if self.settings.vad_on else "wave_off"),
+                              tr("Voice detector"))
+        vad.setCheckable(True)
+        vad.setChecked(self.settings.vad_on)
+        vad.triggered.connect(lambda: self._flip("vad_on"))
+
+        languages = menu.addMenu(theme.icon("globe"), tr("Language of the window"))
+        for code, name in i18n.UI_LANGS.items():
+            item = languages.addAction(name)
+            item.setCheckable(True)
+            item.setChecked(code == i18n.lang())
+            item.triggered.connect(lambda _checked=False, code=code: self._ui_lang_picked(code))
+
+        vr = self._vr_button()
+        if vr is not None:
+            item = menu.addAction(theme.icon("vr"), tr("VR"))
+            item.triggered.connect(vr.click)
+
+        menu.addSeparator()
+        action("trash", "Clear the chat log", self.log.clear)
+
+    def _vr_button(self):
+        for index in range(self.title_buttons.count()):
+            widget = self.title_buttons.itemAt(index).widget()
+            if isinstance(widget, QToolButton) and widget.text() == "VR":
+                return widget
+        return None
 
     def _build_input_bar(self) -> QWidget:
         self.input_bar = QFrame()
@@ -682,27 +748,129 @@ class MainWindow(QWidget):
     def bars_shown(self) -> bool:
         return not self.bars.isHidden()
 
+    def begin_onboarding(self) -> None:
+        """Start at the first screen this profile still needs."""
+        if not self.settings.ui_lang_chosen:
+            self.show_language_prompt()
+        elif not self.settings.first_run_done:
+            self.show_first_run()
+        elif not self.settings.tour_done:
+            self.show_tour()
+        else:
+            self.show_update_notice()
+
+    def show_language_prompt(self) -> None:
+        if self.settings.ui_lang_chosen or self._notice:
+            return
+        from .first_run_dialog import LanguageDialog
+        dialog = LanguageDialog(self, settings=self.settings, save=self._save_settings)
+        panel = DialogPanel(dialog, self)
+        self._embed_notice(dialog, panel, self._after_language)
+
+    def _after_language(self) -> None:
+        # Closing the card without a choice keeps the current language.
+        if not self.settings.ui_lang_chosen:
+            self.settings.ui_lang_chosen = True
+            self._save_settings()
+        self._apply()
+        QTimer.singleShot(0, self.begin_onboarding)
+
     def show_first_run(self) -> None:
-        if self.settings.first_run_done or self._notice:
+        if self.settings.first_run_done:
+            if not self.settings.tour_done:
+                self.show_tour()
+            return
+        if self._notice:
             return
         from .first_run_dialog import FirstRunDialog
         dialog = FirstRunDialog(self, settings=self.settings, save=self._save_settings)
-        panel = self._notice = DialogPanel(dialog, self)
+        panel = DialogPanel(dialog, self)
+        self._embed_notice(dialog, panel, self._after_first_run)
+
+    def _after_first_run(self) -> None:
+        if not self.settings.first_run_done:
+            self.settings.first_run_done = True
+            self._save_settings()
+        QTimer.singleShot(0, self.begin_onboarding)
+
+    def _close_notice(self) -> None:
+        panel = self._notice
+        if panel is None:
+            return
+        self.layout().removeWidget(panel)
+        panel.hide()
+        panel.setParent(None)
+        panel.deleteLater()
+        self._notice = None
+        self.log.show()
+        self.input_bar.setVisible(self.bars_shown())
+
+    def _embed_notice(self, dialog, panel: DialogPanel, after=None) -> None:
+        panel.setParent(self)
+        self._notice = panel
         self.log.hide()
         self.input_bar.hide()
         self.layout().insertWidget(1, panel, 1)
         self._show_bars(True)
 
-        def finished(_):
-            self.layout().removeWidget(panel)
-            panel.deleteLater()
-            self._notice = None
-            self.log.show()
-            self.input_bar.setVisible(self.bars_shown())
-            self.show_update_notice()
+        def finished(_=None):
+            self._close_notice()
+            if after is not None:
+                after()
 
         dialog.finished.connect(finished)
         dialog.show()
+
+    def _tour_steps(self) -> list:
+        from .tutorial import TourStep
+        return [
+            TourStep(None, tr("Quick tour"),
+                     tr("This short tour shows the main buttons. Use Next to continue or Skip to close it.")),
+            TourStep(self.mic_device_button, tr("Microphone input"),
+                     tr("Choose the microphone the translator listens to. Pick the same one you use in VRChat.")),
+            TourStep(self.mic_button, tr("Your voice"),
+                     tr("Turns your microphone on or off. When it is on, your speech is translated into the chatbox.")),
+            TourStep(self.speaker_device_button, tr("Subtitle audio source"),
+                     tr("Choose which app or device the translator listens to for other players' voices.")),
+            TourStep(self.speaker_button, tr("Other players"),
+                     tr("Turns other players' subtitles on or off.")),
+            TourStep(self.my_lang, tr("I speak"), tr("Choose up to 3 languages you speak.")),
+            TourStep(self.swap_button, tr("Swap languages"),
+                     tr("Swaps the languages you speak and the languages they speak.")),
+            TourStep(self.their_lang, tr("They speak"),
+                     tr("Choose up to 3 languages they speak, or Auto-detect.")),
+            TourStep(self.translated_to, tr("Translated to"),
+                     tr("Choose up to 3 languages shown in the subtitles.")),
+            TourStep(self.more_button, tr("More actions"),
+                     tr("Opens a vertical list of tools: move to VRChat, music, voice detector, "
+                        "window language, VR and clear chat.")),
+            TourStep(self.input, tr("Type a message"),
+                     tr("Type a message here. Press Enter to translate and send it.")),
+            TourStep(self.send_button, tr("Send"),
+                     tr("Sends your typed message. The arrow beside it chooses the language it is translated into.")),
+            TourStep(self.send_lang_button, tr("Send language"),
+                     tr("Pick the language your typed text is translated into.")),
+            TourStep(self.pin_button, tr("Always on top"),
+                     tr("Keeps the window above the game. Needs VRChat in windowed or borderless mode.")),
+            TourStep(self.gear_button, tr("Settings"),
+                     tr("Opens settings for models, sound, chatbox and appearance.")),
+        ]
+
+    def show_tour(self) -> None:
+        if self.settings.tour_done or self._tour is not None or self._notice:
+            return
+        from .tutorial import TourOverlay
+        self._show_bars(True)
+        tour = TourOverlay(self, self._tour_steps())
+        self._tour = tour
+        tour.finished.connect(self._tour_finished)
+        tour.start()
+
+    def _tour_finished(self) -> None:
+        self._tour = None
+        self.settings.tour_done = True
+        self._save_settings()
+        self.show_update_notice()
 
     def show_update_notice(self) -> None:
         if self._notice or self.settings.last_update_notice == __version__:
@@ -711,28 +879,18 @@ class MainWindow(QWidget):
         dialog.setWindowTitle(tr("What's new in {version}").format(version=__version__))
         layout = QVBoxLayout(dialog)
         for text in (
-            "SteamVR controller input updates more often, with consistent scrolling and fading speeds.",
-            "Brief pointer movements across the panel edge keep the cursor visible while cancelling clicks safely.",
-            "This is a local test build. Please check cursor movement, buttons and scrolling in your headset.",
-            "This update notice appears once per version.",
+            "First-time setup now asks for your language, recommends local models, "
+            "and can save a named self-hosted service.",
+            "The guided manual highlights each control, and highlighted buttons can be clicked directly.",
+            "Toolbar utilities now live in the More-actions arrow, with Settings beside the pin.",
+            "The music dialog warns when very loud music can affect translation.",
         ):
             label = QLabel("• " + tr(text))
             label.setWordWrap(True)
             layout.addWidget(label)
         layout.addStretch(1)
-        panel = self._notice = DialogPanel(dialog, self)
-        self.log.hide()
-        self.input_bar.hide()
-        self.layout().insertWidget(1, panel, 1)
-        self._show_bars(True)
-        def finished(_):
-            self.layout().removeWidget(panel)
-            panel.deleteLater()
-            self._notice = None
-            self.log.show()
-            self.input_bar.setVisible(self.bars_shown())
-        dialog.finished.connect(finished)
-        dialog.show()
+        panel = DialogPanel(dialog, self)
+        self._embed_notice(dialog, panel)
         self.settings.last_update_notice = __version__
         self._save_settings()
 
@@ -745,7 +903,12 @@ class MainWindow(QWidget):
     def _check_hover(self) -> None:
         if not self.settings.auto_hide_bars:
             return
-        busy = (self._notice is not None or QApplication.activePopupWidget() is not None or self.input.hasFocus()
+        # A native edge drag resizes before Qt sees the mouse press and may keep the
+        # pointer on (or just past) the frame, so an idle cursor check would blank the
+        # whole window mid-drag.
+        busy = (self._notice is not None or self._tour is not None
+                or QApplication.activePopupWidget() is not None or self.input.hasFocus()
+                or self._resizing or time.monotonic() < self._resize_until
                 or bool(QGuiApplication.mouseButtons()))
         self._show_bars(busy or self.frameGeometry().contains(QCursor.pos()))
 
@@ -761,10 +924,12 @@ class MainWindow(QWidget):
             painter.setBrush(QColor(11, 11, 13, 1))
             height = self.bars.geometry().bottom() + 1 if bars else GRIP
             painter.drawRect(QRectF(0, 0, self.width(), height))
+            # Keep the invisible resize border grabbable on every side and corner too.
+            painter.drawRect(QRectF(0, 0, GRIP, self.height()))
+            painter.drawRect(QRectF(self.width() - GRIP, 0, GRIP, self.height()))
+            painter.drawRect(QRectF(0, self.height() - GRIP, self.width(), GRIP))
             if self.input_bar.isVisible():
                 painter.drawRoundedRect(QRectF(self.input_bar.geometry()), 9, 9)
-            if self.resize_grip.isVisible():
-                painter.drawRect(QRectF(self.resize_grip.geometry()))
             return
         if bars:
             alpha = max(alpha, 1)   # alpha 0 lets clicks fall through to the game
@@ -775,43 +940,72 @@ class MainWindow(QWidget):
     # ---- window ---------------------------------------------------------
 
     def _fit_header(self) -> None:
-        status, controls, buttons = (layout.minimumSize().width() for layout in
-                                     (self._header_status, self._capture_controls, self.title_buttons))
-        margins = self._header.contentsMargins()
-        inset = margins.left() + margins.right()
-        gap = self._header.horizontalSpacing()
-        # Keep the narrow layout's width as the minimum even while the toolbar is on one row.
-        self._header.parentWidget().setMinimumWidth(max(status + gap + buttons, controls) + inset)
-        available = self.width()
-        for layout in (self.layout(), self.bars.layout()):
-            margins = layout.contentsMargins()
-            available -= margins.left() + margins.right()
-        compact = available < status + controls + buttons + 2 * gap + inset
-        if compact != self._header_compact:
-            self._header_compact = compact
-            # Move containers so the buttons keep ownership of their menus and actions.
-            if compact:
-                self._header.addWidget(self._title_actions, 0, 1, 1, 2)
-                self._header.addWidget(self._capture_bar, 1, 0, 1, 3)
-            else:
-                self._header.addWidget(self._capture_bar, 0, 1)
-                self._header.addWidget(self._title_actions, 0, 2)
-            self._header.parentWidget().updateGeometry()
-            self.bars.layout().invalidate()
-            self.bars.updateGeometry()
-            self.layout().invalidate()
-        self.setMinimumSize(self.layout().minimumSize().expandedTo(QSize(*config.MIN_SIZE)))
+        """Size the one-row toolbar from the current width.
+
+        The meters narrow one pixel at a time as the window shrinks, so nothing
+        jumps while an edge is dragged; the latency readout only appears when the
+        row has room for it, with a dead band so it cannot blink at the boundary.
+        """
+        if self._fitting:
+            return
+        self._fitting = True
+        try:
+            available = self.width()
+            for layout in (self.layout(), self.bars.layout()):
+                margins = layout.contentsMargins()
+                available -= margins.left() + margins.right()
+
+            status = self._header_status.minimumSize().width()
+            buttons = self.title_buttons.minimumSize().width()
+            margins = self._header.contentsMargins()
+            inset = margins.left() + margins.right()
+            gap = self._header.horizontalSpacing()
+            # The style sheet font may arrive after construction, so refresh the reserved width.
+            allowance = self.delay.fontMetrics().horizontalAdvance("99.9 s")
+            if allowance != self._delay_allowance:
+                self._delay_allowance = allowance
+                self.delay.setMinimumWidth(allowance)
+            delay_cost = self._delay_allowance + self._capture_controls.spacing()
+            # Width the capture row needs with no meters and no latency.
+            base = self._capture_controls.minimumSize().width() \
+                - self._meter_width * 2 \
+                - (delay_cost if self._delay_shown else 0)
+            fixed = status + base + buttons + 2 * gap + inset
+            full = fixed + 2 * METER_WIDE + delay_cost
+
+            shown = available >= full + (0 if self._delay_shown else DELAY_BAND)
+            room = available - fixed
+            meter = max(METER_TIGHT, min(METER_WIDE, room // 2))
+            if shown != self._delay_shown:
+                self._delay_shown = shown
+                self.delay.setVisible(shown)
+            if meter != self._meter_width:
+                self._meter_width = meter
+                self.mic_bar.setFixedWidth(meter)
+                self.speaker_bar.setFixedWidth(meter)
+
+            # One constant minimum: the window must not resize itself while it is dragged.
+            bar = self._header.parentWidget()
+            minimum_width = fixed + 2 * METER_TIGHT
+            if bar.minimumWidth() != minimum_width:
+                bar.setMinimumWidth(minimum_width)
+            minimum = self.layout().minimumSize().expandedTo(QSize(*config.MIN_SIZE))
+            if self.minimumSize() != minimum:
+                self.setMinimumSize(minimum)
+        finally:
+            self._fitting = False
 
     def event(self, event):
         result = super().event(event)
-        if event.type() == QEvent.LayoutRequest and hasattr(self, "resize_grip"):
+        if event.type() == QEvent.LayoutRequest and hasattr(self, "_fitting") and not self._fitting:
             self._fit_header()
         return result
 
     def resizeEvent(self, event):
+        # Keep auto-hide quiet while an edge is being dragged: hiding the bars would
+        # reflow the whole window for a frame.
+        self._resize_until = time.monotonic() + RESIZE_GRACE
         self._fit_header()
-        self.resize_grip.move(self.width() - self.resize_grip.width() - 2,
-                              self.height() - self.resize_grip.height() - 2)
         super().resizeEvent(event)
 
     def move_to_vrchat(self) -> None:
@@ -859,13 +1053,22 @@ class MainWindow(QWidget):
 
     def nativeEvent(self, event_type, message):
         # the window has no frame, so Windows is told which edge the mouse is on
-        if sys.platform == "win32" and event_type == b"windows_generic_MSG" and not self.isMaximized():
+        if sys.platform == "win32" and event_type == b"windows_generic_MSG":
             msg = wintypes.MSG.from_address(int(message))
-            if msg.message == WM_NCHITTEST:
+            self._note_size_move(msg.message)
+            if msg.message == WM_NCHITTEST and not self.isMaximized():
                 code = self._edge_code(msg)
                 if code:
                     return True, code
         return super().nativeEvent(event_type, message)
+
+    def _note_size_move(self, message: int) -> None:
+        """Follow Windows' own drag loop, which Qt does not report as a mouse press."""
+        if message == WM_ENTERSIZEMOVE:
+            self._resizing = True
+        elif message == WM_EXITSIZEMOVE:
+            self._resizing = False
+            self._resize_until = time.monotonic() + RESIZE_GRACE
 
     @staticmethod
     def _edge_code(msg) -> int:
@@ -875,4 +1078,5 @@ class MainWindow(QWidget):
         ctypes.windll.user32.GetWindowRect(msg.hWnd, ctypes.byref(rect))
         grip = max(GRIP * ctypes.windll.user32.GetDpiForWindow(msg.hWnd) // 96, GRIP)
         side = -1 if x < rect.left + grip else (1 if x >= rect.right - grip else 0)
-        return HT.get((side, -1), 0) if y < rect.top + grip else 0
+        edge = -1 if y < rect.top + grip else (1 if y >= rect.bottom - grip else 0)
+        return HT.get((side, edge), 0)
