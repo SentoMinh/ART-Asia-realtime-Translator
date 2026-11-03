@@ -6,6 +6,8 @@ graphics driver, including AMD. NVIDIA users can keep the existing faster-whispe
 The native bridge, ggml and whisper are statically linked into one DLL; Windows supplies the
 graphics driver's Vulkan loader. The SDK is required only to build, not to use the app.
 
+> Current application release: **1.1.0** (4 November 2026) includes this runtime and license in the normal package.
+
 Build with Visual Studio 2022 C++ tools, CMake and the Vulkan SDK:
 
 ```powershell

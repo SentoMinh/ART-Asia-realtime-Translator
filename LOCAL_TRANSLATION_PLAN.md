@@ -2,6 +2,8 @@
 
 Saved 2026-10-22 at the user's request. Scope: text translation after speech recognition, running on the user's PC. Speech-recognition and text-to-speech model variants are separate tasks.
 
+> Current application release: **1.1.0** (4 November 2026). Model choices and the NLLB default are unchanged; 1.1.0 adds first-run onboarding and self-hosted setup. The evaluation below remains historical evidence.
+
 ## Decision rule
 
 **Low latency first; other models remain alternatives.** Choose the lowest measured delay among models that preserve meaning, retain every sentence, use the requested language and avoid repeated or explanatory output. Keep the existing translator available while comparing candidates. A smaller model or faster token rate does not automatically produce a usable complete translation sooner.

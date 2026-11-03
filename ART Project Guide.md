@@ -15,7 +15,9 @@ updated: 2026-10-27
 
 ART means **Asia realtime Translator**. It is one Windows desktop application for hearing speech, translating it, displaying subtitles and sending text to VRChat's chatbox.
 
-Since 0.12.11, online translation handles two destinations at once per utterance and shows each completed subtitle immediately. Panel destinations run before chatbox-only destinations. That release preserved local model CPU limits and recognition settings; the later 27 October source changes the CPU/GPU budget described below. The chatbox still waits for one complete message. See [[LATENCY_REPORT]] for the measured two-language improvement and its limits.
+**Current release: 1.1.0 (4 November 2026).** First launch asks for English, Chinese or Vietnamese and then runs a guided manual. Local models are recommended by default; self-hosted servers can be configured with a URL, optional key, fetched model list and a saved service name. Toolbar utilities moved into the **More actions** arrow, and Settings stays beside the pin. The public repository excludes the automated test folder; tests remain in the private checkout. See [[CHANGELOG]] and the GitHub releases.
+
+Since 0.12.11, online translation handles two destinations at once per utterance and shows each completed subtitle immediately. Panel destinations run before chatbox-only destinations. That release preserved local model CPU limits and recognition settings; the later CPU/GPU budget is described below. The chatbox still waits for one complete message. See [[LATENCY_REPORT]] for the measured two-language improvement and its limits.
 
 For wrong wording, compare the original transcript with what was spoken first. Wrong original text points to audio/recognition; a correct original with a wrong translation points to the translation model or context. Lower latency does not automatically mean lower accuracy: this update removes waiting between independent requests without shortening speech capture or changing decoding.
 
@@ -163,7 +165,7 @@ ART/
 ├── assets/                 Icons and packaged assets
 ├── apo/                    Native microphone mixer implementation
 ├── driver/                 Earlier driver prototype, not the normal mixer path
-├── tests/                  Unit and regression tests
+├── tests/                  Unit and regression tests (private checkout only)
 ├── tools/                  Build, source update, export and packaging helpers
 ├── bench/                  Development benchmarks and recordings; excluded from release export
 ├── updates/                Development update infrastructure; excluded from release export
@@ -218,21 +220,21 @@ The 27 October three-line synthetic comparison measured summed warm translation 
 
 ## 8. Development, testing and release
 
-The working checkout is `F:\Code\vrchat-translator_9.10_gemini`. Reviewed source is exported into `F:\Code\vrchat-translator-public`, whose `main` branch belongs to [the GitHub repository](https://github.com/SentoMinh/ART-Asia-realtime-Translator). These are development/release checkouts for the same app. Keep their Git histories separate.
+The private working checkout holds the full development history and tests. Reviewed source is exported into a separate release checkout, whose `main` branch belongs to [the GitHub repository](https://github.com/SentoMinh/ART-Asia-realtime-Translator). Keep the two Git histories separate.
 
 ### Useful commands
 
 Run from the working checkout:
 
 ```powershell
-# Unit/regression tests; their fixture isolates Windows profile data.
-.venv-app\Scripts\python.exe -m pytest -q
+# Unit/regression tests (private checkout only); the fixture isolates Windows profile data.
+.venv-app\Scripts\python.exe -m pytest tests -q
 
 # Start the source app; this starts the actual application, not a preview.
 .venv-app\Scripts\python.exe -m ui.main
 
 # Build with the validated native mixer binaries.
-powershell -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10
+powershell -File tools\build.ps1 -DistPath dist\1.1.0 -MixerBuild .tools\apo-prototype-10
 ```
 
 Use isolated `APPDATA` and `LOCALAPPDATA` paths for probes so they do not change real settings or keys. Demo previews must close automatically. Do not use live microphone capture or OSC delivery merely to test layout.
@@ -246,11 +248,11 @@ Use isolated `APPDATA` and `LOCALAPPDATA` paths for probes so they do not change
 5. Verify the EXE self-check, required runtimes, native DLLs, model manifest, source match, ZIP and hashes.
 6. Upload a draft release against the exact source commit; compare uploaded asset sizes and digests before publishing.
 7. Test real GitHub download, replacement/restart, new-version self-check and the no-update result.
-8. Record the published commit, hashes and validation in [[AGENT_HANDOFF]]. Preserve older release artifacts.
+8. Record the published commit, hashes and validation in the release notes. Preserve older release artifacts.
 
 Do not run `tools/export_public.py`'s main routine against a populated checkout: it deletes destination files outside the export, including ignored artifacts. Use its file-selection/scanning helpers with a reviewed copy operation that preserves unrelated files.
 
-Source edits do not update an already-built EXE. A release tag identifies the built source; later documentation commits do not alter that binary. See [[AGENT_HANDOFF]] for the current published version and evidence rather than assuming the newest working file is already shipped.
+Source edits do not update an already-built EXE. A release tag identifies the built source; later documentation commits do not alter that binary. See the GitHub releases for the current published version and evidence rather than assuming the newest working file is already shipped.
 
 ## 9. Where to start when something breaks
 
@@ -271,7 +273,7 @@ Source edits do not update an already-built EXE. A release tag identifies the bu
 ## 10. Companion notes and outstanding work
 
 - [[README]] — user setup and controls.
-- [[AGENT_HANDOFF]] — current release/source state and continuation instructions.
+- GitHub releases — current published version, assets and checksums.
 - [[CODEBASE]] — detailed implementation map and historical validation.
 - [[CHANGELOG]] — reasons for changes and repair pointers.
 - [[LATENCY_REPORT]] — measured timing and limits.

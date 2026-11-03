@@ -2,7 +2,7 @@
 
 ## Research and optimization record
 
-This file records measurements and rejected performance choices. [CHANGELOG.md](CHANGELOG.md) records the resulting implementation; [AGENT_HANDOFF.md](AGENT_HANDOFF.md) distinguishes current source from built releases. Existing research and validation are indexed below so a completed experiment is not mistaken for an unfinished proposal.
+This file records measurements and rejected performance choices. [CHANGELOG.md](CHANGELOG.md) records the resulting implementation; GitHub tags distinguish current source from built releases. Existing research and validation are indexed below so a completed experiment is not mistaken for an unfinished proposal.
 
 | Work completed | Result / decision | Detailed record and local evidence |
 | --- | --- | --- |
@@ -13,8 +13,9 @@ This file records measurements and rejected performance choices. [CHANGELOG.md](
 | Whole-app CPU investigation | Kept Qwen prompt caching, repeated-translation caching, OpenMP wait changes and idle/music/log optimizations. Forced AVX-512 and MKL were rejected; earlier priority/GPU tradeoffs remain recorded below. | 26 October section below; `.tools/perf-2026-10-26/` |
 | Hy-MT2 versus NLLB/Qwen candidates | Hy-MT2 Q4 was added as an optional translator after a 31-line comparison; Qwen2.5 3B was rejected. NLLB remains the default, not a claim about the user's saved selection. | [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md), `.tools/model-candidates/results-*.json` |
 | VR and compact UI work | Integrated wrist display, responsive resizing and compact model groups; native rendering/previews checked, live headset behavior outstanding. | [CHANGELOG.md](CHANGELOG.md), `.tools/vr-merge/`, `.tools/resize-ui/`, `.tools/model-list-ui/` |
-| Gaming resource budget | One-thread inference, below-normal priority, guarded NLLB/Qwen CUDA, bounded speech work, model cleanup and idle UI changes implemented in `1efb598`. | 27 October section below; `.tools/gaming-validation/` |
+| Gaming resource budget | One-thread inference, below-normal priority, guarded NLLB/Qwen CUDA, bounded speech work, model cleanup and idle UI changes implemented in 1.0.7. | 27 October section below; `.tools/gaming-validation/` |
 | SteamVR cursor input | Local 1.0.8 test build adds 16 ms input, bounded redraws, elapsed-time scrolling/fading and safe visual edge grace. 789 source tests, 236 bundled checks, EXE self-check and 600 GPU uploads/readbacks passed; live smoothness remains unverified. | [VR_OVERLAY_INVESTIGATION.md](VR_OVERLAY_INVESTIGATION.md), `.tools/vr-overlay-investigation/`, `.tools/release-1.0.8/` |
+| 1.1.0 onboarding and UI | First-run language/setup, guided manual, named self-hosted services and toolbar cleanup. No model or inference-latency change was made; **844 source tests** and packaged self-check passed. | [CHANGELOG.md](CHANGELOG.md), `dist/1.1.0/`, `.tools/release-1.1.0/` |
 
 External documentation research for the gaming pass was requested through `/agy` in the terminal, covering CTranslate2 CUDA/threads, faster-whisper host threads, OpenMP waits, ONNX/SenseVoice threading, llama.cpp and Windows priority. The recorded `agy` attempts timed out at two- and three-minute limits without a completed source-backed answer; auto mode also reported that it was unavailable for the account. Do not count these attempts as completed documentation verification. The implemented choices were checked through local code, installed runtime probes, regression tests and the measurements below. The local probe reported CTranslate2 4.8.2 with `int8_float16` support and a CPU-only llama.cpp runtime. Model-card/source links from earlier research remain in [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md).
 
@@ -38,7 +39,7 @@ This pass also sets one inference thread by default, puts the process below norm
 
 ### Validation and retained evidence
 
-The latest full suite against committed source passed **750 tests in 38.73 seconds**, with zero failures, errors or skips. The earlier inherited-state run passed 734 tests before the final regressions were added. Coverage includes queue overload/stale audio, shutdown cancellation without late chatbox sends, provider rechecks when Local Model is reselected, saved settings applied before hearing startup, GPU admission/post-load/idle checks, DLL handle lifetime, hidden Settings/wrist work and English/Chinese/Vietnamese completion notes. Fake clocks, telemetry and runtimes in the suite are separate from the real-model checks above. The handoff also records an isolated offscreen startup/shutdown check; it is not a live microphone or headset result.
+The latest full suite against committed source passed **844 tests in 49.80 seconds**, with zero failures, errors or skips. The earlier inherited-state run passed 734 tests before the final regressions were added. Coverage includes queue overload/stale audio, shutdown cancellation without late chatbox sends, provider rechecks when Local Model is reselected, saved settings applied before hearing startup, GPU admission/post-load/idle checks, DLL handle lifetime, hidden Settings/wrist work, the 1.1.0 onboarding/manual flow and English/Chinese/Vietnamese completion notes. Fake clocks, telemetry and runtimes in the suite are separate from the real-model checks above. The handoff also records an isolated offscreen startup/shutdown check; it is not a live microphone or headset result.
 
 | Evidence | Contents |
 | --- | --- |
@@ -49,7 +50,7 @@ The latest full suite against committed source passed **750 tests in 38.73 secon
 | `.tools/gaming-resume-baseline.xml` | Initial 734-test suite |
 | `.tools/gaming-validation/settings-before.json` | Pre-validation settings hashes; comparison after continuation confirmed unchanged UI, provider/model and VR settings |
 
-Raw artifacts under `.tools/` are local and ignored by Git; the Markdown summaries travel with source exports. Earlier real-model probes read installed weights without modifying them. For future tests, follow current [AGENTS.md](AGENTS.md): isolate AppData and use fakes or independent workspace fixtures, not the user's model cache. No new binary, version bump, push or publication accompanies this source optimization or documentation update.
+Raw artifacts under `.tools/` are local and ignored by Git; the Markdown summaries travel with source exports. Earlier real-model probes read installed weights without modifying them. For future tests, follow the repository test conventions: isolate AppData and use fakes or independent workspace fixtures, not the user's model cache. No new binary, version bump, push or publication accompanies this source optimization or documentation update.
 
 ## 26 October: whole-app CPU and PC impact with local SenseVoice + Qwen (source only)
 
@@ -89,7 +90,7 @@ GPU hearing saved no CPU, because audio preparation and decoding still run on th
 
 The 0.12.10 helper waited for each destination before starting the next. In 0.12.11, an online `ServiceChain` opts into at most **two simultaneous requests per utterance**, and the caller emits complete results as they finish. Panel destinations are scheduled before chatbox-only destinations; duplicate destinations still run once, and a matching source destination reuses the original immediately. Local translators retain their existing serialization and CPU budget. There is no model, prompt, beam, token-limit or silence-threshold change.
 
-The production helper was compared with the committed helper at development `3fccca6`, using the same `ServiceChain`, configured custom-domain model (advertised as Qwen3.8-27B), HTTP transport and six synthetic EN/ZH/VI phrases, each translated into two other languages. Mode order alternated by phrase. Configuration was read into memory once and supplied to both modes; no user settings were written, no live audio was recorded and no OSC was sent. The model identifier does not verify the server's actual weights, runtime, cache or hardware.
+The production helper was compared with the committed helper, using the same `ServiceChain`, configured custom-domain model (advertised as Qwen3.8-27B), HTTP transport and six synthetic EN/ZH/VI phrases, each translated into two other languages. Mode order alternated by phrase. Configuration was read into memory once and supplied to both modes; no user settings were written, no live audio was recorded and no OSC was sent. The model identifier does not verify the server's actual weights, runtime, cache or hardware.
 
 The first sequential pair took 4,140 ms, including a 4,043 ms first request. Client initialization, connection setup and server startup were not separated. **Both modes for that first phrase are excluded** from the warm comparison below (five paired phrases, ten requests per mode):
 
@@ -126,7 +127,7 @@ A repeated Chinese negative phrase still became “I'm not going to say anything
 
 ## Earlier component measurements
 
-Measured with ART **0.12.4**, source commit `9c5a96c` in the release repository, starting at 15:27:58 UTC. **Local execution was faster in this run.** These are current component timings, not a measured speedup over an older app version.
+Measured with the ART **0.12.4** release source, starting at 15:27:58 UTC. **Local execution was faster in this run.** These are current component timings, not a measured speedup over an older app version.
 
 ## Environment and method
 

@@ -1,6 +1,6 @@
 # Historical virtual-driver installer design
 
-This document describes the earlier virtual-microphone prototype, not the current music dialog. Version 0.11.5 uses the [APO mixer and bundled setup helper](../apo/README.md). The following downloader and kernel-installer design is retained for reference; it is not the release workflow for the current app.
+This document describes the earlier virtual-microphone prototype, not the current music dialog. The current **1.1.0** app uses the [APO mixer and bundled setup helper](../apo/README.md). The following downloader and kernel-installer design is retained for reference; it is not the release workflow for the current app.
 
 The earlier design asks for explicit download/install consent when the music dialog finds no driver. Declining leaves normal translation usable and music routing off. There is no background driver installation.
 
@@ -8,7 +8,7 @@ No installer is published or configured yet. `vrc/driver_setup.py` deliberately 
 
 Once the driver and installer have passed Windows 10/11 validation and signing, publish the installer as an asset in the public repository. All users use the same public, credential-free driver package. Then add a bundled `assets/driver-installer.json` with these fields:
 
-- `url`: exact HTTPS asset URL under `https://github.com/SentoMinh/vrchat-translator-public/releases/download/`.
+- `url`: exact HTTPS asset URL under `https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/download/`.
 - `sha256`: the installer's 64-character SHA-256 digest.
 - `size`: exact byte count, at most 256 MiB.
 - `signer_thumbprint`: the 40-character thumbprint of its trusted Authenticode signing certificate.

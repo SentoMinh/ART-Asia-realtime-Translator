@@ -1,180 +1,235 @@
 # ART – Asia realtime Translator
 
-A small always-on-top window for VRChat (desktop mode) that:
+**[Download the latest release](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/latest)** · Windows 10 1809+ / Windows 11 · x64
 
-- **hears other players** from VRChat or a selected audio output and shows their speech and translation in a scrolling chat log;
-- **hears your microphone**, translates what you say and puts it in your VRChat chatbox;
-- **translates text you type** and sends it to the chatbox;
-- **mixes a running app's music into your physical microphone** using the optional development microphone mixer on Windows 11.
+ART is a desktop overlay for VRChat that turns speech into text, translates it, and sends your voice or typed messages to the VRChat chatbox. It can also show subtitles on a SteamVR wrist panel.
 
-Source version **1.0.7**; the package is in `dist/1.0.7/`. The latest published package is **[1.0.7](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v1.0.7)**. Enter your API URL and key under **Custom domain**, or choose local models.
+## What it does
 
-Version 1.0.6 simplifies the local model list into **Hearing** and **Translating** sections. Cards show the model name, CPU/GPU and supported languages, with compact download/use/delete icons and translated tooltips. The introductory text and long descriptions are removed; download progress and delete confirmation remain.
+- **Hears other players** from VRChat or a selected audio output and shows their speech plus translations in a scrolling chat log.
+- **Hears your microphone**, translates what you say, and sends it to the VRChat chatbox.
+- **Translates typed text** and sends it with the current language choices.
+- **Mixes a running app's music** into your microphone on Windows 11 with the optional mixer.
+- **Shows the chat log on your wrist** when SteamVR is running.
 
-1.0.7 adds a gaming budget: local inference uses one thread by default, NLLB/Qwen may use CUDA when memory checks allow a 3 GiB game reserve, speech queues drop stale work instead of falling behind, and the wrist display idles more cheaply. `VRCT_CPU_THREADS=2`, `VRCT_LOCAL_DEVICE=cpu` and `VRCT_PROCESS_PRIORITY=normal` override thread count, translation device and process priority respectively. CUDA load or reserve-check failures use CPU; an error during CUDA inference fails that line and uses CPU on the next request. The checks do not guarantee free memory throughout a running inference. The update check also logs why it found nothing and accepts a mirror through `VRCT_UPDATE_API`. See the [change log](CHANGELOG.md) for behavior and [latency report](LATENCY_REPORT.md) for measured results and limits; live game FPS has not been validated.
+## What's new in 1.1.0
 
-Version 1.0.5 adds optional Hy-MT2 1.8B CPU translation, reduces local translation/background CPU use, and handles punctuation-only recognition and failed local translations without a long cooldown. NLLB remains the faster default; existing model and detector selections are preserved.
+- First launch asks for **English, 中文 or Tiếng Việt** and uses that language for setup and the guided manual.
+- **Local AI is the default**: Whisper large-v3-turbo and NLLB-200 are recommended and selected immediately.
+- **Self-hosted setup** accepts a URL, optional API key, fetches the model list, and saves the server by name under **Services/API**.
+- The **guided manual** highlights each control, supports Skip/Next, and lets you click the highlighted button.
+- **Settings** stays beside the pin; toolbar utilities moved into the **More actions** arrow.
+- The music dialog warns when very loud music can affect translation.
 
-Version 0.12.14 includes the SteamVR wrist display through the **VR** button and keeps toolbar controls and language selectors readable when resizing the main window.
+Earlier changes are in [CHANGELOG.md](CHANGELOG.md).
 
-Version 0.12.12 fixes skipped mixed-language text for English/Vietnamese outputs and starts loading installed local translation models on the background worker. Existing model choices are preserved.
+## Requirements
 
-See the [change log](CHANGELOG.md) for implementation details, measurements and troubleshooting notes.
+- 64-bit Windows 10 version 1809 or newer, or Windows 11.
+- VRChat in desktop mode, windowed or borderless if you want the overlay above the game.
+- A microphone for voice input; VRChat OSC enabled for chatbox messages.
+- The release EXE/ZIP includes Python, Qt and the Microsoft Visual C++ runtime libraries. **No separate setup script is needed.**
+- Local models download on first use. An NVIDIA GPU is optional; the app also runs local models on CPU, and AMD Vulkan Whisper is available on compatible drivers.
 
-For an Obsidian-ready explanation of the whole project, open [ART Project Guide](ART%20Project%20Guide.md): architecture diagrams, language controls, model storage, folder map, build/update flow and troubleshooting.
+## Quick start
 
-Local models include PhoWhisper Small for Vietnamese hearing, plus NLLB, Qwen3 1.7B INT8 and Hy-MT2 1.8B for translation. NLLB remains the low-latency default. See [the model plan and checks](LOCAL_TRANSLATION_PLAN.md).
+1. Download the EXE or ZIP from the [latest release](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/latest). If you use the ZIP, extract it first.
+2. Open `VRChat-Translator-<version>.exe`. Windows SmartScreen may warn because the build is not code-signed: **More info → Run anyway**.
+3. In VRChat, enable **Action Menu → Options → OSC → Enabled**.
+4. Complete the first-run language screen and setup, then follow the short manual. You can skip either screen.
+5. Open **Settings (gear)** to choose models, microphone, subtitles and chatbox options.
 
-Since version 0.12.4, ART sends your chatbox messages in all selected **They speak** languages. Choose **Custom languages** under Settings → Translation → Chatbox languages to use separate destinations.
+The VRChat status light and tooltip show whether the game and OSC were found.
 
-Languages: English, Chinese (Mandarin), Cantonese, Vietnamese, Japanese and Korean. The window itself can be shown in English, 中文 or Tiếng Việt.
+## First-run setup
 
-**It stays on your languages.** Auto-detect recognizes all six supported languages for translation. Other languages are checked for confidence before being announced with a line such as 【Speaking Spanish】. Uncertain speech is checked against the supported languages.
+### Local AI
 
-Historical measurements for English, Chinese and Vietnamese are in [BENCHMARK.md](BENCHMARK.md). They are not accuracy or latency guarantees for the current model selection, Japanese or Korean.
+Local models are selected by default:
 
-## Get the app and run it
+- **Hearing:** Whisper large-v3-turbo (NVIDIA) or Whisper turbo · Vulkan (AMD), with SenseVoice and PhoWhisper alternatives.
+- **Translating:** NLLB-200, with Qwen3 1.7B and Hy-MT2 1.8B as alternatives.
 
-1. Download the EXE or ZIP from [v1.0.7](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v1.0.7). Extract a ZIP before opening its EXE. Python and the app libraries are bundled.
-2. Run it. The first seconds are the program unpacking itself. Windows SmartScreen may warn because the program is not code-signed: "More info" → "Run anyway".
-3. In VRChat turn OSC on: **Action Menu → Options → OSC → Enabled**. The light beside **VRChat** indicates status; hover for details.
-4. Open **Settings (gear) → Models** and enter your API URL and key under **Custom domain**. Use **+** to add another domain and **−** to remove an added domain. Each domain has its own name, credentials and model choices; available models and account limits depend on your server. Click **Fetch models**, then **Save**. Click **▼** in the model box below each Hearing and Translating domain selector to pick a model; use **Connect** beside the selector to check the API.
-5. Open **Settings → Sound → Microphone** and pick the microphone you use in VRChat.
+Whisper large-v3-turbo and NLLB-200 are marked **Recommended**. The GPU build that does not match the PC is disabled. Chosen models are equipped immediately; downloads continue in the background.
 
-VRChat has to run in windowed or borderless mode for the window to stay on top of it.
+### Self-hosted / Online models
 
-Builds use `VRChat-Translator-<version>.exe` or `VRChat-Translator-<version>-win64.zip`, with one package for everyone. Settings and provider keys stay in your Windows profile.
+Select **Self-hosted** to use an OpenAI-compatible server:
 
-The packaged app checks GitHub for newer releases, downloads updates in the background, and applies them on the next start. A “What’s new” panel appears inside the overlay once per version, including the first start of this release. The app saves the shown version in `ui.json`, so restarting does not repeat it. No provider key is sent to GitHub. A source commit does not publish an application update. The old 0.9.15 EXE did not have an update source configured: download this release manually once to enable future automatic updates. Downloads come from [GitHub Releases](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases).
+1. Enter the server address, for example `https://your-server.example/v1`.
+2. Add an API key if the server requires one.
+3. Click **Fetch models**.
+4. Pick **Hearing model** and **Translating models**.
+5. Give the service a name in the small save window.
 
-**Cannot reach GitHub from your network?** Set `VRCT_UPDATE_API` to a mirror that answers with the same JSON as GitHub's `/releases/latest` and names its own download link there, then start the app. Separate several mirrors with commas or semicolons and write `{source}` where the repository belongs, e.g. `https://mirror.example/{source}/latest`. GitHub is always asked first, so the mirror only matters where GitHub is blocked (mainland China without a VPN); nothing is downloaded unless the version is newer and the size, and the SHA-256 when the answer carries one, both match. `%LOCALAPPDATA%\VRChat-Translator\engine.log` now records why a check found nothing: no answer, a refused request, an unreadable answer, a damaged download or a missing digest.
+The named service is stored in **Settings → Services/API** with its URL, key and model choices. Changing the model dropdowns updates the saved service.
 
-The setup script targets **Windows 10 1809+ / Windows 11 on Intel/AMD x64**. Run `install_windows.bat` if the Microsoft Visual C++ runtime is needed, or `install_windows.bat --check` for a read-only platform precheck. The script's microphone-permission reminder is general guidance, not detection of blocked access. Live Windows 10 testing remains outstanding. On Windows 10, speaker capture may include other apps sharing the audio output; selected-app music injection currently requires Windows 11.
+## Main window
 
-### Models: who hears and who translates
-
-| Service | Hears speech | Translates | Good to know |
-|---|---|---|---|
-| Local Model | ✓ SenseVoice or Whisper | ✓ NLLB, Qwen3 or Hy-MT2 | download the chosen models; no API key |
-| Custom domain | ✓ | ✓ | an OpenAI-compatible API address; add more with **+** |
-
-The **Services** section lists only your custom domains. **Set up…** opens inside Settings with a name, API address, key and **Fetch models**. It moves with Settings; Close or Cancel returns to the Models page. Navigation is disabled while a setup panel is open. Save the API settings, then select models below the Hearing and Translating domain selectors. **Connect** checks the selected API and shows **Connected** when it responds. Use **+** beside a row to add another domain, or **−** to remove an added one. The first domain remains available. Removing a selected domain switches that role back to the first domain. Previously selected, configured providers are preserved as custom domains when upgrading. Several translating models can be listed with commas for fallback.
-
-Custom servers offering `nllb-200-ct2` use their `/translate` endpoint with explicit language codes; other translation models use `/chat/completions`.
-
-**Custom domain → Set up…** fetches the available models. With an address entered, pasting a key automatically fetches the list after a short pause. Saving stores that domain’s list; changing its address or key invalidates the list. Click the down arrow in either Hearing or Translating model box to open its dropdown list. Choosing a model saves immediately. You can also type a model name when a server does not support discovery. Settings shows the model currently in use for each role.
-
-Every normal startup checks configured APIs silently in the background. In **Settings → Models**, status moves from **Checking connection…** to **Online** or **Connection issue**, with a maximum 30-second wait per check. Hover for details. Saving a provider triggers another check. Unconfigured services are skipped. These are connection/authentication checks, not speech or translation requests; an online result does not guarantee that every model works. A missing model-list endpoint is reported as a connection issue; check the API base URL and server configuration.
-
-### Local models: hearing and translation on your PC
-
-Open **Settings → Models → Local Model → Set up…** and choose a model:
-
-| Model | Job | Hardware and languages |
-|---|---|---|
-| Whisper large-v3-turbo | Hearing | Fast NVIDIA GPU option; English, Chinese, Cantonese, Vietnamese, Japanese and Korean. Multilingual conversations; mixed sentences can still be misheard. |
-| Whisper turbo · Vulkan (AMD) | Hearing | The six app languages, using whisper.cpp and a separate Q5 model (~547 MiB download). Requires a Vulkan-compatible GPU/driver; supports AMD. Actual AMD performance remains unverified. |
-| SenseVoice Small | Hearing | Lightweight CPU option; Chinese, Cantonese, English, Japanese and Korean. Automatic detection; no Vietnamese. Mixed-language accuracy varies. |
-| PhoWhisper Small | Hearing | Vietnamese specialist trained on diverse accents. CPU INT8, no NVIDIA needed; may be slower than GPU turbo. About 0.9 GiB download. |
-| NLLB-200 · CTranslate2 | Translation | CPU INT8, or CUDA INT8/FP16 when at least model + 3 GiB is free; all six app languages. Default for low latency. |
-| Qwen3 1.7B · INT8 | Translation | Optional CPU or CUDA language model for all six app languages, thinking disabled. About 1.6 GiB download. Slower than NLLB in our replay; wording and Cantonese quality need comparison. |
-| Hy-MT2 1.8B · Tencent | Translation | Optional CPU translator for all six app languages, Q4_K_M through llama.cpp. About 1.1 GiB download. Better wording on the small local comparison, but about three times slower than NLLB; compare your language pair. |
-
-The download panel opens inside Settings and moves with it. Its model list has one scrollbar; the title and single Close button stay at the top. Cards show download status and the available download/use/delete icon actions with translated tooltips. Downloads resume after interruptions and are checked before use. You can close the setup window while downloading. When the download finishes, that model activates for its job; **Use model** beside an installed model switches to it. Hearing and translation keep separate selections. NVIDIA Whisper turbo requires CUDA libraries; NLLB/Qwen use them only when the memory reserve allows; Vulkan uses the graphics driver instead. Non-turbo Whisper large-v3 is removed from the list; an old selection falls back to turbo without deleting its downloaded files. Existing hearing and translation choices otherwise stay unchanged. Switching translators releases the previous weights before loading another local model; leaving Local Model queues cleanup on the translation worker.
-
-**Free disk space:** click **Delete → Confirm delete** on a model card, or Cancel to keep it. This removes app-managed weights and partial downloads; shared NVIDIA libraries, other models and your settings stay intact. Deletion is disabled during downloads. Leftover non-turbo large-v3 files get a cleanup-only card. External Hugging Face caches and loaded model memory are not removed. If a file is in use, stop using the model/restart ART and retry. Available models can be downloaded again.
-
-Local inference needs no API key. Select Local Model for both Hearing and Translating to run both steps on your PC. The first download needs internet access. Local translation uses only your selected local model; if it fails, the local error is shown without trying online add-ons.
-
-**Since 0.12.5:** Hugging Face model downloads automatically try [HF-Mirror](https://hf-mirror.com/) if the original connection fails or refuses the file. Resume and the original SHA-256 checks remain enabled. Other download hosts are unchanged. A small-file test redirected back to Hugging Face; availability from mainland China is not guaranteed. See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for release status and remaining checks.
-
-**Cannot download NLLB from China or another restricted network?** Use the [offline NLLB package](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/download/v0.12.3/ART-NLLB-200-CT2-offline.zip) (about 558 MiB; [SHA-256](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/download/v0.12.3/ART-NLLB-200-CT2-offline.zip.sha256)). Download it on a working connection or transfer the ZIP by USB or a file-sharing service. Close ART, extract the ZIP, and double-click **Install-NLLB.cmd**. Then open Settings → Models, select **Local Model** for Translating, and choose **Use model** for NLLB. No administrator, Python, Hugging Face connection or API key is needed during installation. The installer checks the four pinned model files and preserves any replaced folder as a backup. It works with v0.12.3; the app EXE is unchanged. GitHub access from mainland China is not verified, so file transfer is the fallback if that download is also unavailable. The model remains [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/); attribution is included in the ZIP.
-
-## The window
-
-| Part | What it does |
+| Control | What it does |
 |---|---|
-| Move to VRChat button | Beside the VRChat label: detects the visible game window and moves the translator to the top-left of its content area. Open or restore VRChat first. This moves once per click and preserves the overlay size. |
-| VRChat + light | Compact status indicator; hover to see connection, OSC and capture details. |
-| Mic / speaker buttons | Turn "my mic → chatbox" and "other players → subtitles" on or off. The bars show the sound level. |
-| Arrows beside mic / speaker | Pick a microphone or subtitle audio source. The subtitle source list starts with VRChat, followed by available output devices. |
-| Music icon | Select a running app, reload the source list, adjust volume, and use one Play/Stop button. Missing mixer setup asks for consent and administrator permission. See [Music setup](MUSIC_SETUP.md). |
-| Wave button | Voice detector on/off. Off cuts the sound every 4 seconds instead of at the end of a sentence. |
-| Globe | Language of the window. |
-| Pin | Always on top. |
-| I speak / They speak | Check up to three spoken languages in each dropdown. With multiple choices, recognition detects the language and ignores results outside your selection. They speak also offers Auto-detect as a separate choice. |
-| Translated to | Check up to three translation languages to show on the panel for microphone speech, other players and typed messages. Each output is labeled with its language. |
-| Text box + Send | Type, press Enter: translated and sent to the chatbox. Auto follows Chatbox languages; the arrow can override this with one language for typed text only. The button shows the current destinations. |
+| VRChat status | Connection, OSC and capture status; hover for details. |
+| Microphone arrow + mic button | Choose the input device and turn **my mic → chatbox** on or off. |
+| Speaker arrow + speaker button | Choose the subtitle source and turn **other players → subtitles** on or off. |
+| **More actions** arrow | Move to VRChat, music, voice detector, window language, VR and clear chat. |
+| **Pin** | Keep the window above the game. |
+| **Gear** (beside the pin) | Open Settings. |
+| I speak / They speak / Translated to | Pick up to three languages for each role. |
+| Text box + Send | Type a message, press Enter, and send the translation. The arrow beside Send chooses the typed-text target. |
+| Minimise / Maximise / Close | Standard window controls. |
 
-For example, set **I speak: English**, **They speak: Chinese, Vietnamese**, and **Translated to: English, Chinese, Vietnamese**. Your microphone sends original English, Chinese and Vietnamese as separate lines in one VRChat message. **Translated to** controls only the panel. **Settings → Translation → Chatbox languages** defaults to **Follow 'They speak'**, or choose **Custom languages** (up to three). When They speak uses Auto-detect, chatbox messages follow the last language heard, falling back to English before anyone is heard. Typed messages use the first I speak language as their source; an explicit Send language overrides chatbox choices for typed messages only.
+The manual does not cover the three window-control buttons, and highlighted controls can be clicked while it is open.
 
-The same three pickers are available in **Settings → Translation**. At least one choice stays selected in each box. Existing settings default to following They speak. Destinations are captured when each message starts. Shared panel/chatbox translations are requested once, and a target matching the source reuses the original unless an English/Vietnamese output contains CJK text that still needs translation. Successful translations survive a failed target; if all chatbox targets fail, the original is sent. Duplicate text lines are removed. Microphone messages include the original plus up to three translations, sharing one 144-character budget; long lines are shortened while keeping space for every language. **Add my own words** controls original text for typed messages. Each completed panel translation appears while the remaining languages continue. Additional distinct targets add translation work and can delay the complete chatbox message; online services now process up to two targets at once per utterance, with panel languages first. Local inference keeps its existing CPU limits. No extra OSC messages are sent.
+## Models and services
 
-In **Settings → Translation**, turn on **Add Speaker words** to also send other players' speech to your own VRChat OSC chatbox as `translation (original)`. It uses the first **Translated to** language, independently of **Add my own words** and the Send language. The switch is off by default. Long messages shorten both parts as needed; turning it off also stops speaker messages waiting to be sent.
+### Local models
 
-Click a line in the chat log to copy what was said (the original text, not the translation).
+| Model | Job | Notes |
+|---|---|---|
+| Whisper large-v3-turbo | Hearing | Fast NVIDIA option; the six app languages. |
+| Whisper turbo · Vulkan (AMD) | Hearing | whisper.cpp/Q5; Vulkan-compatible AMD GPUs. |
+| SenseVoice Small | Hearing | Lightweight CPU option; no Vietnamese. |
+| PhoWhisper Small | Hearing | Vietnamese specialist; CPU. |
+| NLLB-200 CTranslate2 | Translation | Low-latency default; CPU or CUDA when the game reserve allows. |
+| Qwen3 1.7B INT8 | Translation | Optional CPU/CUDA language model; slower than NLLB. |
+| Hy-MT2 1.8B | Translation | Optional CPU translator; better wording on a small test, slower than NLLB. |
 
-Drag the top controls, level meters or header labels to move the window. Drag the standard resize grip in the bottom-right corner to change width and height. The top edge and top corners also resize; other side and bottom edges do not. The corner grip remains available below 30% darkness and when the top controls are hidden. Header buttons distinguish clicks from dragging; native window movement has a manual fallback.
+Model downloads resume after interruptions, are checked before use, and can be deleted from **Settings → Models**. Hugging Face downloads fall back to HF-Mirror when the original connection fails.
 
-Version 0.11.11 fixes the disappearing body background at the 29–30% boundary. In **Settings → Appearance → Background darkness**, values below **30%** let clicks pass through empty overlay space while preserving the selected background darkness. Click a subtitle to copy its original text, or drag over original/translated text to copy only the selection on release (Ctrl+C also works). The typing box and top controls stay usable. At **30%** or above, the full panel accepts clicks again. This was checked against a separate Windows application; live VRChat and Windows 10 behavior still need testing.
+### Services/API
 
-Existing saved API settings are retained where recoverable. If an older installation kept its URL only inside its EXE, enter that URL in Custom domain once; the new app cannot recover settings that were never saved outside the old program.
+Configure one or more OpenAI-compatible domains under **Settings → Services/API** or the first-run online section. Each domain has its own name, URL, key and model choices. **Fetch models** queries `/models`; **Connect** checks the endpoint. API keys are stored in plain text under your Windows profile, not uploaded anywhere except the service you configure.
 
-## Files it keeps
+Hearing and Translating are independent choices. Local mode keeps both steps on this PC. Translation stays within the selected service; there is no silent fallback to another provider.
 
-- `%APPDATA%\VRChat-Translator\ui.json` — settings; `models.json` — API addresses, keys, chosen models and fetched model lists in plain text under your Windows profile. The app does not encrypt them or apply a separate file ACL.
-- `%APPDATA%\VRChat-Translator\addons\` — legacy files are preserved but no longer loaded.
-- `%LOCALAPPDATA%\VRChat-Translator\engine.log` — every sentence heard, its language, the translation and the delay. Look here first when nothing appears.
-- `%LOCALAPPDATA%\VRChat-Translator\local-model\` — downloaded local model files; size depends on your choices. Deleting the folder frees the space; the program offers the downloads again.
+## Files and privacy
 
-What you type or say, and what other players say, is sent to the service picked in Settings → Models to be heard and translated.
+- `%APPDATA%\VRChat-Translator\ui.json` — window, language, audio and model settings.
+- `%APPDATA%\VRChat-Translator\models.json` — service URLs, keys, model choices and fetched model lists in plain text.
+- `%LOCALAPPDATA%\VRChat-Translator\engine.log` — speech, language, translation and timing diagnostics.
+- `%LOCALAPPDATA%\VRChat-Translator\local-model\` — downloaded local model files.
 
-### Translation stays on your selected service
+Speech and typed text are sent only to the service selected under **Settings → Models**. No provider key is sent to GitHub during update checks.
 
-ART tries only the models explicitly configured under Translating. Multiple comma-separated models may fall back within that service. If none can answer, ART shows the selected service's error and lets you choose another service. Legacy per-PC add-on files are ignored for every service, including Custom domain; they cannot silently send a failed translation to Gemini or another provider.
+## Troubleshooting
 
-Hearing and Translating are separate choices. Select Local Model for both to keep both inference steps on your PC. A custom domain's Translating model must support text translation/chat; speech-generation models will fail there.
+- **No VRChat status:** start VRChat first and enable OSC in its Action Menu.
+- **No subtitles:** check the speaker button and subtitle source, then the voice detector setting.
+- **No translation:** open `engine.log`; check the selected service, URL/key and model names. Use **Connect** or **Fetch models** in Settings.
+- **Music is silent:** see [Music setup](MUSIC_SETUP.md). Selected-app music requires Windows 11.
+- **Update check cannot reach GitHub:** set `VRCT_UPDATE_API` to a compatible mirror; see the notes below.
 
-## Run from source
+Optional environment overrides:
 
-Python 3.12 and [uv](https://docs.astral.sh/uv/):
+| Variable | Effect |
+|---|---|
+| `VRCT_NO_UPDATE=1` | Skip the source updater used by `run_ui.bat`. |
+| `VRCT_CPU_THREADS=2` | Use two local-inference threads instead of one. |
+| `VRCT_LOCAL_DEVICE=cpu` | Keep local translation on the CPU. |
+| `VRCT_PROCESS_PRIORITY=normal` | Do not lower the process priority while gaming. |
+| `VRCT_UPDATE_API=url` | Add a GitHub-release mirror; `{source}` is replaced with the repository. |
+| `VRCT_VR_DIAGNOSTICS=1` | Add VR timing/input-loss summaries to `engine.log`. |
 
-```
+## Build from source
+
+### Prerequisites
+
+- Windows 10 1809+ / Windows 11 x64.
+- [Python 3.12](https://www.python.org/) and [uv](https://docs.astral.sh/uv/).
+- PowerShell 5.1 or newer (PowerShell 7 also works).
+- Optional native mixer: Visual Studio 2022 C++/ATL and Windows SDK 10.0.26100. See [apo/README.md](apo/README.md).
+- Optional AMD Whisper runtime: Vulkan SDK with `glslc`, CMake and Visual Studio 2022. See [tools/build-whisper-vulkan.ps1](tools/build-whisper-vulkan.ps1).
+
+The release EXE bundles the Microsoft Visual C++ runtime DLLs; a separate system install script is not required.
+
+### Set up the environment
+
+```powershell
+git clone https://github.com/SentoMinh/ART-Asia-realtime-Translator.git
+cd ART-Asia-realtime-Translator
+
 uv venv .venv-app --python 3.12
-uv pip install --python .venv-app\Scripts\python.exe -r requirements.txt
-run_ui.bat            (or: run_ui.bat --demo for example lines without VRChat)
+uv pip install --python .venv-app\Scripts\python.exe -r requirements.txt `
+  --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
 ```
 
-- **Updates:** `run_ui.bat` first looks for a newer version on GitHub's `main` branch and installs it (`tools\update.py`), then opens the window. It skips the check when offline, when the folder is on a work branch, or while files in it are being edited, so nothing is ever overwritten. `set VRCT_NO_UPDATE=1` turns it off; every start writes one line to `%LOCALAPPDATA%\VRChat-Translator\update.log`.
-- Tests: `.venv-app\Scripts\python -m pytest tests`
-- Build the one-file program: `pwsh -File tools\build.ps1 -MixerBuild .tools\apo-prototype-10` (use your validated native build directory; see [APO build instructions](apo/README.md)). `-Folder` builds a folder and ZIP. Without `-MixerBuild`, native mixer DLLs are not explicitly included by the build command.
-- Check a build: `VRChat-Translator.exe --selfcheck` writes `%LOCALAPPDATA%\VRChat-Translator\selfcheck.txt`
+`requirements.txt` contains the runtime, local-model, test and packaging dependencies. The Windows CPU wheel for `llama-cpp-python` needs the extra index shown above.
 
-Release validation for 0.11.10: **422 tests passed**, including the 30% click-through threshold, top-only resize edges, embedded setup panels and once-per-version update notices. Windows checks also verified actual mouse-drag resizing with the top grip, cross-process click-through, retained text/input interaction and subtitle copying, and window detection/placement against a separate test application. The EXE passed its packaged self-check, bundled-runtime and native-DLL checks, source/artifact scans, ZIP checks and SHA-256 verification. The GitHub download, replacement and restart from 0.11.9 to 0.11.10 were verified, followed by a no-update check on the current version.
+### Run
 
-The 0.12.5 source passed 505 tests. Real pinned PhoWhisper and Qwen files loaded and ran on CPU; two Vietnamese recording replays and short multilingual translation checks are recorded in LOCAL_TRANSLATION_PLAN.md and LATENCY_REPORT.md. This is not a broad quality evaluation. Fresh-PC installation, Windows 10 behavior and mainland-China download access remain unverified.
+```powershell
+.venv-app\Scripts\python.exe -m ui.main          # real capture
+.venv-app\Scripts\python.exe -m ui.main --demo   # example lines, no capture
+```
 
-### SteamVR wrist display
+`run_ui.bat` does the same and checks the source updater first; set `VRCT_NO_UPDATE=1` while developing.
 
-The main app now includes the wrist display from the VR project. Start `run_ui.bat`, then click **VR** beside Settings to choose the left or right hand, placement, size, rotation, opacity and text size. Existing placement settings in `vr.json` are reused. Turn **Show on my wrist** off to disable the overlay. SteamVR must already be running; ART does not start it.
+### Tests
 
-The wrist shows the same subtitles as the desktop. Look at it and point with the opposite controller; press and release the trigger to select controls, drag the scrollbar, or use the thumbstick to scroll. The **I / They** pickers support the main app's three-language selections and update its settings. **Translated to** and custom chatbox destinations remain controlled from the desktop. The hand preview and sample controls in VR settings can be tried without a headset.
+The automated test suite is kept in the **private development checkout** and is intentionally not published in the public repository. With that checkout:
 
-Version 0.12.14 includes the wrist code, OpenVR library, hand model and controller bindings in the normal app. Headset placement and SteamVR compositor behavior still need a live hardware check.
+```powershell
+.venv-app\Scripts\python.exe -m pytest tests
+.venv-app\Scripts\python.exe -m pytest tests/test_ui.py -q
+```
 
-## Layout
+Qt tests set `QT_QPA_PLATFORM=offscreen` themselves. Tests isolate `APPDATA`/`LOCALAPPDATA`, HTTP, audio and model runtimes; do not point them at real credentials or model caches.
 
-- `ui\` — the window (PySide6): main window, settings, chat log, the three window languages.
-- `vr\` — SteamVR wrist display, controller input, hand preview and placement settings; `assets/vr` and `assets/hand` contain its bindings and preview mesh.
-- `vrc\` — VRChat itself: finding it, the chatbox (OSC), sound capture, text translation.
-- `engine\` — speech: voice detector → sentences → speech-to-text (online or local Whisper/SenseVoice) → translation (online or local NLLB). `engine\services.py` lists the services.
-- `apo\` — native microphone mixer and development validation/removal tools; `driver\` retains the earlier unused virtual-microphone prototype.
-- [MUSIC_SETUP.md](MUSIC_SETUP.md) — music routing and current compatibility limits; [CODEBASE.md](CODEBASE.md) — developer map and verification status.
-- [BENCHMARK.md](BENCHMARK.md) — how the speech and translation models were chosen.
-- `tests\`, `tools\` — tests, the build script, a tool that draws the window to PNG.
+### Build the release
 
-## Project priorities
+The one-file build needs the native Whisper Vulkan DLL at `assets/whisper-vulkan/art_whisper_vulkan.dll` (or pass `-WhisperBuild <dir>`). The validated mixer DLL directory can be passed with `-MixerBuild`.
 
-Voice recognition is the current focus. Identifying individual speakers as Speaker 1 / Speaker 2 is deferred. See [ROADMAP.md](ROADMAP.md) for the saved plan to revisit during future feature discussions.
+```powershell
+powershell -File tools\build.ps1 -DistPath dist\1.1.0 `
+  -MixerBuild .tools\apo-prototype-10
 
-For missed words or background-noise subtitles, see [voice detection and repair notes](VOICE_DETECTION.md). Settings → Sound → Restore detector defaults returns to detection on, microphone 50%, other players 70%. Strictness changes take effect between sentences.
+powershell -File tools\build.ps1 -Folder -DistPath dist\1.1.0 `
+  -MixerBuild .tools\apo-prototype-10
+```
+
+The first command creates the one-file EXE; `-Folder` creates the extractable folder and a ZIP. Build outputs are copied to `dist\`.
+
+Check the packaged program with isolated settings:
+
+```powershell
+$env:APPDATA = "$PWD\.tools\selfcheck\appdata"
+$env:LOCALAPPDATA = "$PWD\.tools\selfcheck\localappdata"
+.\dist\1.1.0\VRChat-Translator.exe --selfcheck
+Get-Content "$env:LOCALAPPDATA\VRChat-Translator\selfcheck.txt"
+```
+
+### Release checklist
+
+1. Bump `ui/__init__.py` and add a `CHANGELOG.md` entry.
+2. Run the full test suite in the private checkout.
+3. Build the EXE and folder ZIP; pass the validated native mixer directory.
+4. Run the packaged `--selfcheck` with isolated AppData.
+5. Generate `SHA256SUMS.txt` and update README/release notes.
+6. Export committed source with `tools/export_public.py` into a **clean** public checkout. The export excludes `tests/`, `bench/`, `updates/` and the relay configuration.
+7. Commit/tag `v<version>` in the public repository and upload the assets with GitHub Releases.
+
+Never run `tools/export_public.py` against a populated checkout with local files you want to keep: it removes files that are not part of the committed export.
+
+## Project layout
+
+```text
+ui/       PySide6 window, settings, first-run flow and the guided manual
+engine/   voice detection, speech-to-text, translation and model downloads
+vrc/      VRChat window discovery, OSC chatbox, audio capture
+vr/       SteamVR wrist display and controller input
+apo/      optional Windows microphone mixer
+driver/   earlier virtual-microphone prototype (reference only)
+tools/    build, preview, snapshot and release helpers
+assets/   icons, VR hand data and native Whisper Vulkan runtime
+tests/    automated tests (private development checkout only)
+```
+
+## Documentation
+
+- [CHANGELOG.md](CHANGELOG.md) — behavior changes and validation notes.
+- [CODEBASE.md](CODEBASE.md) — developer architecture map.
+- [MUSIC_SETUP.md](MUSIC_SETUP.md) — music routing and compatibility.
+- [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md) — local model choices and checks.
+- [LATENCY_REPORT.md](LATENCY_REPORT.md) — timing measurements and limits.
+- [VR_OVERLAY_INVESTIGATION.md](VR_OVERLAY_INVESTIGATION.md) — SteamVR cursor/input findings.
+- [ART Project Guide](ART%20Project%20Guide.md) — full project walkthrough.

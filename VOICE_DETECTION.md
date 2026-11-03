@@ -1,6 +1,6 @@
 # Voice detection: behavior and repair notes
 
-Detector evidence: 24 October 2026, version 0.12.8. The reset-card instructions apply again in 0.12.13.
+Detector evidence: 24 October 2026, version 0.12.8. The reset-card instructions apply again in later releases, including **1.1.0**. The measurements below remain historical; no detector threshold change was made for 1.1.0.
 
 ## What strictness changes
 
@@ -35,7 +35,7 @@ Baseline results at two defaults:
 
 A proposed change counting all lower-confidence continuation frames toward minimum speech was rejected: at 50% it admitted a third noise-only clip; at 70% it admitted an additional noise segment. It is not in the release.
 
-Development evidence is under `.tools/vad-0.12.8/`: `probabilities.json`, `comparison.json`, `final-replay.json`, plus the scripts that generated them. Recordings and these large artifacts are not bundled or exported. Packaged and publication evidence is recorded in [[AGENT_HANDOFF]].
+Development evidence is under `.tools/vad-0.12.8/`: `probabilities.json`, `comparison.json`, `final-replay.json`, plus the scripts that generated them. Recordings and these large artifacts are not bundled or exported. Packaged and publication evidence is recorded in the release notes and `dist/` artifacts.
 
 ## Limits and next diagnosis
 

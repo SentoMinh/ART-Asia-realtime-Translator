@@ -1,6 +1,6 @@
 # SteamVR cursor investigation — 30 October 2026
 
-Status: the user approved the focused overlay fix and separate test export with “ok fix it” on 30 October 2026. Implementation, validation and the local 1.0.8 test package are complete; the source remains uncommitted and nothing was published. Executable: `dist/1.0.8/VRChat-Translator-1.0.8.exe`. The investigation below records the original behavior at development HEAD `0dcaef2`; final results follow at the end. Existing user edits to `AGENTS.md`, untracked `AI_GUIDE.md`, and `.obsidian/` are preserved. No saved model/provider changes or live SteamVR session were performed.
+Status: the focused overlay fix was completed for 1.0.8 and now ships in **1.1.0**; source is committed and published. The 1.0.8 investigation below records the original behavior at the 1.0.8 development head and the final validation. Executable: `dist/1.1.0/VRChat-Translator-1.1.0.exe`. The 1.1.0 suite passed **844 tests**, and the packaged self-check passed. No saved model/provider changes or live SteamVR session were performed.
 
 ## Findings reproduced locally
 
@@ -89,6 +89,6 @@ This measures CPU work with fake texture submission and a fake clock. The lower 
 - The actual **1.0.8 EXE self-check passed**, including bundled native/mixer/VR components and HTTPS 200, with isolated AppData and no downloaded models (`selfcheck.txt`). Bundled English/Chinese/Vietnamese update notices rendered correctly and were visually inspected; previews closed automatically (`preview/`).
 - Bundle/privacy scans, native asset equality, required packaged modules, ZIP integrity and all 70 build-input hashes passed. Ten user-file/settings records and 1090 prior artifact size/mtime records matched the original baseline. Results: `verification.json`; checksums: `dist/1.0.8/SHA256SUMS.txt`.
 
-The output folder contains the versioned EXE, test ZIP, installer helper and `READ-ME-FIRST.txt` headset checklist. No source commit, push, publication or destructive checkout export was performed. The build used the existing PowerShell script with the absolute validated mixer path. Windows PowerShell replaced unavailable `pwsh`; direct subprocess log handles avoided treating PyInstaller informational stderr as a shell error. Final build exited 0 (`build-final.txt`).
+The output folder contains the versioned EXE, test ZIP and SHA-256 manifest; the separate installer helper and headset checklist were removed from later source exports. The 1.0.8 build used the existing PowerShell script with the absolute validated mixer path. Windows PowerShell replaced unavailable `pwsh`; direct subprocess log handles avoided treating PyInstaller informational stderr as a shell error. Final build exited 0 (`build-final.txt`).
 
 Still unverified: live controller/headset/compositor behavior, the actual cause of the user's flicker, VRChat/game FPS, Windows 10 and fresh-PC installation. Automated results establish the reproduced mechanisms and package integrity, not subjective smoothness. Compare 1.0.7 and the local 1.0.8 EXE under the same headset conditions, first with recognition/translation paused, then with VRChat running.

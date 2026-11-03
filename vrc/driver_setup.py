@@ -39,7 +39,7 @@ def installer_manifest():
     if not path.exists():
         return None  # No signed installer has been published yet.
     data = json.loads(path.read_text(encoding="utf-8"))
-    if not data["url"].startswith("https://github.com/SentoMinh/vrchat-translator-public/releases/download/"):
+    if not data["url"].startswith("https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/download/"):
         raise DriverSetupError("Invalid driver installer download address.")
     if not re.fullmatch(r"[0-9a-fA-F]{64}", data["sha256"]):
         raise DriverSetupError("Invalid driver installer checksum.")
