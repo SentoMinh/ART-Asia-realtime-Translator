@@ -1,10 +1,10 @@
 # Project priorities
 
-Updated 2026-11-04 for the published **1.1.0** release. See [CHANGELOG.md](CHANGELOG.md) for current release/source changes and [LATENCY_REPORT.md](LATENCY_REPORT.md) for the research and evidence index.
+Updated 2026-11-05 for the published **1.2.0** release. See [CHANGELOG.md](CHANGELOG.md) for current release/source changes and [LATENCY_REPORT.md](LATENCY_REPORT.md) for the research and evidence index.
 
 ## Current focus
 
-Improve voice recognition accuracy, responsiveness and reliability while leaving CPU and memory capacity for VRChat and other heavy tasks. The gaming resource budget is shipped in 1.1.0; live game-FPS/headset checks and a fresh process-priority comparison remain outstanding. Keep recognizing speech from the existing audio sources; identifying which person spoke is outside the current scope.
+Improve voice recognition accuracy, responsiveness and reliability while leaving CPU and memory capacity for VRChat and other heavy tasks. The gaming resource budget is shipped in 1.2.0; live game-FPS/headset checks and a fresh process-priority comparison remain outstanding. Keep recognizing speech from the existing audio sources; identifying which person spoke is outside the current scope.
 
 ## Local translation: latency first
 

@@ -15,7 +15,7 @@ updated: 2026-10-27
 
 ART means **Asia realtime Translator**. It is one Windows desktop application for hearing speech, translating it, displaying subtitles and sending text to VRChat's chatbox.
 
-**Current release: 1.1.0 (4 November 2026).** First launch asks for English, Chinese or Vietnamese and then runs a guided manual. Local models are recommended by default; self-hosted servers can be configured with a URL, optional key, fetched model list and a saved service name. Toolbar utilities moved into the **More actions** arrow, and Settings stays beside the pin. The public repository excludes the automated test folder; tests remain in the private checkout. See [[CHANGELOG]] and the GitHub releases.
+**Current release: 1.2.0 (5 November 2026).** First launch asks for English, Chinese or Vietnamese and now requires completing setup before the window is usable; the guided manual can still be skipped. The chat log opens with a version banner as its first line, new lines push it up, and the manual's circular highlight surrounds the whole hovered button. The microphone picker no longer starts outlined. Local models are recommended by default; self-hosted servers can be configured with a URL, optional key, fetched model list and a saved service name. Toolbar utilities moved into the **More actions** arrow, and Settings stays beside the pin. The public repository excludes the automated test folder; tests remain in the private checkout. See [[CHANGELOG]] and the GitHub releases.
 
 Since 0.12.11, online translation handles two destinations at once per utterance and shows each completed subtitle immediately. Panel destinations run before chatbox-only destinations. That release preserved local model CPU limits and recognition settings; the later CPU/GPU budget is described below. The chatbox still waits for one complete message. See [[LATENCY_REPORT]] for the measured two-language improvement and its limits.
 
@@ -234,7 +234,7 @@ Run from the working checkout:
 .venv-app\Scripts\python.exe -m ui.main
 
 # Build with the validated native mixer binaries.
-powershell -File tools\build.ps1 -DistPath dist\1.1.0 -MixerBuild .tools\apo-prototype-10
+powershell -File tools\build.ps1 -DistPath dist\1.2.0 -MixerBuild .tools\apo-prototype-10
 ```
 
 Use isolated `APPDATA` and `LOCALAPPDATA` paths for probes so they do not change real settings or keys. Demo previews must close automatically. Do not use live microphone capture or OSC delivery merely to test layout.

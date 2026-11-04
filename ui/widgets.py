@@ -13,7 +13,7 @@ from .i18n import tr
 class DialogPanel(QFrame):
     """Present existing dialog contents inside the owning window."""
 
-    def __init__(self, dialog, parent=None):
+    def __init__(self, dialog, parent=None, *, closable=True):
         super().__init__(parent)
         self.dialog = dialog
         self.setObjectName("card")
@@ -23,10 +23,11 @@ class DialogPanel(QFrame):
         title.setObjectName("title")
         title.setWordWrap(True)
         heading.addWidget(title, 1)
-        close = QPushButton(tr("Close"))
-        close.setObjectName("plain")
-        close.clicked.connect(dialog.reject)
-        heading.addWidget(close)
+        if closable:
+            close = QPushButton(tr("Close"))
+            close.setObjectName("plain")
+            close.clicked.connect(dialog.reject)
+            heading.addWidget(close)
         layout.addLayout(heading)
         dialog.setParent(self, Qt.Widget)
         dialog.setAttribute(Qt.WA_DeleteOnClose, False)

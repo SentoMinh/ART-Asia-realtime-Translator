@@ -1,6 +1,6 @@
 # Voice detection: behavior and repair notes
 
-Detector evidence: 24 October 2026, version 0.12.8. The reset-card instructions apply again in later releases, including **1.1.0**. The measurements below remain historical; no detector threshold change was made for 1.1.0.
+Detector evidence: 24 October 2026, version 0.12.8. The reset-card instructions apply again in later releases, including **1.2.0**. The measurements below remain historical; no detector threshold change was made for 1.2.0.
 
 ## What strictness changes
 

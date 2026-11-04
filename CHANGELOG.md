@@ -1,5 +1,49 @@
 # Change log
 
+## 1.2.0 - 2026-11-05 - Required setup, compact spotlights, startup focus and version banner
+
+The microphone picker no longer gets a blue outline automatically at startup.
+Qt was assigning initial focus to the first toolbar control; the window now takes
+that initial focus instead. Tab navigation and keyboard focus outlines remain.
+Regression tests cover startup and reaching the picker with Tab; the isolated
+native Windows demo confirms the picker is unfocused in `startup-focus.log` and
+`startup-focus.png` under `.tools/spotlight/`.
+
+First-run setup now has only Get Started: Skip and the setup card's Close button
+are removed, and Escape cannot dismiss it. Completion is recorded only when the
+setup choices are applied. Other embedded dialogs keep their Close buttons.
+
+The tutorial's circular highlight now surrounds the entire hovered button, including
+its corners. Its click-through mask stays inside the clear opening so the binary
+mask cannot clip the antialiased edge; larger controls retain rounded highlights.
+The spotlight remains clickable and has no added outline. Enlarging the painted
+circle alone would leave the mask's jagged edge, so both boundaries were corrected.
+The follow-up reduces circular padding to 2 px and wide-control padding to 4 px
+per side, keeping the hover clearance and smooth-edge protection.
+
+Regression coverage checks button clearance, click-through and identical rendering
+with and without the input mask at 100%, 150% and 200% image scaling. Native Qt
+previews cover English, Chinese and Vietnamese in idle/hover states at those scales;
+evidence is retained in `.tools/spotlight/`. The 855-test run that covered this work
+passed in 56.64 s. An existing Whisper thread-budget test also now fakes its CUDA
+device selection instead of depending on the host GPU.
+
+The chat panel now opens with a small version banner (`This is 1.2.0` inside ASCII
+stationery and the cat face) as its first line. It follows the interface language in
+English, Chinese and Vietnamese, ignores the mouse, and scrolls up as new subtitle
+rows arrive; clearing the log removes it. The banner shrinks from 16 px down to 6 px
+to fit narrow windows; its first version used `setFont()`, which the theme's global
+`font-size` rule overrides, so it now sets its own font size. Native previews of the
+first line alone and after new rows are in `.tools/spotlight/greeting-row/`.
+The final tree passed all **859 source tests in 52.97 s**.
+
+The packaged `VRChat-Translator-1.2.0.exe` (138,963,259 bytes; SHA-256
+`a5c833eb181df4012e5633af9b6ea639ad88c449c1955c4cd279f7dedd0d3893`) and the folder build
+both passed `--selfcheck` with every part working under isolated AppData, including
+the production mixer files, VR assets, local runtimes and an HTTPS 200. The EXE and
+folder ZIP, installer helper, usage notes and SHA-256 manifest are in `dist/1.2.0/`.
+Live VRChat, headset, game-FPS and Windows 10 behavior remain unverified.
+
 ## 1.1.0 - 2026-11-04 - First-run language picker, guided manual and server setup
 
 The first launch now asks for **中文, Tiếng Việt or English** before setup, and the

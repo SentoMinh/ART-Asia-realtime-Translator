@@ -1,6 +1,6 @@
 # Historical virtual-driver installer design
 
-This document describes the earlier virtual-microphone prototype, not the current music dialog. The current **1.1.0** app uses the [APO mixer and bundled setup helper](../apo/README.md). The following downloader and kernel-installer design is retained for reference; it is not the release workflow for the current app.
+This document describes the earlier virtual-microphone prototype, not the current music dialog. The current **1.2.0** app uses the [APO mixer and bundled setup helper](../apo/README.md). The following downloader and kernel-installer design is retained for reference; it is not the release workflow for the current app.
 
 The earlier design asks for explicit download/install consent when the music dialog finds no driver. Declining leaves normal translation usable and music routing off. There is no background driver installation.
 

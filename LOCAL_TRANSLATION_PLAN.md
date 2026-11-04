@@ -2,7 +2,7 @@
 
 Saved 2026-10-22 at the user's request. Scope: text translation after speech recognition, running on the user's PC. Speech-recognition and text-to-speech model variants are separate tasks.
 
-> Current application release: **1.1.0** (4 November 2026). Model choices and the NLLB default are unchanged; 1.1.0 adds first-run onboarding and self-hosted setup. The evaluation below remains historical evidence.
+> Current application release: **1.2.0** (5 November 2026). Model choices and the NLLB default are unchanged; 1.2.0 is UI/onboarding work. The evaluation below remains historical evidence.
 
 ## Decision rule
 

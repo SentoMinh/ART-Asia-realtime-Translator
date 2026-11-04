@@ -2,7 +2,7 @@
 
 This is the alternative to creating a new virtual microphone: a user-mode Windows Audio Processing Object mixes app music into the existing microphone capture stream. The earlier kernel driver remains in `driver/` for reference; the APO does not use its SYS file or endpoints.
 
-**Working development installation on this PC.** The production DLL is now attached to Virtual Desktop Audio using its legacy capture-effect slot. HyperX QuadCast was previously validated, but VRChat used the headset instead. Live tests measured WAV playback and selected-app audio in headset microphone capture, then verified the tone stopped. The current **1.1.0** source and EXE support both effect slots. Fresh-machine setup, remote VRChat reception, signed public deployment and live Windows 10 validation remain outstanding; never attach the test DLL to Windows.
+**Working development installation on this PC.** The production DLL is now attached to Virtual Desktop Audio using its legacy capture-effect slot. HyperX QuadCast was previously validated, but VRChat used the headset instead. Live tests measured WAV playback and selected-app audio in headset microphone capture, then verified the tone stopped. The current **1.2.0** source and EXE support both effect slots. Fresh-machine setup, remote VRChat reception, signed public deployment and live Windows 10 validation remain outstanding; never attach the test DLL to Windows.
 
 ## Build and inspect
 

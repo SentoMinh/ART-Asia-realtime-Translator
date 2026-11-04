@@ -4,6 +4,7 @@ from __future__ import annotations
 UI_LANGS = {"en": "English", "zh": "中文", "vi": "Tiếng Việt"}   # shown in their own language
 
 _ZH = {
+    "This is {version}": "当前版本 {version}",
     # Model queue & first run
     "Download all": "全部下载",
     "Queued...": "排队中...",
@@ -468,6 +469,7 @@ _ZH = {
 }
 
 _VI = {
+    "This is {version}": "Phiên bản {version}",
     # Model queue & first run
     "Download all": "Tải xuống tất cả",
     "Queued...": "Đang chờ tải...",

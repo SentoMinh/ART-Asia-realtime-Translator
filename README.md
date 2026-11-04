@@ -12,6 +12,13 @@ ART is a desktop overlay for VRChat that turns speech into text, translates it, 
 - **Mixes a running app's music** into your microphone on Windows 11 with the optional mixer.
 - **Shows the chat log on your wrist** when SteamVR is running.
 
+## What's new in 1.2.0
+
+- **Setup can no longer be skipped**: the first-run card has only **Get Started**, and Escape or Close cannot dismiss it. The guided manual can still be skipped.
+- The chat panel starts with the **version banner** as its first line; new lines push it up.
+- The guided manual's **circular highlight now surrounds the whole hovered button**, with smooth edges and no added outline.
+- The **microphone picker no longer starts highlighted**; Tab still reaches it.
+
 ## What's new in 1.1.0
 
 - First launch asks for **English, 中文 or Tiếng Việt** and uses that language for setup and the guided manual.
@@ -36,7 +43,7 @@ Earlier changes are in [CHANGELOG.md](CHANGELOG.md).
 1. Download the EXE or ZIP from the [latest release](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/latest). If you use the ZIP, extract it first.
 2. Open `VRChat-Translator-<version>.exe`. Windows SmartScreen may warn because the build is not code-signed: **More info → Run anyway**.
 3. In VRChat, enable **Action Menu → Options → OSC → Enabled**.
-4. Complete the first-run language screen and setup, then follow the short manual. You can skip either screen.
+4. Complete the first-run language screen and required setup, then follow the short manual. The manual can be skipped.
 5. Open **Settings (gear)** to choose models, microphone, subtitles and chatbox options.
 
 The VRChat status light and tooltip show whether the game and OSC were found.
@@ -180,10 +187,10 @@ Qt tests set `QT_QPA_PLATFORM=offscreen` themselves. Tests isolate `APPDATA`/`LO
 The one-file build needs the native Whisper Vulkan DLL at `assets/whisper-vulkan/art_whisper_vulkan.dll` (or pass `-WhisperBuild <dir>`). The validated mixer DLL directory can be passed with `-MixerBuild`.
 
 ```powershell
-powershell -File tools\build.ps1 -DistPath dist\1.1.0 `
+powershell -File tools\build.ps1 -DistPath dist\1.2.0 `
   -MixerBuild .tools\apo-prototype-10
 
-powershell -File tools\build.ps1 -Folder -DistPath dist\1.1.0 `
+powershell -File tools\build.ps1 -Folder -DistPath dist\1.2.0 `
   -MixerBuild .tools\apo-prototype-10
 ```
 
@@ -194,7 +201,7 @@ Check the packaged program with isolated settings:
 ```powershell
 $env:APPDATA = "$PWD\.tools\selfcheck\appdata"
 $env:LOCALAPPDATA = "$PWD\.tools\selfcheck\localappdata"
-.\dist\1.1.0\VRChat-Translator.exe --selfcheck
+.\dist\1.2.0\VRChat-Translator.exe --selfcheck
 Get-Content "$env:LOCALAPPDATA\VRChat-Translator\selfcheck.txt"
 ```
 

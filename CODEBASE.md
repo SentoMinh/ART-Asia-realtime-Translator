@@ -1,6 +1,8 @@
 # ART – Asia realtime Translator: code map
 
-Updated for source version **1.1.0** (published 4 November 2026). The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+Updated for source version **1.2.0** (published 5 November 2026). The application has one service registry and one build for everyone. Repository: [ART-Asia-realtime-Translator](https://github.com/SentoMinh/ART-Asia-realtime-Translator).
+
+**1.2.0:** first-run setup is required (only Get Started; Skip, Close and Escape cannot dismiss it). The chat log opens with a localized version banner as its first line and pushes it up as new lines arrive. The tutorial's circular highlight contains the whole hovered button with a smooth click-through edge, and the microphone picker no longer takes startup focus. Tests cover the setup flow, greeting row, click-through rendering and focus behavior. Full validation: **859 tests in 52.97 s**, packaged self-check passed under isolated AppData.
 
 **1.1.0:** first-run language selection (English/中文/Tiếng Việt), guided manual, local-model recommendations and immediate selection, self-hosted URL/key/model fetching saved as named Services/API entries, the More-actions toolbar menu, Settings beside the pin, and the music-volume caution. `ui/first_run_dialog.py` owns language/setup; `ui/tutorial.py` owns the spotlight overlay. The public repository excludes `tests/`; the suite stays in the private checkout. Full validation: **844 tests in 49.80 s**, packaged self-check passed under isolated AppData.
 
@@ -20,7 +22,7 @@ Updated for source version **1.1.0** (published 4 November 2026). The applicatio
 
 Implementation history and repair notes are in [CHANGELOG.md](CHANGELOG.md), including the 0.12.2 latency change and its regression tests.
 
-For current release/source differences and open decisions, read [CHANGELOG.md](CHANGELOG.md) and the GitHub tags. Version 1.1.0 adds the first-run language/manual flow and named self-hosted services; earlier 1.0.x releases added HF-Mirror fallback, PhoWhisper Small, Qwen3 1.7B INT8 and the compact model list. Current measured performance is in [LATENCY_REPORT.md](LATENCY_REPORT.md).
+For current release/source differences and open decisions, read [CHANGELOG.md](CHANGELOG.md) and the GitHub tags. Version 1.2.0 makes first-run setup required, adds the version banner as the first chat line, tightens the tutorial highlight and removes the startup microphone outline; 1.1.0 added the first-run language/manual flow and named self-hosted services; earlier 1.0.x releases added HF-Mirror fallback, PhoWhisper Small, Qwen3 1.7B INT8 and the compact model list. Current measured performance is in [LATENCY_REPORT.md](LATENCY_REPORT.md).
 
 The Obsidian-ready [ART Project Guide](ART%20Project%20Guide.md) explains the full structure in plain language. Version 0.12.6 adds scoped model deletion with inline confirmation and cleanup-only retired-model cards; `local_model.delete` validates all targets and preserves shared/unknown files.
 
@@ -34,9 +36,9 @@ It is an always-on-top desktop window. Live audio is a mix of the other players:
 
 Source commits, local builds and published releases are separate steps. Keep previous build artifacts when preparing a new release.
 
-Source version 1.1.0 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
+Source version 1.2.0 uses one package name, `VRChat-Translator-<version>`. Provider URLs, keys and model selections belong in each user's Windows profile. Custom domain supports any compatible API endpoint.
 
-Version [1.1.0](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v1.1.0) is published with an EXE, ZIP, usage notes and checksums. Its release tag identifies the built source; later source/documentation commits do not change the published binary. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL. The public export excludes `tests/` and the installer helper; tests remain in the private checkout.
+Version [1.2.0](https://github.com/SentoMinh/ART-Asia-realtime-Translator/releases/tag/v1.2.0) is published with an EXE, ZIP, usage notes and checksums. Its release tag identifies the built source; later source/documentation commits do not change the published binary. Builds use the validated native binaries from the directory supplied to `tools/build.ps1 -MixerBuild`; only `VrctMicApo.dll` and `VrctApoProducer.dll` are bundled, never the test DLL. The public export excludes `tests/` and the installer helper; tests remain in the private checkout.
 
 ## Current behavior
 
@@ -200,6 +202,10 @@ The development source passed 668 source tests and 495 checks against bundled by
 ## 1.0.6 local release validation
 
 The development source passed 668 source tests and 495 checks against bundled bytecode. The EXE self-check, source/privacy/native-asset scans, English/Chinese/Vietnamese notice and model-list previews, ZIP integrity and isolated 1.0.5 → 1.0.6 packaged upgrade passed. Saved settings were unchanged. Packages are under `dist/1.0.6/`; evidence is `.tools/release-1.0.6/`. This is a local build and commit, not a GitHub publication. Live VR/headset, Windows 10 and fresh-PC installation remain unverified.
+
+## 1.2.0 published validation
+
+The 1.2.0 source passed **859 tests in 52.97 s**. The packaged `VRChat-Translator-1.2.0.exe` (138,963,259 bytes; SHA-256 `a5c833eb181df4012e5633af9b6ea639ad88c449c1955c4cd279f7dedd0d3893`) and the folder build passed `--selfcheck` under isolated AppData, including the production mixer files, VR assets, local runtimes and a live HTTPS answer. Artifacts and checksums are in `dist/1.2.0/`; live VRChat, headset, game-FPS, Windows 10 and fresh-PC checks remain unverified.
 
 ## 1.1.0 published validation
 

@@ -1,6 +1,6 @@
 # SteamVR cursor investigation — 30 October 2026
 
-Status: the focused overlay fix was completed for 1.0.8 and now ships in **1.1.0**; source is committed and published. The 1.0.8 investigation below records the original behavior at the 1.0.8 development head and the final validation. Executable: `dist/1.1.0/VRChat-Translator-1.1.0.exe`. The 1.1.0 suite passed **844 tests**, and the packaged self-check passed. No saved model/provider changes or live SteamVR session were performed.
+Status: the focused overlay fix was completed for 1.0.8 and now ships in **1.2.0**; source is committed and published. The 1.0.8 investigation below records the original behavior at the 1.0.8 development head and the final validation. Executable: `dist/1.2.0/VRChat-Translator-1.2.0.exe`. The 1.2.0 suite passed **859 tests**, and the packaged self-check passed. No saved model/provider changes or live SteamVR session were performed.
 
 ## Findings reproduced locally
 

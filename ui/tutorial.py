@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import hypot
 
 from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QRegion
@@ -11,7 +12,8 @@ from .i18n import tr
 
 CARD_WIDTH = 340
 SMALL_TARGET = 40          # controls up to this size get a small circle
-CIRCLE_MIN, CIRCLE_MAX = 24, 34
+CIRCLE_PADDING = 2
+MASK_INSET = 2            # keep the pixel-aligned input mask inside the clear painted area
 RECT_RADIUS = 8
 
 
@@ -25,9 +27,8 @@ class TourStep:
 class TourOverlay(QWidget):
     """A transparent sheet over the main window with one bright target.
 
-    The sheet eats mouse input on purpose: the note and its buttons are the
-    only controls during the manual, so a click cannot open a menu or a dialog
-    behind the explanation.
+    The sheet blocks other controls while leaving the highlighted target and
+    the note's buttons interactive.
     """
 
     finished = Signal()
@@ -115,11 +116,12 @@ class TourOverlay(QWidget):
         if rect is None:
             return None
         if max(rect.width(), rect.height()) <= SMALL_TARGET:
-            diameter = min(CIRCLE_MAX, max(CIRCLE_MIN, max(rect.width(), rect.height()) + 2))
+            # Include the button's corners, not only its icon: hover fills the whole control.
+            diameter = hypot(rect.width(), rect.height()) + 2 * CIRCLE_PADDING
             center = rect.center()
             return QRectF(center.x() - diameter / 2, center.y() - diameter / 2,
                           diameter, diameter), True
-        return rect.adjusted(-8, -7, 8, 7), False
+        return rect.adjusted(-4, -4, 4, 4), False
 
     def _hole_rect(self) -> QRectF | None:
         spot = self._hole()
@@ -131,8 +133,16 @@ class TourOverlay(QWidget):
         spot = self._hole()
         if spot is not None:
             hole, circle = spot
-            rect = hole.toAlignedRect()
-            region = region.subtracted(QRegion(rect, QRegion.Ellipse) if circle else QRegion(rect))
+            # QWidget masks are binary, even when the painter uses antialiasing. Keep
+            # this cutout away from the painted edge so it cannot turn it into stairs.
+            inner = hole.adjusted(MASK_INSET, MASK_INSET, -MASK_INSET, -MASK_INSET)
+            path = QPainterPath()
+            if circle:
+                path.addEllipse(inner)
+            else:
+                radius = RECT_RADIUS - MASK_INSET
+                path.addRoundedRect(inner, radius, radius)
+            region = region.subtracted(QRegion(path.toFillPolygon().toPolygon()))
         self.setMask(region)
 
     def _place_card(self) -> None:

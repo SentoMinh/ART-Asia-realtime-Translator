@@ -6,6 +6,7 @@ This file records measurements and rejected performance choices. [CHANGELOG.md](
 
 | Work completed | Result / decision | Detailed record and local evidence |
 | --- | --- | --- |
+| China update hosts | Tencent COS and Alibaba OSS mainland storage are direct-download candidates; Baidu Netdisk/Alipan sharing is a manual option. No deployed mirror or mainland EXE test yet. | 4 November follow-up below |
 | Hearing, translation and Cantonese evaluation | Compared recognition/translation engines and detector behavior; results apply to the recorded test sets. | [BENCHMARK.md](BENCHMARK.md), [VOICE_DETECTION.md](VOICE_DETECTION.md), `bench/results/` |
 | Local model and download research | Added PhoWhisper and Qwen3 1.7B, kept Hugging Face with HF-Mirror fallback; the tested Qwen 0.6B conversion was rejected. China connectivity remains unverified. | [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md), `.tools/model-additions/` |
 | Online translation latency | Two concurrent target requests reduced two-target completion time about 46% on five warm paired examples; ordered final chatbox output preserved. | 25 October section below; `.tools/latency-0.12.11/` |
@@ -18,6 +19,82 @@ This file records measurements and rejected performance choices. [CHANGELOG.md](
 | 1.1.0 onboarding and UI | First-run language/setup, guided manual, named self-hosted services and toolbar cleanup. No model or inference-latency change was made; **844 source tests** and packaged self-check passed. | [CHANGELOG.md](CHANGELOG.md), `dist/1.1.0/`, `.tools/release-1.1.0/` |
 
 External documentation research for the gaming pass was requested through `/agy` in the terminal, covering CTranslate2 CUDA/threads, faster-whisper host threads, OpenMP waits, ONNX/SenseVoice threading, llama.cpp and Windows priority. The recorded `agy` attempts timed out at two- and three-minute limits without a completed source-backed answer; auto mode also reported that it was unavailable for the account. Do not count these attempts as completed documentation verification. The implemented choices were checked through local code, installed runtime probes, regression tests and the measurements below. The local probe reported CTranslate2 4.8.2 with `int8_float16` support and a CPU-only llama.cpp runtime. Model-card/source links from earlier research remain in [LOCAL_TRANSLATION_PLAN.md](LOCAL_TRANSLATION_PLAN.md).
+
+## 4 November: interrupted application update and alternative distribution
+
+The supplied friend log records `httpx.RemoteProtocolError: Server disconnected without sending a response`
+at 23:01:11 on 4 November, in `ui/updater.py` at the EXE streaming request. The updater had accepted newer
+release metadata before the connection failed. This establishes an interrupted asset request, not its network
+cause; it does not prove mainland-China filtering. Nearby Hugging Face failures and a successful model-mirror
+fallback support route-specific connectivity trouble, but concern separate downloads.
+
+Local code inspection confirms `release()` returns the first valid GitHub JSON response, while binary downloads
+happen afterward. `VRCT_UPDATE_API` therefore cannot repair this particular path by itself: when metadata succeeds
+and the asset fails, the updater logs the exception, removes partial data, and stops until the next launch.
+
+Immediate alternative: transfer the existing release ZIP through a file-sharing route the friend can reach,
+extract it, close the old application, launch the new EXE, and update any shortcut pointing at the old copy.
+Settings and model caches remain in AppData. Recomputed local SHA-256 values match the recorded release:
+
+- `dist/1.1.0/VRChat-Translator-1.1.0.exe`: 138,960,536 bytes;
+  `46e7588e07f011e0cfdbe3ae4dccfb7d019219be3d01196dbe46caf87bed0d00`.
+- `dist/1.1.0/VRChat-Translator-1.1.0-win64.zip`: 139,688,391 bytes;
+  `10f2d6de82695fc6ab4ab71f4c2128a0f89180b4b5c501173704c75c9e1529cf`.
+
+Longer-term proposal: host identical release assets on a maintainer-controlled HTTPS mirror and add bounded
+asset-download retries/fallback, preserving size and SHA-256 validation against trusted release metadata.
+Existing clients need a manual upgrade to acquire that behavior. No mirror is deployed or verified from China.
+Unverified public EXE proxies were not selected; a metadata-only mirror setting is insufficient for this case.
+This investigation changes no updater code and performs no upload, publication, or friend-side test.
+External hosting research through `/agy` timed out after 100 seconds without sourced results. No current
+hosting-provider limits, pricing, mainland availability, or ready-to-use public mirror were verified.
+
+### Follow-up: host documentation and proposed download fallback
+
+Later bounded `/agy` official-source searches returned these findings:
+
+- **Tencent COS:** [regions and endpoints](https://cloud.tencent.com/document/product/436/6224) list mainland
+  Guangzhou, Shanghai and Beijing separately from Hong Kong, with HTTPS endpoints.
+  [GET Object](https://cloud.tencent.com/document/product/436/7753) permits anonymous reads of public-read
+  objects without an Authorization signature. Response-header override query parameters require signed access;
+  use a plain object URL. Mainland COS is therefore a candidate for hosting identical release files. Search
+  excerpts do not establish every EXE restriction, account/ICP requirement, current charge, or object-size limit.
+- **Baidu Netdisk:** its [download guide](https://pan.baidu.com/union/doc/pkuo3snyp),
+  [OAuth guide](https://pan.baidu.com/union/doc/ol0rsap9s), and
+  [file metadata API](https://pan.baidu.com/union/doc/nksg0sat9) describe authorized API requests and temporary
+  download links (reported validity: eight hours). A normal sharing URL returns a sharing page, not the raw
+  executable expected by this updater. It is a manual-distribution option if reachable by the friend; automatic
+  downloads require an additional authorized integration to obtain/refresh links. Do not embed maintainer
+  credentials in the EXE. Specific mandatory-login/client thresholds for a 140 MB share were not verified.
+- **Alibaba Cloud OSS:** a separate object-storage service from Aliyun Drive/Alipan. Official
+  [PutObject documentation](https://help.aliyun.com/zh/oss/developer-reference/putobject) documents a 5 GB simple
+  upload limit, sufficient for the approximately 140 MB release. Official searches also identify mainland
+  Hangzhou, Beijing and Shanghai endpoints. [Custom domain documentation](https://help.aliyun.com/zh/oss/user-guide/map-custom-domain-names)
+  requires ICP filing when binding a custom domain to mainland buckets. Default-domain forced-download headers
+  should not be confused with blocked binary downloads. The search did not establish all new-account/default-
+  domain EXE restrictions or guarantee unrestricted EXE distribution without custom-domain setup. OSS is a
+  suitable candidate to test alongside COS; no real bucket or application download URL has been verified.
+- **Aliyun Drive / Alipan:** treat ordinary sharing links as a manual-distribution option for this updater.
+  Research returned [Alipan developer documentation](https://opendocs.alipan.com) alongside Alibaba PDS API
+  references. Those products must not be conflated: specific PDS token/expiry numbers are not asserted here as
+  Alipan consumer-share limits. Automatic integration needs separately verified API/authentication behavior;
+  a normal share page is not a drop-in replacement for the direct EXE request.
+
+Proposed implementation, not yet applied: keep GitHub first, freeze the version/filename/size/SHA-256 from its
+metadata, and try the identical asset on the maintainer-controlled HTTPS mirror after network/protocol/HTTP
+failure, interruption, or invalid size/hash. Limit attempts to one per host per startup; reset `.part` and hash
+state between hosts. Require a well-formed SHA-256 for alternate-host installation and promote to `.new` only
+after full validation. Local disk/permission errors should stop rather than cause redundant downloads. Log the
+host/failure in `engine.log`; retain pending-file reuse and restart/rollback behavior. Separate mirror metadata
+would be needed when GitHub metadata is unavailable; its own digest is not independent protection against a
+compromised mirror. Old 1.0.8 clients need one manual upgrade to acquire the new fallback behavior.
+
+Required future tests: metadata success then asset failure falls back; primary success avoids fallback; HTTP
+and mid-stream errors; size/hash/missing-digest failures; both hosts fail; bounded attempts; disk errors; verified
+cache reuse. No updater code, hosting resources, uploads, or releases were changed. Actual download testing on
+the friend's mainland connection remains necessary. The broad 180-second `/agy` comparison timed out; a
+direct-page read reported its tool unavailable, so neither is treated as verification. Completed bounded search
+results support the facts above. Gitee and Cloudflare R2 suitability were not established.
 
 ## 27 October: gaming CPU/GPU budget (source only)
 

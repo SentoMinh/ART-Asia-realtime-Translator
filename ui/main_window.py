@@ -153,7 +153,7 @@ class MainWindow(QWidget):
         bars = QVBoxLayout(self.bars)
         bars.setContentsMargins(4, 2, 2, 4)
         bars.setSpacing(4)
-        self.log = LogView()
+        self.log = LogView(greeting=True)
         bars.addWidget(self._build_title_bar())
         bars.addWidget(self._build_lang_row())
         root.addWidget(self.bars)
@@ -184,6 +184,7 @@ class MainWindow(QWidget):
         backend.apply_settings(settings)
         self._refresh_send_target()
         self._backdrop = OverlayBackdrop(self)
+        self.setFocus(Qt.OtherFocusReason)  # Avoid highlighting the first toolbar control on launch.
 
     # ---- building -------------------------------------------------------
 
@@ -784,14 +785,12 @@ class MainWindow(QWidget):
             return
         from .first_run_dialog import FirstRunDialog
         dialog = FirstRunDialog(self, settings=self.settings, save=self._save_settings)
-        panel = DialogPanel(dialog, self)
+        panel = DialogPanel(dialog, self, closable=False)
         self._embed_notice(dialog, panel, self._after_first_run)
 
     def _after_first_run(self) -> None:
-        if not self.settings.first_run_done:
-            self.settings.first_run_done = True
-            self._save_settings()
-        QTimer.singleShot(0, self.begin_onboarding)
+        if self.settings.first_run_done:
+            QTimer.singleShot(0, self.begin_onboarding)
 
     def _close_notice(self) -> None:
         panel = self._notice

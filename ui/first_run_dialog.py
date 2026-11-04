@@ -353,11 +353,6 @@ class FirstRunDialog(QDialog):
 
         # Bottom Action Buttons
         footer = QHBoxLayout()
-        self.skip_button = QPushButton(tr("Skip"))
-        self.skip_button.setObjectName("plain")
-        self.skip_button.clicked.connect(self.skip_setup)
-        footer.addWidget(self.skip_button, alignment=Qt.AlignLeft)
-
         footer.addStretch(1)
 
         self.finish_button = QPushButton(tr("Get Started"))
@@ -530,11 +525,9 @@ class FirstRunDialog(QDialog):
         if first_enabled >= 0:
             combo.setCurrentIndex(first_enabled)
 
-    def skip_setup(self) -> None:
-        self.settings.first_run_done = True
-        if self.save_settings:
-            self.save_settings()
-        self.accept()
+    def reject(self) -> None:
+        # Required setup completes through Get Started, including when Escape is pressed.
+        pass
 
     def apply_setup(self) -> None:
         if self.local_radio.isChecked():

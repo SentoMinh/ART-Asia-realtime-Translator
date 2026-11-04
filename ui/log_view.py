@@ -8,7 +8,7 @@ from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtWidgets import (QApplication, QFrame, QGraphicsDropShadowEffect, QLabel, QScrollArea, QVBoxLayout,
                                QWidget)
 
-from . import theme
+from . import __version__, theme
 from .backend import LANGS, OTHER_LANGS, Utterance
 from .i18n import tr, tr_note
 
@@ -215,7 +215,7 @@ class LogRow(QFrame):
 
 
 class LogView(QScrollArea):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, greeting=False):
         super().__init__(parent)
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -227,6 +227,16 @@ class LogView(QScrollArea):
         self._layout.setSpacing(4)
         self._layout.addStretch(1)   # keeps the rows at the bottom, like subtitles
         self.setWidget(self._body)
+        self._greeting = QLabel(self._body)
+        self._greeting.setTextFormat(Qt.RichText)
+        self._greeting.setAlignment(Qt.AlignCenter)
+        self._greeting.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._greeting.setStyleSheet(self._greeting_style(16))
+        if greeting:
+            # It is the first chat line: new lines are added below it and push it up.
+            self._layout.addWidget(self._greeting)
+        self._greeting.setVisible(greeting)
+        self._refresh_greeting()
         self._rows: dict[int, LogRow] = {}
         self._look = (17, True, False)
         self._stick = True
@@ -252,6 +262,7 @@ class LogView(QScrollArea):
         return row
 
     def clear(self) -> None:
+        self._greeting.hide()
         for row in self._rows.values():
             row.deleteLater()
         self._rows.clear()
@@ -263,8 +274,45 @@ class LogView(QScrollArea):
 
     def refresh(self) -> None:
         """Redraw every row (after the window's language changed)."""
+        self._refresh_greeting()
         for row in self._rows.values():
             row.refresh()
+
+    def _refresh_greeting(self) -> None:
+        message = tr("This is {version}").format(version=__version__)
+        self._greeting.setAccessibleName(message)
+        self._greeting.setText(
+            '<table cellspacing="0" cellpadding="0" align="center">'
+            '<tr><td>◜</td><td align="center">---------------------------</td><td>◝</td></tr>'
+            f'<tr><td>|</td><td align="center">✉︎&nbsp; {escape(message)} &nbsp;✉︎</td><td>|</td></tr>'
+            '<tr><td>◟</td><td align="center">___________________________</td><td>◞</td></tr>'
+            '<tr><td colspan="3" align="center">|/</td></tr>'
+            '<tr><td colspan="3" align="center">ฅ^&gt;⩊&lt;^ ฅ</td></tr></table>')
+        self._fit_greeting()
+
+    @staticmethod
+    def _greeting_style(px: int) -> str:
+        # The theme's "*" rule sets font-size, which outranks setFont(); the label
+        # needs its own font-size so the first line can shrink in narrow windows.
+        return f"color: {theme.TEXT}; font-family: Consolas; font-size: {px}px;"
+
+    def _fit_greeting(self) -> None:
+        width = max(1, self.viewport().width() - 8)
+        px = 16
+        self._greeting.setStyleSheet(self._greeting_style(px))
+        for _ in range(4):
+            hint = self._greeting.sizeHint().width()
+            if hint <= width:
+                return
+            smaller = max(6, int(px * width / max(1, hint)))
+            if smaller >= px:
+                return
+            px = smaller
+            self._greeting.setStyleSheet(self._greeting_style(px))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._fit_greeting()
 
     # stay at the newest line unless the user scrolled up to read older ones
     def _moved(self, value: int) -> None:
